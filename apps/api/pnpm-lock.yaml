@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@altaniche/auth':
-        specifier: file:../../../altaniche-packages/packages/auth
-        version: file:../../../altaniche-packages/packages/auth(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@10.4.20)(@nestjs/jwt@11.0.2(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)))(@nestjs/passport@11.0.5(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(passport@0.7.0))(bcrypt@6.0.0)(class-transformer@0.5.1)(class-validator@0.14.3)(passport-jwt@4.0.1)(passport@0.7.0)
       '@nestjs/common':
         specifier: ^10.4.0
         version: 10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -128,20 +125,6 @@ importers:
         version: 5.9.3
 
 packages:
-
-  '@altaniche/auth@file:../../../altaniche-packages/packages/auth':
-    resolution: {directory: ../../../altaniche-packages/packages/auth, type: directory}
-    peerDependencies:
-      '@nestjs/common': '>=10.0.0'
-      '@nestjs/config': '>=3.0.0'
-      '@nestjs/core': '>=10.0.0'
-      '@nestjs/jwt': '>=10.0.0'
-      '@nestjs/passport': '>=10.0.0'
-      bcrypt: '>=5.0.0'
-      class-transformer: '>=0.5.0'
-      class-validator: '>=0.14.0'
-      passport: '>=0.7.0'
-      passport-jwt: '>=4.0.0'
 
   '@angular-devkit/core@17.3.11':
     resolution: {integrity: sha512-vTNDYNsLIWpYk2I969LMQFH29GTsLzxNk/0cLw5q56ARF0v5sIWfHYwGTS88jdDqIpuuettcSczbxeA7EuAmqQ==}
@@ -2949,19 +2932,6 @@ packages:
     engines: {node: '>=10'}
 
 snapshots:
-
-  '@altaniche/auth@file:../../../altaniche-packages/packages/auth(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.2(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(@nestjs/core@10.4.20)(@nestjs/jwt@11.0.2(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)))(@nestjs/passport@11.0.5(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(passport@0.7.0))(bcrypt@6.0.0)(class-transformer@0.5.1)(class-validator@0.14.3)(passport-jwt@4.0.1)(passport@0.7.0)':
-    dependencies:
-      '@nestjs/common': 10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/config': 4.0.2(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
-      '@nestjs/core': 10.4.20(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@10.4.20)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/jwt': 11.0.2(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))
-      '@nestjs/passport': 11.0.5(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(passport@0.7.0)
-      bcrypt: 6.0.0
-      class-transformer: 0.5.1
-      class-validator: 0.14.3
-      passport: 0.7.0
-      passport-jwt: 4.0.1
 
   '@angular-devkit/core@17.3.11(chokidar@3.6.0)':
     dependencies:

@@ -5,8 +5,16 @@
 - Scaffolded fresh Next.js 14.1.0 with create-next-app to fix ActionQueueContext bug
 - Used: `npx create-next-app@14.1.0 dashboard --typescript --tailwind --eslint --app --src-dir --use-pnpm`
 - Clean scaffold ensures all Next.js internals are properly aligned
+- Moved auth module from @altaniche/auth symlink to local libs folder
+- Copied all auth files to `apps/api/src/libs/auth/`
+- Removed external package dependency
+- Updated all imports to use local auth module
+- Fixed TypeScript type compatibility issues with @nestjs/jwt
+- Verified login endpoint works with local auth
 
-**Result:** Dashboard running successfully at localhost:3000
+**Result:**
+- Dashboard running successfully at localhost:3000
+- API auth working with local libs/auth module
 
 **Note:** Next.js 14.1.0 has a security advisory (see nextjs.org/blog/security-update-2025-12-11) - will need to upgrade once hydration issue is resolved in newer versions
 

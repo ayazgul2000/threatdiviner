@@ -1,0 +1,1 @@
+export const AUTH_CONFIG = 'ALTANICHE_AUTH_CONFIG';

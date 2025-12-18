@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ITenantRepository, ITenant } from '@altaniche/auth';
+import { ITenantRepository, ITenant } from '../../libs/auth';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()

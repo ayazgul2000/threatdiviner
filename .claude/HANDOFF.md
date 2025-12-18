@@ -1,10 +1,10 @@
 # ThreatDiviner - Handoff
 
 ## Current Task
-**Feature 1: Platform Core — Shared Auth Package**
+**Feature 1: Platform Core — Auth Module (Local)**
 
 ## Status
-🟢 SHARED AUTH PACKAGE INTEGRATED
+🟢 AUTH MODULE COMPLETE (LOCAL COPY)
 
 ## Owner
 CLI
@@ -19,18 +19,17 @@ CLI
 - [x] Tenant middleware (set session context)
 - [x] Seed script: 2 test tenants + 2 users each
 - [x] Verify full stack runs locally
-- [x] Extract auth to @altaniche/auth shared package
-- [x] Link ThreatDiviner to shared package
-- [x] Fix dashboard hydration error (Next.js downgrade)
+- [x] Fix dashboard hydration error (fresh scaffold)
+- [x] Move auth to local libs folder (remove symlink)
 
 ## Blockers
 None
 
-## Shared Auth Package (@altaniche/auth)
+## Auth Module (Local Copy)
 
 ### Location
 ```
-C:\dev\altaniche-packages\packages\auth
+apps/api/src/libs/auth/
 ```
 
 ### Features
@@ -38,16 +37,16 @@ C:\dev\altaniche-packages\packages\auth
 - httpOnly cookie tokens (access + refresh)
 - Tenant middleware for RLS context
 - Role-based access control decorators
-- Configurable for any NestJS project
+- Fully contained in the project (no external dependencies)
 
 ### Usage in ThreatDiviner
 ```typescript
 // apps/api/src/auth/auth.module.ts
-import { AuthModule as AltanicheAuthModule } from '@altaniche/auth';
+import { AuthModule as LocalAuthModule } from '../libs/auth';
 
 @Module({
   imports: [
-    AltanicheAuthModule.registerAsync({
+    LocalAuthModule.registerAsync({
       imports: [ConfigModule, PrismaModule],
       inject: [ConfigService, PrismaService],
       useFactory: (config, prisma) => ({
@@ -63,9 +62,6 @@ import { AuthModule as AltanicheAuthModule } from '@altaniche/auth';
 })
 export class AuthModule {}
 ```
-
-### Package Documentation
-See: `C:\dev\altaniche-packages\packages\auth\README.md`
 
 ## Auth Endpoints
 | Method | Path | Description | Auth Required |
@@ -120,12 +116,6 @@ Password: threatdiviner_dev
 | API | Running | 3001 |
 | Dashboard | Running | 3000 |
 
-## Dashboard Fix
-Fixed "Missing ActionQueueContext" hydration error by downgrading Next.js:
-- Changed `next` from `^14.2.0` to `14.1.0`
-- Changed `eslint-config-next` from `^14.2.0` to `14.1.0`
-- This is a known Next.js 14.2.x bug
-
 ## Next Steps
 1. Protected routes with role-based guards
 2. Dashboard login page integration
@@ -133,38 +123,44 @@ Fixed "Missing ActionQueueContext" hydration error by downgrading Next.js:
 
 ## Files Structure
 
-### ThreatDiviner Auth (uses @altaniche/auth)
+### Auth Module (Local)
+```
+apps/api/src/libs/auth/
+├── index.ts
+├── auth.module.ts
+├── auth.service.ts
+├── auth.controller.ts
+├── auth.constants.ts
+├── jwt.strategy.ts
+├── interfaces/
+│   ├── index.ts
+│   └── auth-config.interface.ts
+├── dto/
+│   ├── index.ts
+│   ├── login.dto.ts
+│   └── register.dto.ts
+├── decorators/
+│   ├── index.ts
+│   ├── current-user.decorator.ts
+│   ├── roles.decorator.ts
+│   └── public.decorator.ts
+├── guards/
+│   ├── index.ts
+│   ├── jwt-auth.guard.ts
+│   └── roles.guard.ts
+└── middleware/
+    ├── index.ts
+    └── tenant.middleware.ts
+```
+
+### ThreatDiviner Auth (imports local auth)
 ```
 apps/api/src/auth/
-├── auth.module.ts              # Imports @altaniche/auth
+├── auth.module.ts              # Imports ../libs/auth
 └── repositories/
     ├── index.ts
     ├── user.repository.ts      # Implements IUserRepository
     └── tenant.repository.ts    # Implements ITenantRepository
-```
-
-### Shared Package
-```
-C:\dev\altaniche-packages\
-├── package.json
-├── pnpm-workspace.yaml
-└── packages/
-    └── auth/
-        ├── package.json
-        ├── tsconfig.json
-        ├── README.md
-        └── src/
-            ├── index.ts
-            ├── auth.module.ts
-            ├── auth.service.ts
-            ├── auth.controller.ts
-            ├── jwt.strategy.ts
-            ├── auth.constants.ts
-            ├── interfaces/
-            ├── dto/
-            ├── decorators/
-            ├── guards/
-            └── middleware/
 ```
 
 ### Database Files
@@ -181,18 +177,18 @@ apps/api/
 
 ## Commands
 ```bash
-# Build shared package
-cd C:\dev\altaniche-packages\packages\auth && pnpm build
-
-# Install in ThreatDiviner
-cd apps/api && pnpm install
+# Build API
+cd apps/api && pnpm build
 
 # Run API
 cd apps/api && pnpm start:dev
 
 # Run seed
 cd apps/api && pnpm db:seed
+
+# Run Dashboard
+cd apps/dashboard && pnpm dev
 ```
 
 ---
-*Last updated: 2025-12-18 (dashboard fix) — CLI Session*
+*Last updated: 2025-12-19 (auth moved to local) — CLI Session*

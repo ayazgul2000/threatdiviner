@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthModule as AltanicheAuthModule } from '@altaniche/auth';
+import { AuthModule as LocalAuthModule } from '../libs/auth';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRepository, TenantRepository } from './repositories';
@@ -8,7 +8,7 @@ import { UserRepository, TenantRepository } from './repositories';
 @Module({
   imports: [
     PrismaModule,
-    AltanicheAuthModule.registerAsync({
+    LocalAuthModule.registerAsync({
       imports: [ConfigModule, PrismaModule],
       inject: [ConfigService, PrismaService],
       useFactory: (config: ConfigService, prisma: PrismaService) => {
@@ -31,6 +31,6 @@ import { UserRepository, TenantRepository } from './repositories';
       },
     }),
   ],
-  exports: [AltanicheAuthModule],
+  exports: [LocalAuthModule],
 })
 export class AuthModule {}
