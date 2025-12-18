@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Docker
+docker-compose.override.yml
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Secrets (never commit)
+*.pem
+*.key
+*.crt
+secrets/
+
+# Scan artifacts (large files)
+scan-results/
+artifacts/
+*.sarif
+
+# Database
+*.sqlite
+*.db
+
+# MinIO data
+minio-data/
+
+# Postgres data
+postgres-data/
+
+# Redis data
+redis-data/
+
+# Qdrant data
+qdrant-data/
