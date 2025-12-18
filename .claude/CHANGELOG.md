@@ -3,22 +3,31 @@
 ## 2025-12-19 Session 1
 **Completed:**
 - Scaffolded fresh Next.js 14.1.0 with create-next-app to fix ActionQueueContext bug
-- Used: `npx create-next-app@14.1.0 dashboard --typescript --tailwind --eslint --app --src-dir --use-pnpm`
-- Clean scaffold ensures all Next.js internals are properly aligned
 - Moved auth module from @altaniche/auth symlink to local libs folder
-- Copied all auth files to `apps/api/src/libs/auth/`
-- Removed external package dependency
-- Updated all imports to use local auth module
-- Fixed TypeScript type compatibility issues with @nestjs/jwt
-- Verified login endpoint works with local auth
+- Built dashboard login page with tenant/email/password form
+- Built protected dashboard page with user info display
+- Added auth state redirect on home page
+- Updated layout metadata (title: ThreatDiviner)
+
+**Dashboard Pages:**
+- `/login` - Login form with Organization, Email, Password fields
+- `/dashboard` - Protected page showing user info, tenant info, logout button
+- `/` - Redirects to /login or /dashboard based on auth state
+
+**Login Flow:**
+1. Visit localhost:3000 → redirects to /login
+2. Enter credentials → POST to API → sets httpOnly cookies
+3. Redirects to /dashboard → fetches profile → shows welcome
+4. Logout → clears cookies → redirects to /login
 
 **Result:**
-- Dashboard running successfully at localhost:3000
-- API auth working with local libs/auth module
+- Full auth flow working end-to-end
+- Dashboard integrates with API via httpOnly cookies
+- CORS configured for cross-origin requests
 
-**Note:** Next.js 14.1.0 has a security advisory (see nextjs.org/blog/security-update-2025-12-11) - will need to upgrade once hydration issue is resolved in newer versions
+**Note:** Next.js 14.1.0 has a security advisory - will need to upgrade later
 
-**Next:** Protected routes, dashboard login page integration
+**Next:** Role-based guards, API key management
 
 ---
 

@@ -1,10 +1,10 @@
 # ThreatDiviner - Handoff
 
 ## Current Task
-**Feature 1: Platform Core — Auth Module (Local)**
+**Feature 1: Platform Core — Dashboard Auth Integration**
 
 ## Status
-🟢 AUTH MODULE COMPLETE (LOCAL COPY)
+🟢 DASHBOARD LOGIN COMPLETE
 
 ## Owner
 CLI
@@ -21,6 +21,9 @@ CLI
 - [x] Verify full stack runs locally
 - [x] Fix dashboard hydration error (fresh scaffold)
 - [x] Move auth to local libs folder (remove symlink)
+- [x] Dashboard login page with form
+- [x] Dashboard protected page with user info
+- [x] Auth state redirect on home page
 
 ## Blockers
 None
@@ -116,10 +119,29 @@ Password: threatdiviner_dev
 | API | Running | 3001 |
 | Dashboard | Running | 3000 |
 
+## Dashboard Pages
+
+### Routes
+| Route | Description | Auth Required |
+|-------|-------------|---------------|
+| / | Redirect to /login or /dashboard based on auth | No |
+| /login | Login form (tenant, email, password) | No |
+| /dashboard | Protected dashboard with user info | Yes |
+
+### Login Flow
+1. User visits localhost:3000 → redirected to /login
+2. User enters credentials (admin@acme.com / admin123 / acme-corp)
+3. POST to localhost:3001/auth/login with credentials
+4. API returns user info, sets httpOnly cookies
+5. Dashboard redirects to /dashboard
+6. Dashboard fetches profile from /auth/profile
+7. Shows welcome message with user and tenant info
+8. Logout button clears cookies and redirects to /login
+
 ## Next Steps
-1. Protected routes with role-based guards
-2. Dashboard login page integration
-3. API key management for external integrations
+1. Role-based guards for admin-only routes
+2. API key management for external integrations
+3. Security scanner integration (Feature 2)
 
 ## Files Structure
 
@@ -175,6 +197,17 @@ apps/api/
     └── prisma.service.ts
 ```
 
+### Dashboard Files
+```
+apps/dashboard/src/app/
+├── layout.tsx           # Root layout with metadata
+├── page.tsx             # Home page (auth redirect)
+├── login/
+│   └── page.tsx         # Login form
+└── dashboard/
+    └── page.tsx         # Protected dashboard
+```
+
 ## Commands
 ```bash
 # Build API
@@ -191,4 +224,4 @@ cd apps/dashboard && pnpm dev
 ```
 
 ---
-*Last updated: 2025-12-19 (auth moved to local) — CLI Session*
+*Last updated: 2025-12-19 (dashboard login page) — CLI Session*
