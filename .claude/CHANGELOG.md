@@ -2,10 +2,9 @@
 
 ## 2025-12-19 Session 1
 **Completed:**
-- Fixed dashboard hydration error completely
-- Pinned exact versions: Next.js 14.1.0, React 18.2.0, React-DOM 18.2.0
-- Removed ESLint deps (not needed for core functionality)
-- Clean reinstall of node_modules
+- Scaffolded fresh Next.js 14.1.0 with create-next-app to fix ActionQueueContext bug
+- Used: `npx create-next-app@14.1.0 dashboard --typescript --tailwind --eslint --app --src-dir --use-pnpm`
+- Clean scaffold ensures all Next.js internals are properly aligned
 
 **Result:** Dashboard running successfully at localhost:3000
 

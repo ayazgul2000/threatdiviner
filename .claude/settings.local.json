@@ -37,7 +37,10 @@
       "Bash(git add:*)",
       "Bash(git restore:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\ndocs: Update HANDOFF.md and add CHANGELOG.md\n\n- Updated HANDOFF.md with completed auth package integration\n- Added CHANGELOG.md with session history\n- Dashboard hydration fix documented \\(Next.js 14.1.0\\)\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: dashboard hydration - pinned Next 14.1.0 + React 18.2.0\n\n- Clean package.json with exact pinned versions\n- Removed ESLint dependencies \\(not needed for core\\)\n- Updated CHANGELOG with fix details\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: dashboard hydration - pinned Next 14.1.0 + React 18.2.0\n\n- Clean package.json with exact pinned versions\n- Removed ESLint dependencies \\(not needed for core\\)\n- Updated CHANGELOG with fix details\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cmd //c \"taskkill /F /PID 24300\")",
+      "Bash(npx create-next-app@14.1.0:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
