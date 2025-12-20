@@ -66,6 +66,28 @@ export default function FindingsPage() {
     }
   };
 
+  // Extract short rule ID from full path (e.g., "C.Dev.threatdiviner...sql-injection" -> "sql-injection")
+  const getShortRuleId = (ruleId: string) => {
+    // Split by dots and take the last segment
+    const parts = ruleId.split('.');
+    return parts[parts.length - 1] || ruleId;
+  };
+
+  // Extract relative path from full file path (strip temp dir prefix)
+  const getRelativePath = (filePath: string) => {
+    // Remove common temp/scan prefixes
+    const patterns = [
+      /^[A-Za-z]:\/tmp\/threatdiviner-scans\/[^/]+\//,  // Windows temp
+      /^\/tmp\/threatdiviner-scans\/[^/]+\//,           // Unix temp
+      /^C:\/tmp\/threatdiviner-scans\/[^/]+\//,         // Windows C: drive
+    ];
+    let result = filePath;
+    for (const pattern of patterns) {
+      result = result.replace(pattern, '');
+    }
+    return result;
+  };
+
   if (loading && findings.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -161,13 +183,13 @@ export default function FindingsPage() {
                       <p className="font-medium text-gray-900 dark:text-white truncate max-w-md">
                         {finding.title}
                       </p>
-                      <p className="text-xs text-gray-500 truncate max-w-md">
-                        {finding.ruleId}
+                      <p className="text-xs text-gray-500 truncate max-w-md" title={finding.ruleId}>
+                        {getShortRuleId(finding.ruleId)}
                       </p>
                     </TableCell>
                     <TableCell>
-                      <code className="text-sm bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded truncate max-w-xs block">
-                        {finding.filePath}:{finding.startLine}
+                      <code className="text-sm bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded truncate max-w-xs block" title={finding.filePath}>
+                        {getRelativePath(finding.filePath)}:{finding.startLine}
                       </code>
                     </TableCell>
                     <TableCell>
@@ -180,7 +202,9 @@ export default function FindingsPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-gray-600 dark:text-gray-400 text-sm">
-                        {new Date(finding.firstSeenAt).toLocaleDateString()}
+                        {finding.firstSeenAt || finding.createdAt
+                          ? new Date(finding.firstSeenAt || finding.createdAt).toLocaleDateString()
+                          : '-'}
                       </span>
                     </TableCell>
                   </TableRow>
@@ -212,8 +236,8 @@ export default function FindingsPage() {
                 {/* Location */}
                 <div>
                   <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location</h4>
-                  <code className="block bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded text-sm">
-                    {selectedFinding.filePath}:{selectedFinding.startLine}
+                  <code className="block bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded text-sm" title={selectedFinding.filePath}>
+                    {getRelativePath(selectedFinding.filePath)}:{selectedFinding.startLine}
                     {selectedFinding.endLine && selectedFinding.endLine !== selectedFinding.startLine && `-${selectedFinding.endLine}`}
                   </code>
                 </div>
@@ -236,7 +260,7 @@ export default function FindingsPage() {
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rule ID</h4>
-                    <code className="text-sm">{selectedFinding.ruleId}</code>
+                    <code className="text-sm" title={selectedFinding.ruleId}>{getShortRuleId(selectedFinding.ruleId)}</code>
                   </div>
                   {selectedFinding.cwe?.length > 0 && (
                     <div>

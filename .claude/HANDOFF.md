@@ -298,11 +298,28 @@ Password: threatdiviner_dev
 ## Next Steps
 1. ~~Install Semgrep binary for local testing~~ ✅ DONE - 18 local rules working
 2. Test full scan flow with a real repository (GitHub OAuth + trigger scan via UI)
-3. Add Bandit scanner (Python)
-4. Add Gosec scanner (Go)
-5. Add Trivy scanner (SCA/containers)
-6. Add Gitleaks scanner (secrets)
-7. Bull Board UI at /admin/queues (may need custom implementation)
+3. ~~Add Bandit scanner (Python)~~ ✅ DONE
+4. ~~Add Gosec scanner (Go)~~ ✅ DONE
+5. ~~Add Trivy scanner (SCA/containers)~~ ✅ DONE
+6. ~~Add Gitleaks scanner (secrets)~~ ✅ DONE
+7. Complete AI Triage integration (API endpoint, auto-triage during scan)
+8. Add triage UI in findings page (show AI analysis, allow override)
+9. Bull Board UI at /admin/queues (may need custom implementation)
+
+## Scanner Status
+| Scanner | Type | Status | Binary Required |
+|---------|------|--------|-----------------|
+| Semgrep | SAST | ✅ Working | semgrep |
+| Bandit | SAST (Python) | 🔧 Ready | bandit (pip install) |
+| Gosec | SAST (Go) | 🔧 Ready | gosec (go install) |
+| Trivy | SCA | 🔧 Ready | trivy |
+| Gitleaks | Secrets | 🔧 Ready | gitleaks |
+
+## AI Triage
+- **Module**: `apps/api/src/ai/`
+- **Service**: `AiService` with `triageFinding()` and `batchTriageFindings()`
+- **Config**: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (defaults to claude-sonnet-4-20250514)
+- **Returns**: Analysis, suggested severity, false positive likelihood, exploitability, remediation, references
 
 ## Debug Logs
 API logs for scan debugging: `C:\Users\ayazg\AppData\Local\Temp\claude\C--dev-threatdiviner\tasks\bd7676b.output`
@@ -329,4 +346,4 @@ cd apps/api && npx prisma db push
 ```
 
 ---
-*Last updated: 2025-12-20 (Semgrep YAML syntax fix: 18 rules validated, 73 findings detected in test scan) — CLI Session*
+*Last updated: 2025-12-20 (Added 4 scanners + AI triage module + display fixes) — CLI Session*

@@ -93,8 +93,9 @@ export interface Finding {
   cwe: string[];
   fingerprint: string;
   status: 'open' | 'fixed' | 'ignored' | 'false_positive';
-  firstSeenAt: string;
-  lastSeenAt: string;
+  firstSeenAt?: string;
+  lastSeenAt?: string;
+  createdAt?: string;
   scan?: Scan;
 }
 

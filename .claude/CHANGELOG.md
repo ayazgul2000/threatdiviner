@@ -1,5 +1,50 @@
 # ThreatDiviner - Changelog
 
+## 2025-12-20 Session 7
+**Completed:**
+- Fixed display issues (Invalid Date, long rule names, temp dir in paths)
+- Added 4 new scanners: Gitleaks, Trivy, Bandit, Gosec
+- Started AI Triage feature with Claude integration
+
+**Display Fixes:**
+- **Invalid Date**: Frontend now uses `createdAt` as fallback when `firstSeenAt` is undefined
+- **Long rule names**: Added `getShortRuleId()` - extracts last segment from dotted rule IDs
+- **Temp dir paths**: Added `getRelativePath()` - strips workDir prefix from file paths
+- Backend now stores cleaned data: `extractShortRuleId()` and `getRelativePath()` in FindingProcessorService
+
+**New Scanners:**
+- **Gitleaks** (`apps/api/src/scanners/secrets/gitleaks/`) - Secrets detection, outputs SARIF
+- **Trivy** (`apps/api/src/scanners/sca/trivy/`) - SCA for dependencies, outputs SARIF
+- **Bandit** (`apps/api/src/scanners/sast/bandit/`) - Python SAST, outputs JSON with custom parser
+- **Gosec** (`apps/api/src/scanners/sast/gosec/`) - Go SAST, outputs SARIF
+
+**AI Triage Feature:**
+- Created `AiModule` with `AiService` using Anthropic Claude SDK
+- `triageFinding()` - Analyzes a finding and returns severity assessment, false positive likelihood, exploitability, remediation
+- `batchTriageFindings()` - Process multiple findings with rate limiting
+- Config: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (defaults to claude-sonnet-4-20250514)
+
+**Files Created:**
+- `apps/api/src/ai/ai.service.ts` - Claude AI integration for triage
+- `apps/api/src/ai/ai.module.ts` - NestJS module
+- `apps/api/src/scanners/secrets/gitleaks/gitleaks.scanner.ts`
+- `apps/api/src/scanners/sca/trivy/trivy.scanner.ts`
+- `apps/api/src/scanners/sast/bandit/bandit.scanner.ts`
+- `apps/api/src/scanners/sast/gosec/gosec.scanner.ts`
+
+**Files Updated:**
+- `apps/dashboard/src/app/dashboard/findings/page.tsx` - Display fixes
+- `apps/dashboard/src/lib/api.ts` - Added `createdAt` to Finding type
+- `apps/api/src/scanners/services/finding-processor.service.ts` - Path/ruleId normalization
+- `apps/api/src/scanners/scanners.module.ts` - Registered all new scanners
+- `apps/api/src/queue/processors/scan.processor.ts` - Injected and configured new scanners
+- `apps/api/src/app.module.ts` - Added AiModule
+
+**Dependencies Added:**
+- `@anthropic-ai/sdk` - Claude API client
+
+---
+
 ## 2025-12-20 Session 6
 **Completed:**
 - Fixed Semgrep YAML syntax errors causing scans to fail with exit code 7

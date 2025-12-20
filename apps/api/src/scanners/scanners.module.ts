@@ -13,8 +13,16 @@ import { LocalExecutorService } from './execution/local-executor.service';
 // Parsers
 import { SarifParser } from './parsers/sarif.parser';
 
-// Scanners
+// SAST Scanners
 import { SemgrepScanner } from './sast/semgrep/semgrep.scanner';
+import { BanditScanner } from './sast/bandit/bandit.scanner';
+import { GosecScanner } from './sast/gosec/gosec.scanner';
+
+// SCA Scanners
+import { TrivyScanner } from './sca/trivy/trivy.scanner';
+
+// Secrets Scanners
+import { GitleaksScanner } from './secrets/gitleaks/gitleaks.scanner';
 
 // Services
 import { FindingProcessorService } from './services/finding-processor.service';
@@ -34,8 +42,16 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     // Parsers
     SarifParser,
 
-    // Scanners
+    // SAST Scanners
     SemgrepScanner,
+    BanditScanner,
+    GosecScanner,
+
+    // SCA Scanners
+    TrivyScanner,
+
+    // Secrets Scanners
+    GitleaksScanner,
 
     // Services
     FindingProcessorService,
@@ -49,6 +65,10 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     LocalExecutorService,
     SarifParser,
     SemgrepScanner,
+    BanditScanner,
+    GosecScanner,
+    TrivyScanner,
+    GitleaksScanner,
     FindingProcessorService,
   ],
 })

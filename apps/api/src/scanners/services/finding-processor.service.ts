@@ -14,6 +14,7 @@ export class FindingProcessorService {
     tenantId: string,
     repositoryId: string,
     findings: NormalizedFinding[],
+    workDir?: string,
   ): Promise<number> {
     if (findings.length === 0) {
       return 0;
@@ -27,11 +28,11 @@ export class FindingProcessorService {
       scanId,
       repositoryId,
       scanner: f.scanner,
-      ruleId: f.ruleId,
+      ruleId: this.extractShortRuleId(f.ruleId),
       severity: f.severity,
       title: f.title,
       description: f.description,
-      filePath: f.filePath,
+      filePath: this.getRelativePath(f.filePath, workDir),
       startLine: f.startLine,
       endLine: f.endLine,
       snippet: f.snippet,
@@ -120,5 +121,43 @@ export class FindingProcessorService {
     }
 
     return fingerprints;
+  }
+
+  /**
+   * Extract short rule ID from full path
+   * e.g., "C.Dev.threatdiviner.apps.api.src...sql-injection-string-concat" -> "sql-injection-string-concat"
+   */
+  private extractShortRuleId(ruleId: string): string {
+    // Split by dots and take the last segment
+    const parts = ruleId.split('.');
+    return parts[parts.length - 1] || ruleId;
+  }
+
+  /**
+   * Convert absolute file path to relative path
+   * Strips the workDir prefix from the path
+   */
+  private getRelativePath(filePath: string, workDir?: string): string {
+    if (!workDir) {
+      return filePath;
+    }
+
+    // Normalize both paths (forward slashes, no trailing slash)
+    const normalizedWorkDir = workDir.replace(/\\/g, '/').replace(/\/$/, '');
+    const normalizedPath = filePath.replace(/\\/g, '/');
+
+    // If path starts with workDir, strip it
+    if (normalizedPath.startsWith(normalizedWorkDir + '/')) {
+      return normalizedPath.slice(normalizedWorkDir.length + 1);
+    }
+
+    // Also try with backslashes for Windows paths
+    const backslashWorkDir = workDir.replace(/\//g, '\\').replace(/\\$/, '');
+    const backslashPath = filePath.replace(/\//g, '\\');
+    if (backslashPath.startsWith(backslashWorkDir + '\\')) {
+      return backslashPath.slice(backslashWorkDir.length + 1).replace(/\\/g, '/');
+    }
+
+    return filePath;
   }
 }

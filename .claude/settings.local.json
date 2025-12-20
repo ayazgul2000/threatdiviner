@@ -69,7 +69,8 @@
       "Bash(cmd //c \"taskkill /F /PID 23540\")",
       "Bash(dir C:tmptest-scan.sarif)",
       "Bash(cmd //c \"dir C:\\\\tmp\\\\test-scan.sarif\")",
-      "Bash(cmd //c \"del /f nul 2>nul\")"
+      "Bash(cmd //c \"del /f nul 2>nul\")",
+      "Bash(gitleaks version)"
     ]
   }
 }

@@ -7,6 +7,7 @@ import { ScmModule } from './scm/scm.module';
 import { CustomBullModule } from './queue/custom-bull.module';
 import { QueueModule } from './queue/queue.module';
 import { ScannersModule } from './scanners/scanners.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ScannersModule } from './scanners/scanners.module';
     ScmModule,
     QueueModule,
     ScannersModule,
+    AiModule,
   ],
   controllers: [HealthController],
   providers: [],

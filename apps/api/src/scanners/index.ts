@@ -4,4 +4,6 @@ export * from './utils';
 export * from './execution';
 export * from './parsers';
 export * from './sast';
+export * from './sca';
+export * from './secrets';
 export * from './services';

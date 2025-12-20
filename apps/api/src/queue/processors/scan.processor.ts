@@ -5,6 +5,10 @@ import { CryptoService } from '../../scm/services/crypto.service';
 import { GitHubProvider } from '../../scm/providers';
 import { GitService, LanguageStats } from '../../scanners/utils';
 import { SemgrepScanner } from '../../scanners/sast/semgrep';
+import { BanditScanner } from '../../scanners/sast/bandit';
+import { GosecScanner } from '../../scanners/sast/gosec';
+import { TrivyScanner } from '../../scanners/sca/trivy';
+import { GitleaksScanner } from '../../scanners/secrets/gitleaks';
 import { FindingProcessorService } from '../../scanners/services/finding-processor.service';
 import { QueueService } from '../services/queue.service';
 import { QUEUE_NAMES } from '../queue.constants';
@@ -24,6 +28,10 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly cryptoService: CryptoService,
     private readonly gitService: GitService,
     private readonly semgrepScanner: SemgrepScanner,
+    private readonly banditScanner: BanditScanner,
+    private readonly gosecScanner: GosecScanner,
+    private readonly trivyScanner: TrivyScanner,
+    private readonly gitleaksScanner: GitleaksScanner,
     private readonly findingProcessor: FindingProcessorService,
     private readonly queueService: QueueService,
     private readonly githubProvider: GitHubProvider,
@@ -101,6 +109,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
         tenantId,
         repositoryId,
         dedupedFindings,
+        workDir, // Pass workDir to strip from file paths
       );
       await job.updateProgress(90);
 
@@ -165,27 +174,48 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
 
   private selectScanners(languages: LanguageStats, config: ScanJobData['config']): IScanner[] {
     const scanners: IScanner[] = [];
+    const detectedLangs = Object.keys(languages.languages);
 
-    this.logger.log(`DEBUG selectScanners: enableSast=${config.enableSast}, languages=${Object.keys(languages.languages).join(',')}`);
+    this.logger.log(`Selecting scanners for languages: ${detectedLangs.join(', ')}`);
 
+    // SAST Scanners
     if (config.enableSast) {
-      // Semgrep supports most languages
+      // Semgrep - supports most languages
       const semgrepLanguages = this.semgrepScanner.supportedLanguages;
-      const detectedLangs = Object.keys(languages.languages);
-      const hasSupported = detectedLangs.some((lang) =>
+      const hasSemgrepSupported = detectedLangs.some((lang) =>
         semgrepLanguages.includes(lang),
       );
-
-      this.logger.log(`DEBUG selectScanners: semgrepLanguages=${semgrepLanguages.join(',')}, hasSupported=${hasSupported}`);
-
-      if (hasSupported) {
+      if (hasSemgrepSupported) {
         scanners.push(this.semgrepScanner);
-        this.logger.log('DEBUG selectScanners: Added semgrep scanner');
+        this.logger.log('Added Semgrep scanner');
       }
-    } else {
-      this.logger.warn('DEBUG selectScanners: SAST is DISABLED in config!');
+
+      // Bandit - Python only
+      if (detectedLangs.includes('python')) {
+        scanners.push(this.banditScanner);
+        this.logger.log('Added Bandit scanner (Python)');
+      }
+
+      // Gosec - Go only
+      if (detectedLangs.includes('go')) {
+        scanners.push(this.gosecScanner);
+        this.logger.log('Added Gosec scanner (Go)');
+      }
     }
 
+    // SCA Scanner (Trivy) - always run for dependency scanning
+    if (config.enableSca !== false) {
+      scanners.push(this.trivyScanner);
+      this.logger.log('Added Trivy scanner (SCA)');
+    }
+
+    // Secrets Scanner (Gitleaks) - always run for secrets detection
+    if (config.enableSecrets !== false) {
+      scanners.push(this.gitleaksScanner);
+      this.logger.log('Added Gitleaks scanner (secrets)');
+    }
+
+    this.logger.log(`Selected ${scanners.length} scanners: ${scanners.map(s => s.name).join(', ')}`);
     return scanners;
   }
 
