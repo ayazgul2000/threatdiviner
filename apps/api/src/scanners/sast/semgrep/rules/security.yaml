@@ -1,0 +1,231 @@
+rules:
+  # SQL Injection
+  - id: sql-injection-string-concat
+    patterns:
+      - pattern-either:
+          - pattern: $DB.query($X + ...)
+          - pattern: $DB.execute($X + ...)
+          - pattern: "$DB.$METHOD(`...${...}...`)"
+          - pattern: $DB.$METHOD("..." + $VAR + "...")
+    message: Potential SQL injection via string concatenation
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-89"
+      owasp: "A03:2021"
+
+  - id: sql-injection-prisma-raw
+    patterns:
+      - pattern: $PRISMA.$rawQuery(...)
+      - pattern: $PRISMA.$executeRaw(...)
+    message: Using raw SQL queries - ensure proper parameterization
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-89"
+
+  # Command Injection
+  - id: command-injection-exec
+    patterns:
+      - pattern-either:
+          - pattern: exec($CMD + ...)
+          - pattern: execSync($CMD + ...)
+          - pattern: "spawn($CMD, [..., $USER_INPUT, ...])"
+    message: Potential command injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-78"
+      owasp: "A03:2021"
+
+  # XSS
+  - id: xss-dangerously-set-html
+    pattern: "<$EL dangerouslySetInnerHTML=... />"
+    message: Potential XSS via dangerouslySetInnerHTML
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-79"
+      owasp: "A03:2021"
+
+  # Hardcoded Secrets
+  - id: hardcoded-secret-password
+    patterns:
+      - pattern-either:
+          - pattern: password = "..."
+          - pattern: password = '...'
+          - pattern: PASSWORD = "..."
+          - pattern: secret = "..."
+          - pattern: apiKey = "..."
+          - pattern: api_key = "..."
+    message: Potential hardcoded secret
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-798"
+
+  - id: hardcoded-jwt-secret
+    patterns:
+      - pattern-either:
+          - pattern: jwt.sign($DATA, "...")
+          - pattern: jwt.verify($DATA, "...")
+    message: Hardcoded JWT secret
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-798"
+
+  # Insecure Crypto
+  - id: weak-crypto-md5
+    patterns:
+      - pattern-either:
+          - pattern: crypto.createHash("md5")
+          - pattern: crypto.createHash('md5')
+    message: MD5 is cryptographically weak
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-328"
+
+  - id: weak-crypto-sha1
+    patterns:
+      - pattern-either:
+          - pattern: crypto.createHash("sha1")
+          - pattern: crypto.createHash('sha1')
+    message: SHA1 is cryptographically weak
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-328"
+
+  # Path Traversal
+  - id: path-traversal
+    patterns:
+      - pattern-either:
+          - pattern: fs.readFile($PATH + ...)
+          - pattern: fs.readFileSync($PATH + ...)
+          - pattern: path.join(..., $USER_INPUT, ...)
+    message: Potential path traversal vulnerability
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-22"
+      owasp: "A01:2021"
+
+  # Eval and Code Execution
+  - id: dangerous-eval
+    pattern: eval(...)
+    message: Avoid using eval - can lead to code injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-95"
+
+  - id: dangerous-function-constructor
+    pattern: new Function(...)
+    message: Avoid using Function constructor - can lead to code injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-95"
+
+  # Insecure Configuration
+  - id: cors-allow-all
+    patterns:
+      - pattern-either:
+          - pattern: "cors({ origin: '*' })"
+          - pattern: "cors({ origin: true })"
+          - pattern: $RES.setHeader("Access-Control-Allow-Origin", "*")
+    message: CORS allows all origins
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-942"
+
+  - id: disable-security-headers
+    patterns:
+      - pattern-either:
+          - pattern: "helmet({ ..., contentSecurityPolicy: false, ... })"
+          - pattern: "helmet({ ..., xssFilter: false, ... })"
+    message: Security headers disabled
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      category: security
+
+  # Authentication Issues
+  - id: jwt-none-algorithm
+    patterns:
+      - pattern-either:
+          - pattern: 'jwt.verify($TOKEN, $SECRET, { algorithms: ["none"] })'
+          - pattern: "jwt.verify($TOKEN, $SECRET, { algorithms: ['none'] })"
+    message: JWT none algorithm is insecure
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-347"
+
+  # Logging Sensitive Data
+  - id: log-sensitive-data
+    patterns:
+      - pattern-either:
+          - pattern: console.log(..., $PASSWORD, ...)
+          - pattern: console.log(..., $TOKEN, ...)
+          - pattern: this.logger.log(..., password, ...)
+    message: Potentially logging sensitive data
+    languages: [javascript, typescript]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-532"
+
+  # Prototype Pollution
+  - id: prototype-pollution
+    patterns:
+      - pattern-either:
+          - pattern: '$OBJ["__proto__"] = ...'
+          - pattern: $OBJ.constructor.prototype.$PROP = ...
+          - pattern: "Object.assign({}, $USER_INPUT)"
+    message: Potential prototype pollution
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-1321"
+
+  # Insecure Randomness
+  - id: insecure-random
+    patterns:
+      - pattern: Math.random()
+    message: Math.random() is not cryptographically secure - use crypto.randomBytes() instead
+    languages: [javascript, typescript]
+    severity: INFO
+    metadata:
+      category: security
+      cwe: "CWE-338"
+
+  # NoSQL Injection
+  - id: nosql-injection
+    patterns:
+      - pattern-either:
+          - pattern: "$COLLECTION.find({$where: $USER_INPUT})"
+          - pattern: "$COLLECTION.findOne({$where: $USER_INPUT})"
+    message: Potential NoSQL injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-943"

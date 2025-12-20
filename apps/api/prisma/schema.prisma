@@ -15,7 +15,12 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users User[]
+  users          User[]
+  scmConnections ScmConnection[]
+  repositories   Repository[]
+  scanConfigs    ScanConfig[]
+  scans          Scan[]
+  findings       Finding[]
 
   @@map("tenants")
 }
@@ -32,4 +37,167 @@ model User {
 
   @@unique([tenantId, email])
   @@map("users")
+}
+
+// SCM provider connection (OAuth or PAT)
+model ScmConnection {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  provider       String // github, gitlab, bitbucket
+  authMethod     String    @map("auth_method") // oauth, pat, github_app
+  accessToken    String    @map("access_token") // encrypted at rest
+  refreshToken   String?   @map("refresh_token") // encrypted, for OAuth refresh
+  tokenExpiresAt DateTime? @map("token_expires_at")
+  installationId String?   @map("installation_id") // GitHub App installation ID
+  externalId     String    @map("external_id") // provider's user/org ID
+  externalName   String    @map("external_name") // username or org name
+  scope          String[] // permissions granted
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repositories Repository[]
+
+  @@unique([tenantId, provider, externalId])
+  @@index([tenantId])
+  @@map("scm_connections")
+}
+
+// Repository to scan
+model Repository {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  connectionId  String    @map("connection_id")
+  name          String // repo name
+  fullName      String    @map("full_name") // owner/repo
+  cloneUrl      String    @map("clone_url")
+  htmlUrl       String    @map("html_url") // web URL
+  defaultBranch String    @default("main") @map("default_branch")
+  language      String? // primary language
+  isPrivate     Boolean   @default(true) @map("is_private")
+  isActive      Boolean   @default(true) @map("is_active")
+  lastScanAt    DateTime? @map("last_scan_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection ScmConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  scanConfig ScanConfig?
+  scans      Scan[]
+
+  @@unique([tenantId, fullName])
+  @@index([tenantId])
+  @@index([connectionId])
+  @@map("repositories")
+}
+
+// Per-repo scan settings
+model ScanConfig {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  repositoryId  String   @unique @map("repository_id")
+  enableSast    Boolean  @default(true) @map("enable_sast")
+  enableSca     Boolean  @default(true) @map("enable_sca")
+  enableSecrets Boolean  @default(true) @map("enable_secrets")
+  enableIac     Boolean  @default(true) @map("enable_iac")
+  enableDast    Boolean  @default(false) @map("enable_dast") // requires URL
+  branches      String[] @default(["main", "master"])
+  skipPaths     String[] @default(["node_modules", "vendor", ".git"]) @map("skip_paths")
+  customRules   Json?    @map("custom_rules") // Semgrep custom rules etc
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("scan_configs")
+}
+
+// Individual scan run
+model Scan {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  repositoryId   String    @map("repository_id")
+  commitSha      String    @map("commit_sha")
+  branch         String
+  status         String    @default("pending") // pending, cloning, scanning, analyzing, completed, failed
+  triggeredBy    String    @map("triggered_by") // webhook, manual, scheduled
+  triggerEvent   String?   @map("trigger_event") // push, pull_request, workflow_dispatch
+  pullRequestId  String?   @map("pull_request_id") // PR number if triggered by PR
+  pullRequestUrl String?   @map("pull_request_url")
+  checkRunId     String?   @map("check_run_id") // GitHub check run ID for status updates
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  duration       Int? // seconds
+  errorMessage   String?   @map("error_message")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  findings   Finding[]
+
+  @@index([tenantId])
+  @@index([repositoryId])
+  @@index([status])
+  @@map("scans")
+}
+
+// Vulnerability/issue found by scanner
+model Finding {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  scanId        String    @map("scan_id")
+  repositoryId  String    @map("repository_id")
+  scanner       String // semgrep, trivy, gitleaks, checkov, etc
+  ruleId        String    @map("rule_id") // scanner's rule identifier
+  severity      String // critical, high, medium, low, info
+  title         String
+  description   String?
+  filePath      String    @map("file_path")
+  startLine     Int?      @map("start_line")
+  endLine       Int?      @map("end_line")
+  snippet       String? // code snippet
+  cweId         String?   @map("cwe_id") // CWE-79, etc
+  cveId         String?   @map("cve_id") // CVE-2024-xxxx
+  owasp         String? // A01:2021, etc
+  confidence    String? // high, medium, low
+  status        String    @default("open") // open, triaged, fixed, false_positive, accepted
+  triagedBy     String?   @map("triaged_by") // user ID who triaged
+  triagedAt     DateTime? @map("triaged_at")
+  fixedInCommit String?   @map("fixed_in_commit")
+  aiAnalysis    String?   @map("ai_analysis") // Claude's assessment
+  aiConfidence  Float?    @map("ai_confidence") // AI confidence score
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scan   Scan   @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([scanId])
+  @@index([repositoryId])
+  @@index([severity])
+  @@index([status])
+  @@map("findings")
+}
+
+// Webhook audit log
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  tenantId    String?   @map("tenant_id") // nullable - may not know tenant yet
+  provider    String // github, gitlab, bitbucket
+  eventType   String    @map("event_type") // push, pull_request, installation
+  deliveryId  String?   @map("delivery_id") // provider's delivery ID
+  signature   String // for verification
+  payload     Json // raw webhook body (sanitized)
+  processed   Boolean   @default(false)
+  processedAt DateTime? @map("processed_at")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([provider, deliveryId])
+  @@index([processed])
+  @@map("webhook_events")
 }

@@ -1,164 +1,303 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Card, CardHeader, CardTitle, CardContent, Badge, SeverityBadge, StatusBadge } from '@/components/ui';
+import { useAuth } from '@/lib/auth-context';
+import type { DashboardStats, Scan, Finding } from '@/lib/api';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  role: string;
-  tenantId?: string;
-  tenantSlug?: string;
-  tenantName?: string;
-  createdAt?: string;
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
+export default function OverviewPage() {
+  const { user } = useAuth();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchStats = async () => {
       try {
-        const response = await fetch('http://localhost:3001/auth/profile', {
-          credentials: 'include',
-        });
+        // For now, fetch individual endpoints since /dashboard/stats may not exist yet
+        const [reposRes, scansRes, findingsRes] = await Promise.all([
+          fetch(`${API_URL}/scm/repositories`, { credentials: 'include' }),
+          fetch(`${API_URL}/scm/scans?limit=5`, { credentials: 'include' }),
+          fetch(`${API_URL}/scm/findings?limit=5`, { credentials: 'include' }),
+        ]);
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            router.push('/login');
-            return;
-          }
-          throw new Error('Failed to fetch profile');
+        const repos = reposRes.ok ? await reposRes.json() : [];
+        const scans = scansRes.ok ? await scansRes.json() : [];
+        const findings = findingsRes.ok ? await findingsRes.json() : { findings: [], total: 0 };
+
+        // Calculate stats
+        const findingsBySeverity = {
+          critical: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          info: 0,
+          total: findings.total || 0,
+        };
+
+        if (findings.findings) {
+          findings.findings.forEach((f: Finding) => {
+            if (f.severity in findingsBySeverity) {
+              findingsBySeverity[f.severity as keyof typeof findingsBySeverity]++;
+            }
+          });
         }
 
-        const data = await response.json();
-        setUser(data);
+        setStats({
+          totalRepositories: Array.isArray(repos) ? repos.length : 0,
+          activeConnections: 0, // Would need connections endpoint
+          totalScans: Array.isArray(scans) ? scans.length : 0,
+          openFindings: findings.total || 0,
+          findingsBySeverity,
+          recentScans: Array.isArray(scans) ? scans.slice(0, 5) : [],
+          recentFindings: findings.findings?.slice(0, 5) || [],
+        });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load profile');
-        router.push('/login');
+        console.error('Failed to fetch stats:', err);
+        // Set empty stats on error
+        setStats({
+          totalRepositories: 0,
+          activeConnections: 0,
+          totalScans: 0,
+          openFindings: 0,
+          findingsBySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0, total: 0 },
+          recentScans: [],
+          recentFindings: [],
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProfile();
-  }, [router]);
-
-  const handleLogout = async () => {
-    try {
-      await fetch('http://localhost:3001/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      router.push('/login');
-    } catch (err) {
-      console.error('Logout failed:', err);
-      router.push('/login');
-    }
-  };
+    fetchStats();
+  }, []);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-red-600 dark:text-red-400">{error || 'Not authenticated'}</div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="space-y-6">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            ThreatDiviner
-          </h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {user.email}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Welcome back, {user?.name || user?.email}
+        </h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">
+          Here's an overview of your security posture
+        </p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card variant="bordered">
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Repositories</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                  {stats?.totalRepositories || 0}
+                </p>
+              </div>
+              <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="bordered">
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Total Scans</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                  {stats?.totalScans || 0}
+                </p>
+              </div>
+              <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
+                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="bordered">
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Open Findings</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                  {stats?.openFindings || 0}
+                </p>
+              </div>
+              <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="bordered">
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Critical/High</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
+                  {(stats?.findingsBySeverity?.critical || 0) + (stats?.findingsBySeverity?.high || 0)}
+                </p>
+              </div>
+              <div className="p-3 bg-red-100 dark:bg-red-900 rounded-lg">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Severity Breakdown */}
+      <Card variant="bordered">
+        <CardHeader>
+          <CardTitle>Findings by Severity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <SeverityBadge severity="critical" />
+              <span className="text-lg font-semibold">{stats?.findingsBySeverity?.critical || 0}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SeverityBadge severity="high" />
+              <span className="text-lg font-semibold">{stats?.findingsBySeverity?.high || 0}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SeverityBadge severity="medium" />
+              <span className="text-lg font-semibold">{stats?.findingsBySeverity?.medium || 0}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SeverityBadge severity="low" />
+              <span className="text-lg font-semibold">{stats?.findingsBySeverity?.low || 0}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <SeverityBadge severity="info" />
+              <span className="text-lg font-semibold">{stats?.findingsBySeverity?.info || 0}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Scans */}
+        <Card variant="bordered">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Recent Scans</CardTitle>
+              <Link href="/dashboard/scans" className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                View all
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {stats?.recentScans && stats.recentScans.length > 0 ? (
+              <div className="space-y-3">
+                {stats.recentScans.map((scan: Scan) => (
+                  <div key={scan.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {scan.repository?.fullName || 'Unknown repo'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {scan.branch} • {scan.commitSha?.substring(0, 7)}
+                      </p>
+                    </div>
+                    <StatusBadge status={scan.status} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">No recent scans</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Findings */}
+        <Card variant="bordered">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Recent Findings</CardTitle>
+              <Link href="/dashboard/findings" className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                View all
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {stats?.recentFindings && stats.recentFindings.length > 0 ? (
+              <div className="space-y-3">
+                {stats.recentFindings.map((finding: Finding) => (
+                  <div key={finding.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {finding.title}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {finding.filePath}:{finding.startLine}
+                      </p>
+                    </div>
+                    <SeverityBadge severity={finding.severity} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">No recent findings</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <Card variant="bordered">
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/dashboard/connections"
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
             >
-              Logout
-            </button>
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Connection
+            </Link>
+            <Link
+              href="/dashboard/repositories"
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              Manage Repositories
+            </Link>
           </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Welcome, {user.email}
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                User Info
-              </h3>
-              <dl className="space-y-2">
-                <div className="flex">
-                  <dt className="w-24 text-sm text-gray-500 dark:text-gray-400">Email:</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">{user.email}</dd>
-                </div>
-                <div className="flex">
-                  <dt className="w-24 text-sm text-gray-500 dark:text-gray-400">Role:</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white capitalize">{user.role}</dd>
-                </div>
-                <div className="flex">
-                  <dt className="w-24 text-sm text-gray-500 dark:text-gray-400">User ID:</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white font-mono text-xs">{user.id}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Organization
-              </h3>
-              <dl className="space-y-2">
-                <div className="flex">
-                  <dt className="w-24 text-sm text-gray-500 dark:text-gray-400">Name:</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">{user.tenantName || 'N/A'}</dd>
-                </div>
-                <div className="flex">
-                  <dt className="w-24 text-sm text-gray-500 dark:text-gray-400">Slug:</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">{user.tenantSlug || 'N/A'}</dd>
-                </div>
-                <div className="flex">
-                  <dt className="w-24 text-sm text-gray-500 dark:text-gray-400">Tenant ID:</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white font-mono text-xs">{user.tenantId || 'N/A'}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <p className="text-green-700 dark:text-green-400 font-medium">
-                Authentication Status: Active
-              </p>
-              <p className="text-sm text-green-600 dark:text-green-500 mt-1">
-                You are successfully authenticated with multi-tenant JWT.
-              </p>
-            </div>
-          </div>
-        </div>
-      </main>
+        </CardContent>
+      </Card>
     </div>
   );
 }

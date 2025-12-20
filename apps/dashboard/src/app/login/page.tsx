@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { Button } from '@/components/ui';
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { login, error: authError, loading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     tenantSlug: '',
     email: '',
@@ -19,22 +20,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      router.push('/dashboard');
+      await login(formData.tenantSlug, formData.email, formData.password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -45,19 +31,26 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h1 className="text-center text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-blue-600 rounded-lg">
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             ThreatDiviner
           </h1>
-          <h2 className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+          <h2 className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Sign in to your account
           </h2>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
+          {(error || authError) && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
-              {error}
+              {error || authError}
             </div>
           )}
 
@@ -113,17 +106,23 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            loading={loading || authLoading}
+            className="w-full"
+            size="lg"
           >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
+            Sign in
+          </Button>
         </form>
 
-        <div className="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
-          Test: admin@acme.com / admin123 / acme-corp
+        <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 font-medium">Test Credentials:</p>
+          <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1">
+            <p>Organization: <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">acme-corp</code></p>
+            <p>Email: <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">admin@acme.com</code></p>
+            <p>Password: <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">admin123</code></p>
+          </div>
         </div>
       </div>
     </div>
