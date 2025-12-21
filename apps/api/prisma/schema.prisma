@@ -8,12 +8,16 @@ datasource db {
 }
 
 model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  plan      String   @default("starter")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  plan             String   @default("free") // free, pro, enterprise
+  maxUsers         Int      @default(5) @map("max_users")
+  maxRepositories  Int      @default(10) @map("max_repositories")
+  aiTriageEnabled  Boolean  @default(false) @map("ai_triage_enabled")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   users              User[]
   scmConnections     ScmConnection[]
@@ -230,25 +234,30 @@ model NotificationConfig {
 
 // Platform-wide configuration (for admin portal)
 model PlatformConfig {
-  id          String   @id @default(uuid())
-  key         String   @unique
-  value       String
-  encrypted   Boolean  @default(false)
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                     String   @id @default(uuid())
+  aiProvider             String   @default("anthropic") @map("ai_provider")
+  aiModel                String   @default("claude-sonnet-4-20250514") @map("ai_model")
+  aiApiKey               String?  @map("ai_api_key") // Encrypted
+  defaultPlan            String   @default("free") @map("default_plan")
+  defaultMaxUsers        Int      @default(5) @map("default_max_users")
+  defaultMaxRepositories Int      @default(10) @map("default_max_repositories")
+  maintenanceMode        Boolean  @default(false) @map("maintenance_mode")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
-  @@map("platform_configs")
+  @@map("platform_config")
 }
 
 // Platform administrator accounts
 model PlatformAdmin {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
   name         String
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  isSuperAdmin Boolean   @default(false) @map("is_super_admin")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@map("platform_admins")
 }

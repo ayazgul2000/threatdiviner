@@ -4,7 +4,16 @@
 Enterprise-grade DevSecOps-as-a-Service platform for SMB SaaS companies. Managed security scanning + SOC 2 compliance automation at $500-4K/month.
 
 ## Current Phase
-**Feature 1: Platform Core** — Not started
+**Phase 1: Platform Core** — COMPLETE
+
+Completed features:
+- Multi-scanner security scanning (Semgrep, Gitleaks, Trivy, Bandit, Gosec)
+- AI-powered triage with Claude API
+- Slack notifications with Block Kit templates
+- PDF reporting with MinIO storage
+- Enhanced RBAC with 5 roles and granular permissions
+- Dashboard settings (notifications, team, profile)
+- Platform Admin Portal (separate Next.js app)
 
 ## Architecture Summary
 - **Backend:** NestJS API (auth, tenants, webhooks, jobs)

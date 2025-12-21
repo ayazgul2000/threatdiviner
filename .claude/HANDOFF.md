@@ -1,375 +1,244 @@
-# ThreatDiviner - Handoff
+# ThreatDiviner - Session Handoff
 
-## Current Task
-**Feature 4: Dashboard UI**
+Last updated: 2024-12-22
 
-## Status
-🟢 DASHBOARD UI COMPLETE
+## Current State
 
-## Owner
-CLI
+The platform is feature-complete for Phase 1 with all major components implemented:
 
-## Task Breakdown
+### Completed Features
 
-### Feature 1: Platform Core (COMPLETE)
-- [x] Create Docker Compose with Postgres, Redis, MinIO, Qdrant
-- [x] NestJS API scaffold with health check
-- [x] Next.js dashboard scaffold with health check
-- [x] PostgreSQL schema: tenants, users tables
-- [x] RLS policies for tenant isolation
-- [x] JWT auth module (register, login, refresh)
-- [x] Tenant middleware (set session context)
-- [x] Seed script: 2 test tenants + 2 users each
-- [x] Verify full stack runs locally
-- [x] Fix dashboard hydration error (fresh scaffold)
-- [x] Move auth to local libs folder (remove symlink)
-- [x] Dashboard login page with form
-- [x] Dashboard protected page with user info
-- [x] Auth state redirect on home page
+1. **Multi-Scanner Security Scanning**
+   - Semgrep (SAST)
+   - Gitleaks (secrets)
+   - Trivy (containers/dependencies)
+   - Bandit (Python)
+   - Gosec (Go - requires Go installation)
 
-### Feature 2: SCM Integration (COMPLETE - API Layer)
-- [x] Database schema: scm_connections, repositories, scan_configs, scans, findings, webhook_events
-- [x] RLS policies for all SCM tables
-- [x] Token encryption service (AES-256-GCM)
-- [x] GitHub provider (OAuth, PAT, webhooks, check runs)
-- [x] SCM service (connection management, repo management, scan triggers)
-- [x] SCM controller (REST endpoints)
-- [x] Webhooks controller (GitHub push/PR events)
+2. **AI-Powered Triage**
+   - Claude API integration for finding analysis
+   - Auto-triage after scan completion
+   - Manual triage via dashboard
+   - Batch triage support
 
-### Feature 3: SAST Pipeline (COMPLETE - API Layer)
-- [x] BullMQ queue module with job types
-- [x] Git service (clone, checkout, language detection)
-- [x] Local executor for scanner binaries
-- [x] SARIF parser (universal scanner output)
-- [x] Semgrep scanner implementation
-- [x] Finding processor (dedupe, store, count)
-- [x] Scan processor (main orchestrator)
-- [x] Notify processor (GitHub check runs)
+3. **Slack Notifications**
+   - Webhook integration
+   - Configurable events (scan start, complete, critical/high findings)
+   - Block Kit message templates
 
-### Feature 4: Dashboard UI (COMPLETE)
-- [x] Shared UI components (button, card, badge, table, modal)
-- [x] API client library (lib/api.ts)
-- [x] Auth context with global state management
-- [x] Dashboard layout with sidebar navigation
-- [x] Overview page with stats cards
-- [x] Connections page (OAuth, PAT, list, delete)
-- [x] Repositories page (add, scan, delete)
-- [x] Scans page (list with filters)
-- [x] Findings page (list, filter, detail modal, status update)
-- [x] API endpoints for listing scans and findings
+4. **PDF Reporting**
+   - Scan reports
+   - Repository reports
+   - Summary reports
+   - MinIO storage integration
 
-## Blockers
-**None** - All major blockers resolved.
+5. **Enhanced RBAC**
+   - 5 roles: viewer, developer, member, security_lead, admin
+   - Granular permissions system
+   - Permission guard and decorator
 
-**Previous BullMQ Issue (RESOLVED):**
-- `@nestjs/bullmq` had ModuleRef dependency injection issues with `@nestjs/core` 10.4.x
-- Solution: Created custom `CustomBullModule` using `bullmq` directly
-- Removed `@nestjs/bullmq` entirely
-- Processors use standard NestJS services with Workers via `OnModuleInit`/`OnModuleDestroy`
+6. **Dashboard Settings**
+   - Notification configuration
+   - Team management (UI ready, API TODO)
+   - Profile/password management (UI ready, API TODO)
 
-## Recent Bug Fixes
-- **Semgrep YAML syntax errors**: Fixed `security.yaml` - patterns with special YAML characters (`{}`, `:`, `[]`) must be quoted
-  - Root cause: scans completing in 6ms with 0 findings, Semgrep exit code 7 (config error)
-  - Fixed XSS pattern to valid Semgrep JSX syntax
-  - 18 rules now validate correctly, 73 findings detected in test scan
-- **Semgrep Windows encoding**: Registry rules fail with charmap error - created local rules file
-  - Added `--no-git-ignore` flag to bypass Windows git ls-files issue
-  - Auto-detects Windows and uses local rules
-- **Git clone directory exists**: Fixed `createWorkDir()` in `git.service.ts` to clean up existing directories before cloning
-- **Scan jobs not enqueued**: Added QueueService to ScmService, now properly calls `enqueueScan()` in `triggerScan()`
-- **OAuth callback redirect**: Changed `/settings/connections` → `/dashboard/connections` in `scm.controller.ts`
-- **AddRepository validation**: Added `externalId` optional field to DTO in `dto/index.ts`
-- **Scans page crash**: Added null safety for `scan.trigger`, `scan.branch`, `scan.createdAt` in `scans/page.tsx`
+7. **Platform Admin Portal**
+   - Separate Next.js app at `apps/admin`
+   - Platform admin authentication
+   - Tenant management (CRUD)
+   - System health monitoring
+   - AI configuration
+   - Maintenance mode
 
-## Dashboard UI
+---
 
-### Structure
+## Architecture
+
 ```
-apps/dashboard/src/
-├── app/
-│   ├── layout.tsx              # Root layout with AuthProvider
-│   ├── page.tsx                # Home redirect
-│   ├── login/page.tsx          # Login form
-│   └── dashboard/
-│       ├── layout.tsx          # Dashboard layout with sidebar
-│       ├── page.tsx            # Overview with stats
-│       ├── connections/page.tsx # SCM connections
-│       ├── repositories/page.tsx # Repositories
-│       ├── scans/page.tsx      # Scan history
-│       └── findings/page.tsx   # Security findings
-├── components/
-│   ├── ui/
-│   │   ├── index.ts
-│   │   ├── button.tsx
-│   │   ├── card.tsx
-│   │   ├── badge.tsx
-│   │   ├── table.tsx
-│   │   └── modal.tsx
-│   └── layout/
-│       ├── index.ts
-│       ├── sidebar.tsx
-│       └── dashboard-layout.tsx
-└── lib/
-    ├── api.ts                  # API client
-    └── auth-context.tsx        # Auth state management
-```
-
-### Features
-- Responsive sidebar navigation
-- Dark mode support (via Tailwind)
-- Loading states and error handling
-- OAuth and PAT connection flows
-- Repository management with scan triggers
-- Finding detail modal with status updates
-- Severity badges (critical, high, medium, low, info)
-- Status badges (pending, running, completed, failed)
-
-### Dashboard Pages
-| Route | Description |
-|-------|-------------|
-| /dashboard | Overview with stats, recent scans, recent findings |
-| /dashboard/connections | Manage SCM provider connections |
-| /dashboard/repositories | Manage repositories, trigger scans |
-| /dashboard/scans | View scan history |
-| /dashboard/findings | View and manage security findings |
-
-## API Endpoints (Updated)
-
-### SCM Endpoints
-| Method | Path | Description | Auth Required |
-|--------|------|-------------|---------------|
-| POST | /scm/oauth/initiate | Start OAuth flow | Yes |
-| GET | /scm/oauth/callback | OAuth callback (redirects) | No |
-| POST | /scm/connect/pat | Connect with PAT | Yes |
-| GET | /scm/connections | List connections | Yes |
-| DELETE | /scm/connections/:id | Remove connection | Yes (admin) |
-| GET | /scm/connections/:id/available-repos | List repos from provider | Yes |
-| GET | /scm/repositories | List added repositories | Yes |
-| POST | /scm/repositories | Add repository | Yes |
-| GET | /scm/repositories/:id | Get repository details | Yes |
-| PUT | /scm/repositories/:id/config | Update scan config | Yes |
-| DELETE | /scm/repositories/:id | Remove repository | Yes (admin) |
-| GET | /scm/scans | List scans | Yes |
-| POST | /scm/scans | Trigger scan | Yes |
-| GET | /scm/scans/:id | Get scan details | Yes |
-| GET | /scm/findings | List findings | Yes |
-| GET | /scm/findings/:id | Get finding details | Yes |
-| PUT | /scm/findings/:id/status | Update finding status | Yes |
-| POST | /webhooks/github | GitHub webhook endpoint | No (signature verified) |
-
-## SAST Pipeline
-
-### Queue Module Structure
-```
-apps/api/src/queue/
-├── queue.module.ts
-├── queue.constants.ts
-├── services/queue.service.ts
-├── processors/
-│   ├── scan.processor.ts      # Main orchestrator
-│   └── notify.processor.ts    # GitHub notifications
-└── jobs/scan.job.ts           # Job type definitions
-```
-
-### Scanners Module Structure
-```
-apps/api/src/scanners/
-├── scanners.module.ts
-├── interfaces/scanner.interface.ts
-├── utils/git.service.ts
-├── execution/local-executor.service.ts
-├── parsers/sarif.parser.ts
-├── sast/semgrep/
-│   ├── semgrep.scanner.ts
-│   └── rules/security.yaml     # Local rules (18 rules, Windows-compatible)
-└── services/finding-processor.service.ts
-```
-
-### Scan Flow
-1. Webhook/manual trigger → Create scan record
-2. Enqueue ScanJob to BullMQ
-3. ScanProcessor:
-   - Clone repository with auth token
-   - Checkout specific commit
-   - Detect languages
-   - Select appropriate scanners
-   - Run scanners in parallel
-   - Parse SARIF output
-   - Deduplicate findings
-   - Store in database
-   - Update GitHub check run
-4. NotifyProcessor:
-   - Post final summary to PR
-
-## Database Schema
-
-### Tables
-| Table | Description |
-|-------|-------------|
-| tenants | Multi-tenant organizations |
-| users | User accounts with tenant association |
-| scm_connections | OAuth/PAT connections to SCM providers |
-| repositories | Repositories added for scanning |
-| scan_configs | Per-repo scan settings |
-| scans | Individual scan runs |
-| findings | Vulnerabilities found by scanners |
-| webhook_events | Webhook audit log |
-
-### RLS Policies
-All tables have:
-- `{table}_tenant_isolation` - Restricts access to tenant's data
-- `{table}_superuser_bypass` - Allows postgres user full access
-
-## Environment Variables
-```bash
-# Database
-DATABASE_URL="postgresql://postgres:threatdiviner_dev@localhost:5433/threatdiviner"
-
-# JWT
-JWT_SECRET="your-jwt-secret-here"
-JWT_EXPIRES_IN="15m"
-JWT_REFRESH_EXPIRES_IN="7d"
-
-# API URLs
-API_BASE_URL="http://localhost:3001"
-DASHBOARD_URL="http://localhost:3000"
-
-# SCM Integration
-TOKEN_ENCRYPTION_KEY="change-this-to-a-secure-random-string"
-GITHUB_CLIENT_ID=""
-GITHUB_CLIENT_SECRET=""
-GITHUB_WEBHOOK_SECRET=""
-
-# Redis (for BullMQ)
-REDIS_HOST="localhost"
-REDIS_PORT=6379
-
-# Scanning
-SCAN_WORKDIR="C:/tmp/threatdiviner-scans"  # Windows path
-SCANNER_TIMEOUT=300000
-SCAN_TIMEOUT=600000
-SEMGREP_PATH="semgrep"
-SEMGREP_USE_LOCAL_RULES="true"  # Optional: force local rules (auto-detected on Windows)
-```
-
-## Auth Module (Local Copy)
-
-### Location
-```
-apps/api/src/libs/auth/
-```
-
-### Features
-- Multi-tenant JWT authentication
-- httpOnly cookie tokens (access + refresh)
-- Tenant middleware for RLS context
-- Role-based access control decorators
-- Fully contained in the project (no external dependencies)
-
-### Test Credentials
-| Tenant | Email | Password | Role |
-|--------|-------|----------|------|
-| acme-corp | admin@acme.com | admin123 | admin |
-| acme-corp | dev@acme.com | dev123 | member |
-| beta-inc | admin@beta.io | admin123 | admin |
-| beta-inc | dev@beta.io | dev123 | member |
-
-## Database Configuration
-
-### Connection
-```
-Host: localhost
-Port: 5433 (mapped to internal 5432)
-Database: threatdiviner
-User: postgres
-Password: threatdiviner_dev
-```
-
-## Infrastructure Status
-| Service | Status | Port |
-|---------|--------|------|
-| Postgres | Running | 5433 |
-| Redis | Running | 6379 |
-| MinIO | Running | 9000/9001 |
-| Qdrant | Running | 6333/6334 |
-| API | Running | 3001 |
-| Dashboard | Running | 3000 |
-
-## Next Steps
-1. ~~Install Semgrep binary for local testing~~ ✅ DONE - 18 local rules working
-2. Test full scan flow with a real repository (GitHub OAuth + trigger scan via UI)
-3. ~~Add Bandit scanner (Python)~~ ✅ DONE
-4. ~~Add Gosec scanner (Go)~~ ✅ DONE
-5. ~~Add Trivy scanner (SCA/containers)~~ ✅ DONE
-6. ~~Add Gitleaks scanner (secrets)~~ ✅ DONE
-7. ~~Complete AI Triage integration~~ ✅ DONE - API endpoints + auto-triage during scan
-8. ~~Add triage UI in findings page~~ ✅ DONE - AI analysis, confidence, remediation displayed
-9. Bull Board UI at /admin/queues (may need custom implementation)
-10. Install Gosec binary (requires Go installation)
-
-## Scanner Status
-| Scanner | Type | Status | Binary Required |
-|---------|------|--------|-----------------|
-| Semgrep | SAST | ✅ Working | semgrep |
-| Bandit | SAST (Python) | 🔧 Ready | bandit (pip install) |
-| Gosec | SAST (Go) | 🔧 Ready | gosec (go install) |
-| Trivy | SCA | 🔧 Ready | trivy |
-| Gitleaks | Secrets | 🔧 Ready | gitleaks |
-
-## AI Triage
-- **Module**: `apps/api/src/ai/`
-- **Service**: `AiService` with `triageFinding()` and `batchTriageFindings()`
-- **Controller**: `AiController` with REST endpoints
-- **Config**: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_TRIAGE_ENABLED`, `AI_TRIAGE_BATCH_SIZE`
-- **Returns**: Analysis, suggested severity, false positive likelihood, exploitability, remediation, references
-
-### AI Triage API Endpoints
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /ai/status | Check if AI is available |
-| POST | /ai/triage/:findingId | Triage single finding |
-| POST | /ai/triage/batch | Triage multiple findings |
-| GET | /ai/triage/:findingId | Get triage result |
-
-### Auto-Triage During Scan
-- When `AI_TRIAGE_ENABLED=true`, high/critical findings are auto-triaged after scan
-- Configurable batch size via `AI_TRIAGE_BATCH_SIZE` (default: 10)
-- Results stored in finding: `aiAnalysis`, `aiConfidence`, `aiSeverity`, `aiFalsePositive`, `aiExploitability`, `aiRemediation`, `aiTriagedAt`
-
-### Dashboard UI
-- AI column in findings table shows triage status (FP/OK + confidence %)
-- Finding modal has AI Triage section with:
-  - "Run AI Triage" / "Re-analyze" buttons
-  - Confidence score with color coding
-  - False positive indicator
-  - Suggested severity
-  - Exploitability rating
-  - AI analysis text
-  - Suggested remediation
-
-## Debug Logs
-API logs for scan debugging: `C:\Users\ayazg\AppData\Local\Temp\claude\C--dev-threatdiviner\tasks\bd7676b.output`
-
-## Commands
-```bash
-# Build API
-cd apps/api && pnpm build
-
-# Run API
-cd apps/api && pnpm start:dev
-
-# Run seed
-cd apps/api && pnpm db:seed
-
-# Run Dashboard
-cd apps/dashboard && pnpm dev
-
-# Regenerate Prisma client
-cd apps/api && npx prisma generate
-
-# Push schema changes (dev)
-cd apps/api && npx prisma db push
+apps/
+├── api/                  # NestJS backend (port 3001)
+│   └── src/
+│       ├── ai/           # AI triage module
+│       ├── auth/         # Tenant auth
+│       ├── libs/auth/    # Auth package with RBAC
+│       ├── notifications/ # Slack notifications
+│       ├── platform/     # Platform admin API
+│       ├── prisma/       # Database
+│       ├── queue/        # BullMQ job processing
+│       ├── reporting/    # PDF generation
+│       ├── scanners/     # Security scanners
+│       └── scm/          # GitHub/GitLab integration
+│
+├── dashboard/            # Next.js customer dashboard (port 3000)
+│   └── src/
+│       └── app/dashboard/
+│           ├── connections/
+│           ├── repositories/
+│           ├── scans/
+│           ├── findings/
+│           └── settings/
+│
+└── admin/                # Next.js platform admin (port 3002)
+    └── src/
+        └── app/
+            ├── login/
+            └── (dashboard)/
+                ├── tenants/
+                └── settings/
 ```
 
 ---
-*Last updated: 2025-12-20 (Added 4 scanners + AI triage module + display fixes) — CLI Session*
+
+## Database Schema (Key Models)
+
+```prisma
+model Tenant {
+  id               String   @id
+  name             String
+  slug             String   @unique
+  plan             String   // free, pro, enterprise
+  maxUsers         Int
+  maxRepositories  Int
+  aiTriageEnabled  Boolean
+  isActive         Boolean
+}
+
+model Finding {
+  // ... standard fields ...
+  aiAnalysis       String?
+  aiConfidence     Float?
+  aiSeverity       String?
+  aiFalsePositive  Boolean?
+  aiExploitability String?
+  aiRemediation    String?
+  aiTriagedAt      DateTime?
+}
+
+model PlatformConfig {
+  aiProvider             String
+  aiModel                String
+  aiApiKey               String?
+  defaultPlan            String
+  defaultMaxUsers        Int
+  defaultMaxRepositories Int
+  maintenanceMode        Boolean
+}
+
+model PlatformAdmin {
+  email        String   @unique
+  passwordHash String
+  name         String
+  isSuperAdmin Boolean
+  lastLoginAt  DateTime?
+}
+```
+
+---
+
+## Pending Tasks
+
+### High Priority
+1. **Gosec binary installation** - Requires Go to be installed
+2. **Prisma migrate** - Run `npx prisma migrate dev` after stopping API
+3. **Team management API** - Backend endpoints for inviting/managing users
+4. **Profile update API** - Backend endpoints for profile/password changes
+
+### Medium Priority
+1. **User model enhancements** - Add `name`, `status`, `lastLoginAt` fields
+2. **Invitation system** - Email-based team member invitations
+3. **Webhook events** - GitHub/GitLab webhook handlers for auto-scan
+
+### Low Priority
+1. **Rate limiting** - Add rate limits to API endpoints
+2. **Audit logging** - Track admin actions
+3. **Email notifications** - Alternative to Slack
+
+---
+
+## Environment Variables
+
+```env
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/threatdiviner
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# JWT
+JWT_SECRET=your-secret-key
+
+# AI (Anthropic)
+ANTHROPIC_API_KEY=sk-ant-...
+AI_MODEL=claude-sonnet-4-20250514
+
+# MinIO
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=threatdiviner
+
+# GitHub OAuth (optional)
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+```
+
+---
+
+## Running the Project
+
+```bash
+# Start infrastructure
+docker-compose up -d
+
+# API (port 3001)
+cd apps/api
+pnpm install
+npx prisma generate
+npx prisma db push
+pnpm start:dev
+
+# Dashboard (port 3000)
+cd apps/dashboard
+pnpm install
+pnpm dev
+
+# Admin Portal (port 3002)
+cd apps/admin
+pnpm install
+pnpm dev
+```
+
+---
+
+## Git Status
+
+Uncommitted changes in:
+- `apps/` - All new code
+- `docker-compose.yml`
+
+Consider committing with:
+```bash
+git add apps/ docker-compose.yml
+git commit -m "feat: complete phase 1 - multi-scanner, AI triage, notifications, reporting, RBAC, admin portal"
+```
+
+---
+
+## Notes for Next Session
+
+1. Run `npx prisma migrate dev` to apply schema changes
+2. Create initial platform admin:
+   ```typescript
+   await prisma.platformAdmin.create({
+     data: {
+       email: 'admin@example.com',
+       passwordHash: await bcrypt.hash('password', 10),
+       name: 'Admin',
+       isSuperAdmin: true,
+     }
+   });
+   ```
+3. Install Go for Gosec scanner if needed
+4. Test all features end-to-end before production

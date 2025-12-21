@@ -305,6 +305,46 @@ export const dashboardApi = {
     fetchApi<DashboardStats>('/dashboard/stats'),
 };
 
+// Notifications API
+export interface NotificationConfig {
+  id?: string;
+  slackEnabled: boolean;
+  slackWebhookUrl: string | null;
+  slackChannel: string | null;
+  notifyOnScanStart: boolean;
+  notifyOnScanComplete: boolean;
+  notifyOnCritical: boolean;
+  notifyOnHigh: boolean;
+}
+
+export const notificationsApi = {
+  getConfig: () =>
+    fetchApi<NotificationConfig>('/notifications/config'),
+
+  updateConfig: (config: Partial<NotificationConfig>) =>
+    fetchApi<NotificationConfig>('/notifications/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
+
+  testSlack: () =>
+    fetchApi<{ success: boolean; message: string }>('/notifications/test-slack', {
+      method: 'POST',
+    }),
+};
+
+// Reports API
+export const reportsApi = {
+  getScanReport: (scanId: string) =>
+    `${API_URL}/reports/scan/${scanId}/pdf`,
+
+  getRepositoryReport: (repositoryId: string) =>
+    `${API_URL}/reports/repository/${repositoryId}/pdf`,
+
+  getSummaryReport: () =>
+    `${API_URL}/reports/summary/pdf`,
+};
+
 // AI Triage API
 export const aiApi = {
   getStatus: () =>

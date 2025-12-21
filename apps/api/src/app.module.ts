@@ -10,6 +10,7 @@ import { ScannersModule } from './scanners/scanners.module';
 import { AiModule } from './ai/ai.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportingModule } from './reporting/reporting.module';
+import { PlatformModule } from './platform/platform.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ReportingModule } from './reporting/reporting.module';
     AiModule,
     NotificationsModule,
     ReportingModule,
+    PlatformModule,
   ],
   controllers: [HealthController],
   providers: [],

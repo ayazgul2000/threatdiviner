@@ -1,415 +1,120 @@
-# ThreatDiviner - Changelog
+# ThreatDiviner Changelog
 
-## 2025-12-20 Session 8
-**Completed:**
-- Complete AI Triage feature integration
-- AI triage API endpoints (controller + routes)
-- Auto-triage during scan for high/critical findings
-- Dashboard UI for AI triage with interactive analysis
+All notable changes to this project will be documented in this file.
 
-**AI Triage Implementation:**
-- Created `AiController` with REST endpoints:
-  - `GET /ai/status` - Check AI availability
-  - `POST /ai/triage/:findingId` - Triage single finding
-  - `POST /ai/triage/batch` - Batch triage (max 50)
-  - `GET /ai/triage/:findingId` - Get triage result
-- Auto-triage in `ScanProcessor`:
-  - Runs after findings stored (if `AI_TRIAGE_ENABLED=true`)
-  - Processes high/critical findings up to `AI_TRIAGE_BATCH_SIZE`
-  - Non-blocking (scan completes even if AI fails)
+## [Unreleased] - 2024-12-22
 
-**Prisma Schema Updates:**
-- Added AI triage fields to Finding model:
-  - `aiSeverity` - AI-suggested severity
-  - `aiFalsePositive` - AI false positive detection
-  - `aiExploitability` - Exploitability rating (easy/moderate/difficult/unlikely)
-  - `aiRemediation` - AI-suggested fix
-  - `aiTriagedAt` - Timestamp of AI analysis
-  - `firstSeenAt` - First occurrence tracking
+### Session 3: Platform Features + Admin Portal
 
-**Dashboard UI:**
-- Added AI column to findings table (shows FP/OK badge + confidence %)
-- Finding modal AI Triage section:
-  - "Run AI Triage" button (appears when AI available, not triaged)
-  - "Re-analyze" button (appears when already triaged)
-  - Confidence score with color coding (green >80%, yellow 60-80%, red <60%)
-  - False positive indicator badge
-  - Suggested severity badge
-  - Exploitability badge (color-coded)
-  - AI analysis text
-  - Suggested remediation text
-  - Timestamp of analysis
+#### Added - Slack Notifications Module
+- `apps/api/src/notifications/notifications.module.ts` - Module setup
+- `apps/api/src/notifications/notifications.service.ts` - Core notification logic
+- `apps/api/src/notifications/notifications.controller.ts` - REST endpoints
+- `apps/api/src/notifications/slack/slack.service.ts` - Slack webhook integration
+- `apps/api/src/notifications/slack/slack.templates.ts` - Block Kit message templates
+- Dashboard API client updated with `notificationsApi`
 
-**Environment Variables Added:**
-- `AI_TRIAGE_ENABLED` - Enable/disable auto-triage (default: true)
-- `AI_TRIAGE_BATCH_SIZE` - Max findings per auto-triage batch (default: 10)
-- `GITLEAKS_PATH` - Path to gitleaks binary
-- `TRIVY_PATH` - Path to trivy binary
+#### Added - PDF Reporting Module
+- `apps/api/src/reporting/reporting.module.ts` - Module setup
+- `apps/api/src/reporting/reporting.service.ts` - MinIO storage integration
+- `apps/api/src/reporting/reporting.controller.ts` - REST endpoints for PDF downloads
+- `apps/api/src/reporting/generators/pdf.generator.ts` - PDFKit report generation
+- Dashboard API client updated with `reportsApi`
 
-**Scanner Binaries Installed:**
-- Bandit v1.9.2 (pip)
-- Gitleaks v8.30.0 (chocolatey)
-- Trivy v0.68.2 (chocolatey)
-- Gosec - Not installed (requires Go)
+#### Added - Enhanced RBAC System
+- `apps/api/src/libs/auth/permissions/permissions.enum.ts` - Permission and Role enums
+- `apps/api/src/libs/auth/permissions/permissions.decorator.ts` - @RequirePermissions decorator
+- `apps/api/src/libs/auth/permissions/permissions.guard.ts` - NestJS permission guard
+- Role-Permission matrix: viewer, developer, member, security_lead, admin
 
-**Files Created:**
-- `apps/api/src/ai/ai.controller.ts` - AI triage REST controller
+#### Added - Dashboard Settings Pages
+- `apps/dashboard/src/app/dashboard/settings/page.tsx` - Settings redirect
+- `apps/dashboard/src/app/dashboard/settings/layout.tsx` - Settings layout with sidebar
+- `apps/dashboard/src/app/dashboard/settings/notifications/page.tsx` - Slack config UI
+- `apps/dashboard/src/app/dashboard/settings/team/page.tsx` - Team management UI
+- `apps/dashboard/src/app/dashboard/settings/profile/page.tsx` - Profile/password UI
+- Updated sidebar with Settings navigation link
 
-**Files Updated:**
-- `apps/api/src/ai/ai.module.ts` - Added controller and PrismaModule
-- `apps/api/src/ai/index.ts` - Export controller
-- `apps/api/src/queue/processors/scan.processor.ts` - Added auto-triage step
-- `apps/api/src/scanners/scanners.module.ts` - Added AiModule import
-- `apps/api/prisma/schema.prisma` - Added AI triage fields
-- `apps/api/.env` - Added AI and scanner path variables
-- `apps/dashboard/src/lib/api.ts` - Added AI types and aiApi
-- `apps/dashboard/src/app/dashboard/findings/page.tsx` - AI triage UI
+#### Added - Platform Admin Portal (apps/admin)
+- New Next.js 14 application for platform administration
+- Login page with platform admin authentication
+- Dashboard with system health monitoring (API, DB, Redis, Storage)
+- Tenant management CRUD (plans, limits, AI triage settings)
+- Platform settings (AI provider/model, API key, maintenance mode)
+
+#### Added - Platform API Backend
+- `apps/api/src/platform/platform.module.ts` - Platform module
+- `apps/api/src/platform/platform-auth.controller.ts` - Admin login/logout
+- `apps/api/src/platform/platform-auth.service.ts` - JWT-based admin auth
+- `apps/api/src/platform/platform-tenants.controller.ts` - Tenant CRUD
+- `apps/api/src/platform/platform-tenants.service.ts` - Tenant logic with stats
+- `apps/api/src/platform/platform-config.controller.ts` - Platform config
+- `apps/api/src/platform/platform-config.service.ts` - AI/defaults management
+- `apps/api/src/platform/platform-stats.controller.ts` - Stats endpoints
+- `apps/api/src/platform/platform-stats.service.ts` - Platform-wide metrics
+- `apps/api/src/platform/guards/platform-admin.guard.ts` - Admin route protection
+- `apps/api/src/platform/decorators/current-admin.decorator.ts` - Current admin param
+
+#### Changed - Prisma Schema
+- `Tenant` model: Added `maxUsers`, `maxRepositories`, `aiTriageEnabled`, `isActive`
+- `PlatformConfig` model: Restructured for AI settings, defaults, maintenance mode
+- `PlatformAdmin` model: Added `isSuperAdmin`, `lastLoginAt`
 
 ---
 
-## 2025-12-20 Session 7
-**Completed:**
-- Fixed display issues (Invalid Date, long rule names, temp dir in paths)
-- Added 4 new scanners: Gitleaks, Trivy, Bandit, Gosec
-- Started AI Triage feature with Claude integration
+## [Previous Session] - 2024-12-21
 
-**Display Fixes:**
-- **Invalid Date**: Frontend now uses `createdAt` as fallback when `firstSeenAt` is undefined
-- **Long rule names**: Added `getShortRuleId()` - extracts last segment from dotted rule IDs
-- **Temp dir paths**: Added `getRelativePath()` - strips workDir prefix from file paths
-- Backend now stores cleaned data: `extractShortRuleId()` and `getRelativePath()` in FindingProcessorService
+### Session 2: Multi-Scanner + AI Triage
 
-**New Scanners:**
-- **Gitleaks** (`apps/api/src/scanners/secrets/gitleaks/`) - Secrets detection, outputs SARIF
-- **Trivy** (`apps/api/src/scanners/sca/trivy/`) - SCA for dependencies, outputs SARIF
-- **Bandit** (`apps/api/src/scanners/sast/bandit/`) - Python SAST, outputs JSON with custom parser
-- **Gosec** (`apps/api/src/scanners/sast/gosec/`) - Go SAST, outputs SARIF
+#### Added - Multiple Security Scanners
+- Semgrep scanner (SAST)
+- Gitleaks scanner (secrets detection)
+- Trivy scanner (container/dependency vulnerabilities)
+- Bandit scanner (Python security)
+- Gosec scanner (Go security - requires Go installation)
 
-**AI Triage Feature:**
-- Created `AiModule` with `AiService` using Anthropic Claude SDK
-- `triageFinding()` - Analyzes a finding and returns severity assessment, false positive likelihood, exploitability, remediation
-- `batchTriageFindings()` - Process multiple findings with rate limiting
-- Config: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (defaults to claude-sonnet-4-20250514)
+#### Added - AI Triage System
+- `apps/api/src/ai/ai.module.ts` - AI module setup
+- `apps/api/src/ai/ai.service.ts` - Claude API integration
+- `apps/api/src/ai/ai.controller.ts` - Triage endpoints
+- Auto-triage after scan completion in scan processor
+- Dashboard UI for AI triage with modal display
 
-**Files Created:**
-- `apps/api/src/ai/ai.service.ts` - Claude AI integration for triage
-- `apps/api/src/ai/ai.module.ts` - NestJS module
-- `apps/api/src/scanners/secrets/gitleaks/gitleaks.scanner.ts`
-- `apps/api/src/scanners/sca/trivy/trivy.scanner.ts`
-- `apps/api/src/scanners/sast/bandit/bandit.scanner.ts`
-- `apps/api/src/scanners/sast/gosec/gosec.scanner.ts`
+#### Changed - Finding Model
+- Added AI fields: `aiAnalysis`, `aiConfidence`, `aiSeverity`, `aiFalsePositive`
+- Added: `aiExploitability`, `aiRemediation`, `aiTriagedAt`, `firstSeenAt`
 
-**Files Updated:**
-- `apps/dashboard/src/app/dashboard/findings/page.tsx` - Display fixes
-- `apps/dashboard/src/lib/api.ts` - Added `createdAt` to Finding type
-- `apps/api/src/scanners/services/finding-processor.service.ts` - Path/ruleId normalization
-- `apps/api/src/scanners/scanners.module.ts` - Registered all new scanners
-- `apps/api/src/queue/processors/scan.processor.ts` - Injected and configured new scanners
-- `apps/api/src/app.module.ts` - Added AiModule
-
-**Dependencies Added:**
-- `@anthropic-ai/sdk` - Claude API client
+#### Added - Dashboard AI Triage UI
+- AI triage button in findings modal
+- Display AI analysis, confidence, exploitability
+- Batch triage support
 
 ---
 
-## 2025-12-20 Session 6
-**Completed:**
-- Fixed Semgrep YAML syntax errors causing scans to fail with exit code 7
-- Semgrep now working end-to-end on Windows (tested: 73 findings detected)
+## [Initial] - 2024-12-20
 
-**Root Cause Analysis:**
-- Scans were completing in 6ms with 0 findings
-- Debug logging revealed Semgrep was being selected and run correctly
-- Semgrep exit code 7 = configuration error
-- Manual test revealed: "Invalid YAML file... mapping values are not allowed here"
-- Issue: `security.yaml` had unquoted patterns containing YAML special characters
+### Session 1: Project Foundation
 
-**Bug Fixes:**
-- **YAML syntax errors in security.yaml**: Multiple patterns contained `{}`, `:`, `[]` characters that YAML interpreted as mappings
-  - Line 46: `dangerouslySetInnerHTML={{__html: $VAR}}` → quoted properly
-  - Line 147-149: CORS patterns with curly braces → quoted properly
-  - Line 160-161: Helmet patterns with ellipsis → fixed `...` syntax to `...,`
-  - Line 172-173: JWT verify patterns with nested braces → quoted properly
-  - All NoSQL/prototype pollution patterns → quoted properly
-- **XSS pattern fix**: Changed from invalid JSX attribute syntax to valid Semgrep pattern `<$EL dangerouslySetInnerHTML=... />`
-- **CORS header pattern fix**: Changed string literal to valid JavaScript: `$RES.setHeader("Access-Control-Allow-Origin", "*")`
+#### Added - Project Structure
+- Monorepo with apps/ directory (api, dashboard)
+- NestJS API backend with TypeScript
+- Next.js 14 dashboard with App Router
+- Docker Compose for local development
+- PostgreSQL + Redis + MinIO setup
 
-**Files Updated:**
-- `apps/api/src/scanners/sast/semgrep/rules/security.yaml` - Fixed all YAML syntax errors (18 rules now valid)
+#### Added - Core Modules
+- Authentication with JWT + cookies
+- Multi-tenant architecture with tenant context
+- SCM connections (GitHub OAuth/PAT)
+- Repository management
+- Scan queue with BullMQ
+- Basic Semgrep scanner
+- Findings storage and display
 
-**Verified Working:**
-- `semgrep scan --validate` passes with 0 errors, 18 rules
-- Test scan of API source: **73 findings detected**
-- SARIF output file generated correctly (50KB)
-
-**Debug logs location:** `C:\Users\ayazg\AppData\Local\Temp\claude\C--dev-threatdiviner\tasks\bd7676b.output`
-
----
-
-## 2025-12-20 Session 5
-**Completed:**
-- Fixed scan failing due to existing work directory from failed scans
-- Added QueueService to ScmService to actually enqueue scan jobs
-- Added local Semgrep rules to bypass Windows encoding issues
-
-**Bug Fixes:**
-- **Git clone failure fix**: Modified `createWorkDir()` in `git.service.ts` to clean up any existing directory before creating a fresh one
-  - Previous scans would fail with "directory already exists" if a prior scan failed mid-clone
-  - Now uses `fs.rm(workDir, { recursive: true, force: true })` before `fs.mkdir()`
-- **Scan jobs not being queued**: ScmService.triggerScan() had a TODO comment instead of calling `queueService.enqueueScan()`
-  - Added QueueService injection to ScmService
-  - Builds proper `ScanJobData` and enqueues to BullMQ
-- **Semgrep Windows encoding fix**: Registry rules fail with "charmap codec can't encode Unicode character '\u202a'"
-  - Created local rules file: `apps/api/src/scanners/sast/semgrep/rules/security.yaml`
-  - Modified SemgrepScanner to auto-detect Windows and use local rules
-  - Added `--no-git-ignore` flag to bypass Windows git ls-files issues
-  - Added Python UTF-8 encoding env vars (`PYTHONUTF8`, `PYTHONIOENCODING`)
-- **SCAN_WORKDIR path fix**: Changed from Unix `/tmp/...` to Windows `C:/tmp/...` in .env
-
-**Files Created:**
-- `apps/api/src/scanners/sast/semgrep/rules/security.yaml` - Local security rules (18 rules)
-
-**Files Updated:**
-- `apps/api/src/scanners/utils/git.service.ts` - createWorkDir() now cleans up existing directories
-- `apps/api/src/scm/services/scm.service.ts` - Added QueueService, calls enqueueScan()
-- `apps/api/src/scm/scm.module.ts` - Added QueueModule import
-- `apps/api/src/scanners/sast/semgrep/semgrep.scanner.ts` - Local rules + --no-git-ignore
-- `apps/api/src/scanners/execution/local-executor.service.ts` - Added Python UTF-8 encoding env vars
-- `apps/api/src/queue/processors/scan.processor.ts` - Added debug logging
-- `apps/api/.env` - Fixed SCAN_WORKDIR path for Windows
-
-**Verified Working:**
-- API starts with all modules initialized
-- Scan worker and Notify worker running
-- Scans now properly enqueued to Redis/BullMQ
-- Work directory cleanup prevents clone failures
-
-**Next:** Test full scan flow end-to-end with Semgrep
-
----
-
-## 2025-12-20 Session 4
-**Completed:**
-- Fixed BullMQ dependency issue (RESOLVED)
-- Full SAST pipeline now functional with queue workers
-
-**BullMQ Fix:**
-- Created custom `CustomBullModule` (`apps/api/src/queue/custom-bull.module.ts`)
-- Uses `bullmq` directly instead of `@nestjs/bullmq` wrapper
-- Removed `@nestjs/bullmq` dependency entirely
-- Updated processors to use standard NestJS services with Workers
-
-**Technical Details:**
-- `@nestjs/bullmq` had ModuleRef dependency injection issues with `@nestjs/core` 10.4.x
-- Custom module creates Queue instances via providers with injection tokens
-- Processors (`ScanProcessor`, `NotifyProcessor`) now implement `OnModuleInit`/`OnModuleDestroy`
-- Workers are created/destroyed with module lifecycle
-
-**Files Created:**
-- `apps/api/src/queue/custom-bull.module.ts` - Custom BullMQ module
-
-**Files Updated:**
-- `apps/api/src/app.module.ts` - Uses CustomBullModule instead of @nestjs/bullmq
-- `apps/api/src/queue/queue.module.ts` - Simplified, no longer imports BullModule
-- `apps/api/src/queue/services/queue.service.ts` - Uses @Inject instead of @InjectQueue
-- `apps/api/src/queue/processors/scan.processor.ts` - Standard NestJS service with Worker
-- `apps/api/src/queue/processors/notify.processor.ts` - Standard NestJS service with Worker
-- `apps/api/package.json` - Removed @nestjs/bullmq, kept bullmq
-
-**Verified Working:**
-- API starts with all modules initialized
-- CustomBullModule, QueueModule, ScannersModule all load
-- Scan worker and Notify worker start successfully
-- Full stack running: API (3001) + Dashboard (3000)
-
-**Next:** Install Semgrep, test full scan flow with real repository
-
----
-
-## 2025-12-19 Session 3
-**Completed:**
-- Feature 4: Dashboard UI (Complete)
-- Verified full stack running: API (3001) + Dashboard (3000)
-
-**Bug Fixes:**
-- OAuth callback redirect: Changed from `/settings/connections` to `/dashboard/connections`
-- AddRepository DTO: Added `externalId` as optional field to fix validation error
-- Scans page null safety: Fixed crash when `scan.trigger`, `scan.branch`, `scan.createdAt` are undefined
-
-**Dashboard UI Components (`apps/dashboard/src/components/ui/`):**
-- Button: Primary, secondary, danger, ghost variants with loading state
-- Card: Default, bordered, elevated variants with header/content/footer
-- Badge: Severity (critical, high, medium, low, info) and status badges
-- Table: Full table components with empty state
-- Modal: Accessible modal with header/body/footer
-
-**Dashboard Layout (`apps/dashboard/src/components/layout/`):**
-- Sidebar: Navigation with icons, active state, user info, logout
-- DashboardLayout: Sidebar + main content wrapper
-
-**Auth Context (`apps/dashboard/src/lib/auth-context.tsx`):**
-- Global auth state management
-- Auto-redirect on auth state change
-- Login/logout functions
-
-**API Client (`apps/dashboard/src/lib/api.ts`):**
-- Type-safe API client for all endpoints
-- authApi, connectionsApi, repositoriesApi, scansApi, findingsApi, dashboardApi
-
-**Dashboard Pages:**
-- Overview (`/dashboard`): Stats cards, severity breakdown, recent scans/findings
-- Connections (`/dashboard/connections`): OAuth/PAT flow, list/delete connections
-- Repositories (`/dashboard/repositories`): Add repos, trigger scans, manage
-- Scans (`/dashboard/scans`): List with trigger/status info
-- Findings (`/dashboard/findings`): Filter, detail modal, status updates
-
-**API Updates:**
-- Added `GET /scm/scans` - List all scans
-- Added `GET /scm/findings` - List findings with filters
-- Added `GET /scm/findings/:id` - Get finding details
-- Added `PUT /scm/findings/:id/status` - Update finding status
-- Fixed response format for list endpoints (returns arrays directly)
-
-**Files Created:**
-- `apps/dashboard/src/components/ui/*.tsx` (5 files)
-- `apps/dashboard/src/components/layout/*.tsx` (2 files)
-- `apps/dashboard/src/lib/api.ts`
-- `apps/dashboard/src/lib/auth-context.tsx`
-- `apps/dashboard/src/app/dashboard/layout.tsx`
-- `apps/dashboard/src/app/dashboard/connections/page.tsx`
-- `apps/dashboard/src/app/dashboard/repositories/page.tsx`
-- `apps/dashboard/src/app/dashboard/scans/page.tsx`
-- `apps/dashboard/src/app/dashboard/findings/page.tsx`
-
-**Files Updated:**
-- `apps/dashboard/src/app/layout.tsx` - Added AuthProvider
-- `apps/dashboard/src/app/page.tsx` - Uses auth context
-- `apps/dashboard/src/app/login/page.tsx` - Uses auth context and Button
-- `apps/dashboard/src/app/dashboard/page.tsx` - Overview with stats
-- `apps/api/src/scm/scm.controller.ts` - Added scan/findings list endpoints
-- `apps/api/src/scm/services/scm.service.ts` - Added listScans, listFindings methods
-
-**Next:** Install Semgrep, test full scan flow
-
----
-
-## 2025-12-19 Session 2
-**Completed:**
-- Feature 2: SCM Integration (API Layer)
-- Configured GitHub OAuth credentials and tested OAuth flow
-- Feature 3: SAST Pipeline (API Layer)
-
-**SAST Pipeline (Feature 3):**
-- BullMQ queue module with job types (scan, clone, sast, notify, cleanup)
-- Git service (clone with auth, checkout, language detection, cleanup)
-- Local executor service for running scanner binaries
-- SARIF parser for universal scanner output
-- Semgrep scanner implementation
-- Finding processor service (dedupe, store, count by severity)
-- Scan processor (main orchestrator) - clone → detect → scan → store → notify
-- Notify processor for GitHub check run updates and PR summaries
-
-**New Queue Names:**
-- scan-jobs, clone-jobs, sast-jobs, sca-jobs, secrets-jobs, notify-jobs, cleanup-jobs
-
-**New Environment Variables:**
-- REDIS_HOST, REDIS_PORT
-- SCAN_WORKDIR, SCANNER_TIMEOUT, SCAN_TIMEOUT
-- SEMGREP_PATH, BANDIT_PATH, GOSEC_PATH
-
-**Database:**
-- Added 6 new tables: scm_connections, repositories, scan_configs, scans, findings, webhook_events
-- RLS policies for all new tables (tenant isolation + superuser bypass)
-- Prisma schema updated with all models and relations
-
-**SCM Module (`apps/api/src/scm/`):**
-- CryptoService: AES-256-GCM token encryption
-- GitHubProvider: OAuth, PAT auth, webhooks, check runs
-- ScmService: Connection/repo management, scan triggers
-- ScmController: REST endpoints for all operations
-- WebhooksController: GitHub push/PR event handling
-
-**New Endpoints:**
-- `POST /scm/oauth/initiate` - Start OAuth flow
-- `GET /scm/oauth/callback` - OAuth callback
-- `POST /scm/connect/pat` - Connect with PAT
-- `GET /scm/connections` - List connections
-- `DELETE /scm/connections/:id` - Remove connection
-- `GET /scm/connections/:id/available-repos` - List provider repos
-- `GET /scm/repositories` - List added repos
-- `POST /scm/repositories` - Add repository
-- `GET /scm/repositories/:id` - Get repo details
-- `PUT /scm/repositories/:id/config` - Update scan config
-- `DELETE /scm/repositories/:id` - Remove repo
-- `POST /scm/scans` - Trigger scan
-- `GET /scm/scans/:id` - Get scan details
-- `POST /webhooks/github` - GitHub webhook endpoint
-
-**Environment Variables Added:**
-- API_BASE_URL, DASHBOARD_URL
-- TOKEN_ENCRYPTION_KEY
-- GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_WEBHOOK_SECRET
-
-**Next:** Dashboard UI for SCM, BullMQ job queue, scanner integration
-
----
-
-## 2025-12-19 Session 1
-**Completed:**
-- Scaffolded fresh Next.js 14.1.0 with create-next-app to fix ActionQueueContext bug
-- Moved auth module from @altaniche/auth symlink to local libs folder
-- Built dashboard login page with tenant/email/password form
-- Built protected dashboard page with user info display
-- Added auth state redirect on home page
-- Updated layout metadata (title: ThreatDiviner)
-
-**Dashboard Pages:**
-- `/login` - Login form with Organization, Email, Password fields
-- `/dashboard` - Protected page showing user info, tenant info, logout button
-- `/` - Redirects to /login or /dashboard based on auth state
-
-**Login Flow:**
-1. Visit localhost:3000 → redirects to /login
-2. Enter credentials → POST to API → sets httpOnly cookies
-3. Redirects to /dashboard → fetches profile → shows welcome
-4. Logout → clears cookies → redirects to /login
-
-**Result:**
-- Full auth flow working end-to-end
-- Dashboard integrates with API via httpOnly cookies
-- CORS configured for cross-origin requests
-
-**Note:** Next.js 14.1.0 has a security advisory - will need to upgrade later
-
-**Next:** Role-based guards, API key management
-
----
-
-## 2025-12-18 Session 2
-**Duration:** 3 hours
-**Completed:**
-- Auth module extracted to @altaniche/auth
-- Symlink integrated with ThreatDiviner
-- Dashboard Next.js downgrade attempted
-
-**Blockers:**
-- Dashboard hydration still broken
-
-**Next:** Fix dashboard, then switch auth to local copy
-
----
-
-## 2025-12-18 Session 1
-**Duration:** 2 hours
-**Completed:**
-- Docker Compose (Postgres, Redis, MinIO, Qdrant)
-- NestJS API scaffold + health check
-- Next.js dashboard scaffold
-- Prisma schema + RLS policies
-- Seed data (2 tenants, 4 users)
-- JWT auth with httpOnly cookies
-
-**Blockers:**
-- Postgres port conflict (fixed: 5433)
-
-**Next:** Test auth endpoints
+#### Added - Dashboard
+- Login page
+- Dashboard overview with stats
+- Connections management
+- Repositories list
+- Scans history
+- Findings list with severity filters
