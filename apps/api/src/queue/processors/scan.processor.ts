@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from '../../scm/services/crypto.service';
@@ -15,6 +16,7 @@ import { QUEUE_NAMES } from '../queue.constants';
 import { ScanJobData, NotifyJobData, FindingsCount } from '../jobs';
 import { IScanner, NormalizedFinding, ScanContext } from '../../scanners/interfaces';
 import { BULL_CONNECTION } from '../custom-bull.module';
+import { AiService, TriageRequest } from '../../ai/ai.service';
 
 type ScanStatus = 'pending' | 'queued' | 'cloning' | 'scanning' | 'analyzing' | 'storing' | 'notifying' | 'completed' | 'failed';
 
@@ -23,9 +25,13 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ScanProcessor.name);
   private worker: Worker | null = null;
 
+  private readonly aiTriageEnabled: boolean;
+  private readonly aiTriageBatchSize: number;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cryptoService: CryptoService,
+    private readonly configService: ConfigService,
     private readonly gitService: GitService,
     private readonly semgrepScanner: SemgrepScanner,
     private readonly banditScanner: BanditScanner,
@@ -35,8 +41,12 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly findingProcessor: FindingProcessorService,
     private readonly queueService: QueueService,
     private readonly githubProvider: GitHubProvider,
+    private readonly aiService: AiService,
     @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
-  ) {}
+  ) {
+    this.aiTriageEnabled = this.configService.get('AI_TRIAGE_ENABLED', 'false') === 'true';
+    this.aiTriageBatchSize = parseInt(this.configService.get('AI_TRIAGE_BATCH_SIZE', '10'), 10);
+  }
 
   async onModuleInit() {
     this.worker = new Worker(
@@ -111,18 +121,24 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
         dedupedFindings,
         workDir, // Pass workDir to strip from file paths
       );
+      await job.updateProgress(85);
+
+      // 5. AI Auto-triage (if enabled)
+      if (this.aiTriageEnabled && storedCount > 0) {
+        await this.runAutoTriage(scanId, repositoryId, job.data);
+      }
       await job.updateProgress(90);
 
-      // 5. Count findings by severity
+      // 6. Count findings by severity
       const findingsCount = await this.findingProcessor.countFindingsBySeverity(scanId);
 
-      // 6. Notify (GitHub check run, PR comment)
+      // 7. Notify (GitHub check run, PR comment)
       if (job.data.pullRequestId || job.data.checkRunId) {
         await this.updateScanStatus(scanId, 'notifying');
         await this.enqueueNotification(job.data, findingsCount, startTime);
       }
 
-      // 7. Complete
+      // 8. Complete
       await this.completeScan(scanId, storedCount, Date.now() - startTime);
       await job.updateProgress(100);
 
@@ -377,5 +393,95 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       return 'neutral';
     }
     return 'success';
+  }
+
+  private async runAutoTriage(
+    scanId: string,
+    repositoryId: string,
+    data: ScanJobData,
+  ): Promise<void> {
+    try {
+      // Check if AI is available
+      const isAvailable = await this.aiService.isAvailable();
+      if (!isAvailable) {
+        this.logger.warn('AI triage not available - skipping auto-triage');
+        return;
+      }
+
+      // Get the repository info for context
+      const repository = await this.prisma.repository.findUnique({
+        where: { id: repositoryId },
+        select: { name: true, language: true },
+      });
+
+      // Get high and critical severity findings that haven't been triaged
+      const findings = await this.prisma.finding.findMany({
+        where: {
+          scanId,
+          severity: { in: ['critical', 'high'] },
+          aiTriagedAt: null, // Not already triaged
+        },
+        take: this.aiTriageBatchSize,
+        orderBy: [
+          { severity: 'asc' }, // critical first (alphabetical)
+          { createdAt: 'asc' },
+        ],
+      });
+
+      if (findings.length === 0) {
+        this.logger.log('No high/critical findings to auto-triage');
+        return;
+      }
+
+      this.logger.log(`Auto-triaging ${findings.length} high/critical findings...`);
+
+      // Build triage requests
+      const requests: TriageRequest[] = findings.map((f) => ({
+        finding: {
+          id: f.id,
+          title: f.title,
+          description: f.description || '',
+          severity: f.severity,
+          ruleId: f.ruleId,
+          filePath: f.filePath,
+          startLine: f.startLine || 0,
+          snippet: f.snippet || undefined,
+          cweId: f.cweId || undefined,
+        },
+        repositoryContext: {
+          name: repository?.name || data.fullName,
+          language: repository?.language || 'unknown',
+        },
+      }));
+
+      // Run batch triage
+      const results = await this.aiService.batchTriageFindings(requests);
+
+      // Update findings with AI triage results
+      let triaged = 0;
+      for (const finding of findings) {
+        const result = results.get(finding.id);
+        if (result) {
+          await this.prisma.finding.update({
+            where: { id: finding.id },
+            data: {
+              aiAnalysis: result.analysis,
+              aiConfidence: result.confidence,
+              aiSeverity: result.suggestedSeverity,
+              aiFalsePositive: result.isLikelyFalsePositive,
+              aiExploitability: result.exploitability,
+              aiRemediation: result.remediation,
+              aiTriagedAt: new Date(),
+            },
+          });
+          triaged++;
+        }
+      }
+
+      this.logger.log(`Auto-triaged ${triaged} findings`);
+    } catch (error) {
+      // Log but don't fail the scan if AI triage fails
+      this.logger.error(`Auto-triage failed: ${error}`);
+    }
   }
 }

@@ -70,7 +70,13 @@
       "Bash(dir C:tmptest-scan.sarif)",
       "Bash(cmd //c \"dir C:\\\\tmp\\\\test-scan.sarif\")",
       "Bash(cmd //c \"del /f nul 2>nul\")",
-      "Bash(gitleaks version)"
+      "Bash(gitleaks version)",
+      "Bash(bandit --version:*)",
+      "Bash(trivy:*)",
+      "Bash(gosec:*)",
+      "Bash(choco --version)",
+      "Bash(choco install:*)",
+      "Bash(go version:*)"
     ]
   }
 }

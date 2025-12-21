@@ -1,5 +1,72 @@
 # ThreatDiviner - Changelog
 
+## 2025-12-20 Session 8
+**Completed:**
+- Complete AI Triage feature integration
+- AI triage API endpoints (controller + routes)
+- Auto-triage during scan for high/critical findings
+- Dashboard UI for AI triage with interactive analysis
+
+**AI Triage Implementation:**
+- Created `AiController` with REST endpoints:
+  - `GET /ai/status` - Check AI availability
+  - `POST /ai/triage/:findingId` - Triage single finding
+  - `POST /ai/triage/batch` - Batch triage (max 50)
+  - `GET /ai/triage/:findingId` - Get triage result
+- Auto-triage in `ScanProcessor`:
+  - Runs after findings stored (if `AI_TRIAGE_ENABLED=true`)
+  - Processes high/critical findings up to `AI_TRIAGE_BATCH_SIZE`
+  - Non-blocking (scan completes even if AI fails)
+
+**Prisma Schema Updates:**
+- Added AI triage fields to Finding model:
+  - `aiSeverity` - AI-suggested severity
+  - `aiFalsePositive` - AI false positive detection
+  - `aiExploitability` - Exploitability rating (easy/moderate/difficult/unlikely)
+  - `aiRemediation` - AI-suggested fix
+  - `aiTriagedAt` - Timestamp of AI analysis
+  - `firstSeenAt` - First occurrence tracking
+
+**Dashboard UI:**
+- Added AI column to findings table (shows FP/OK badge + confidence %)
+- Finding modal AI Triage section:
+  - "Run AI Triage" button (appears when AI available, not triaged)
+  - "Re-analyze" button (appears when already triaged)
+  - Confidence score with color coding (green >80%, yellow 60-80%, red <60%)
+  - False positive indicator badge
+  - Suggested severity badge
+  - Exploitability badge (color-coded)
+  - AI analysis text
+  - Suggested remediation text
+  - Timestamp of analysis
+
+**Environment Variables Added:**
+- `AI_TRIAGE_ENABLED` - Enable/disable auto-triage (default: true)
+- `AI_TRIAGE_BATCH_SIZE` - Max findings per auto-triage batch (default: 10)
+- `GITLEAKS_PATH` - Path to gitleaks binary
+- `TRIVY_PATH` - Path to trivy binary
+
+**Scanner Binaries Installed:**
+- Bandit v1.9.2 (pip)
+- Gitleaks v8.30.0 (chocolatey)
+- Trivy v0.68.2 (chocolatey)
+- Gosec - Not installed (requires Go)
+
+**Files Created:**
+- `apps/api/src/ai/ai.controller.ts` - AI triage REST controller
+
+**Files Updated:**
+- `apps/api/src/ai/ai.module.ts` - Added controller and PrismaModule
+- `apps/api/src/ai/index.ts` - Export controller
+- `apps/api/src/queue/processors/scan.processor.ts` - Added auto-triage step
+- `apps/api/src/scanners/scanners.module.ts` - Added AiModule import
+- `apps/api/prisma/schema.prisma` - Added AI triage fields
+- `apps/api/.env` - Added AI and scanner path variables
+- `apps/dashboard/src/lib/api.ts` - Added AI types and aiApi
+- `apps/dashboard/src/app/dashboard/findings/page.tsx` - AI triage UI
+
+---
+
 ## 2025-12-20 Session 7
 **Completed:**
 - Fixed display issues (Invalid Date, long rule names, temp dir in paths)

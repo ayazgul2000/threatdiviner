@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button, Card, CardContent, Badge, SeverityBadge, Modal, ModalHeader, ModalBody, ModalFooter, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui';
-import { findingsApi, type Finding } from '@/lib/api';
+import { findingsApi, aiApi, type Finding, type AiTriageResult } from '@/lib/api';
 
 export default function FindingsPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
@@ -10,10 +10,19 @@ export default function FindingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [triaging, setTriaging] = useState(false);
+  const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   const [filters, setFilters] = useState({
     severity: '',
     status: '',
   });
+
+  // Check if AI triage is available
+  useEffect(() => {
+    aiApi.getStatus()
+      .then((status) => setAiAvailable(status.available))
+      .catch(() => setAiAvailable(false));
+  }, []);
 
   const fetchFindings = async () => {
     setLoading(true);
@@ -48,6 +57,53 @@ export default function FindingsPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update status');
+    }
+  };
+
+  const handleAiTriage = async (findingId: string) => {
+    setTriaging(true);
+    try {
+      const result = await aiApi.triageFinding(findingId);
+      // Update the finding with AI triage results
+      const updatedFinding = {
+        ...findings.find(f => f.id === findingId)!,
+        aiAnalysis: result.aiAnalysis,
+        aiConfidence: result.aiConfidence,
+        aiSeverity: result.aiSeverity,
+        aiFalsePositive: result.aiFalsePositive,
+        aiExploitability: result.aiExploitability,
+        aiRemediation: result.aiRemediation,
+        aiTriagedAt: result.aiTriagedAt,
+      };
+      setFindings(findings.map(f => f.id === findingId ? updatedFinding : f));
+      if (selectedFinding?.id === findingId) {
+        setSelectedFinding(updatedFinding);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run AI triage');
+    } finally {
+      setTriaging(false);
+    }
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.8) return 'text-green-600 dark:text-green-400';
+    if (confidence >= 0.6) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-red-600 dark:text-red-400';
+  };
+
+  const getExploitabilityBadge = (exploitability: string | null | undefined) => {
+    switch (exploitability) {
+      case 'easy':
+        return <Badge variant="danger">Easy</Badge>;
+      case 'moderate':
+        return <Badge variant="warning">Moderate</Badge>;
+      case 'difficult':
+        return <Badge variant="info">Difficult</Badge>;
+      case 'unlikely':
+        return <Badge variant="success">Unlikely</Badge>;
+      default:
+        return null;
     }
   };
 
@@ -163,13 +219,14 @@ export default function FindingsPage() {
                 <TableHead>Title</TableHead>
                 <TableHead>File</TableHead>
                 <TableHead>Scanner</TableHead>
+                <TableHead>AI</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>First Seen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {findings.length === 0 ? (
-                <TableEmpty colSpan={6} message="No findings match your filters." />
+                <TableEmpty colSpan={7} message="No findings match your filters." />
               ) : (
                 findings.map((finding) => (
                   <TableRow
@@ -194,6 +251,22 @@ export default function FindingsPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="default">{finding.scanner}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {finding.aiTriagedAt ? (
+                        <div className="flex items-center gap-1">
+                          {finding.aiFalsePositive ? (
+                            <Badge variant="warning" size="sm">FP</Badge>
+                          ) : (
+                            <Badge variant="success" size="sm">OK</Badge>
+                          )}
+                          <span className={`text-xs ${getConfidenceColor(finding.aiConfidence || 0)}`}>
+                            {Math.round((finding.aiConfidence || 0) * 100)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusColor(finding.status) as any}>
@@ -278,6 +351,97 @@ export default function FindingsPage() {
                       {selectedFinding.status.replace('_', ' ')}
                     </Badge>
                   </div>
+                </div>
+
+                {/* AI Triage Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">AI Triage</h4>
+                    {aiAvailable && !selectedFinding.aiTriagedAt && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleAiTriage(selectedFinding.id)}
+                        disabled={triaging}
+                      >
+                        {triaging ? 'Analyzing...' : 'Run AI Triage'}
+                      </Button>
+                    )}
+                    {aiAvailable && selectedFinding.aiTriagedAt && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleAiTriage(selectedFinding.id)}
+                        disabled={triaging}
+                      >
+                        {triaging ? 'Re-analyzing...' : 'Re-analyze'}
+                      </Button>
+                    )}
+                  </div>
+
+                  {selectedFinding.aiTriagedAt ? (
+                    <div className="space-y-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                      {/* AI Summary Row */}
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Confidence:</span>
+                          <span className={`font-medium ${getConfidenceColor(selectedFinding.aiConfidence || 0)}`}>
+                            {Math.round((selectedFinding.aiConfidence || 0) * 100)}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">False Positive:</span>
+                          {selectedFinding.aiFalsePositive ? (
+                            <Badge variant="warning">Likely FP</Badge>
+                          ) : (
+                            <Badge variant="success">Likely True</Badge>
+                          )}
+                        </div>
+                        {selectedFinding.aiSeverity && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Suggested Severity:</span>
+                            <SeverityBadge severity={selectedFinding.aiSeverity as any} />
+                          </div>
+                        )}
+                        {selectedFinding.aiExploitability && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Exploitability:</span>
+                            {getExploitabilityBadge(selectedFinding.aiExploitability)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* AI Analysis */}
+                      {selectedFinding.aiAnalysis && (
+                        <div>
+                          <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Analysis</h5>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">{selectedFinding.aiAnalysis}</p>
+                        </div>
+                      )}
+
+                      {/* AI Remediation */}
+                      {selectedFinding.aiRemediation && (
+                        <div>
+                          <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Suggested Fix</h5>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">{selectedFinding.aiRemediation}</p>
+                        </div>
+                      )}
+
+                      <div className="text-xs text-gray-400">
+                        Analyzed {selectedFinding.aiTriagedAt ? new Date(selectedFinding.aiTriagedAt).toLocaleString() : ''}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                      {aiAvailable === false ? (
+                        <span>AI triage is not available. Configure ANTHROPIC_API_KEY to enable.</span>
+                      ) : aiAvailable === null ? (
+                        <span>Checking AI availability...</span>
+                      ) : (
+                        <span>Click &quot;Run AI Triage&quot; to analyze this finding with AI.</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </ModalBody>

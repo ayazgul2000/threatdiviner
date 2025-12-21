@@ -167,9 +167,15 @@ model Finding {
   triagedBy     String?   @map("triaged_by") // user ID who triaged
   triagedAt     DateTime? @map("triaged_at")
   fixedInCommit String?   @map("fixed_in_commit")
-  aiAnalysis    String?   @map("ai_analysis") // Claude's assessment
-  aiConfidence  Float?    @map("ai_confidence") // AI confidence score
-  createdAt     DateTime  @default(now()) @map("created_at")
+  aiAnalysis       String?   @map("ai_analysis") // Claude's assessment
+  aiConfidence     Float?    @map("ai_confidence") // AI confidence score 0-1
+  aiSeverity       String?   @map("ai_severity") // AI-suggested severity
+  aiFalsePositive  Boolean?  @map("ai_false_positive") // AI thinks it's a false positive
+  aiExploitability String?   @map("ai_exploitability") // high, medium, low, none
+  aiRemediation    String?   @map("ai_remediation") // AI-suggested fix
+  aiTriagedAt      DateTime? @map("ai_triaged_at") // When AI triaged
+  firstSeenAt      DateTime  @default(now()) @map("first_seen_at") // First occurrence
+  createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

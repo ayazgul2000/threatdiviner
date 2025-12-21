@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ScmModule } from '../scm/scm.module';
 import { QueueModule } from '../queue/queue.module';
+import { AiModule } from '../ai/ai.module';
 
 // Utils
 import { GitService } from './utils/git.service';
@@ -31,7 +32,7 @@ import { FindingProcessorService } from './services/finding-processor.service';
 import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule],
+  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule],
   providers: [
     // Utils
     GitService,

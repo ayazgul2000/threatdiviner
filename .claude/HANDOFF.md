@@ -302,9 +302,10 @@ Password: threatdiviner_dev
 4. ~~Add Gosec scanner (Go)~~ ✅ DONE
 5. ~~Add Trivy scanner (SCA/containers)~~ ✅ DONE
 6. ~~Add Gitleaks scanner (secrets)~~ ✅ DONE
-7. Complete AI Triage integration (API endpoint, auto-triage during scan)
-8. Add triage UI in findings page (show AI analysis, allow override)
+7. ~~Complete AI Triage integration~~ ✅ DONE - API endpoints + auto-triage during scan
+8. ~~Add triage UI in findings page~~ ✅ DONE - AI analysis, confidence, remediation displayed
 9. Bull Board UI at /admin/queues (may need custom implementation)
+10. Install Gosec binary (requires Go installation)
 
 ## Scanner Status
 | Scanner | Type | Status | Binary Required |
@@ -318,8 +319,33 @@ Password: threatdiviner_dev
 ## AI Triage
 - **Module**: `apps/api/src/ai/`
 - **Service**: `AiService` with `triageFinding()` and `batchTriageFindings()`
-- **Config**: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (defaults to claude-sonnet-4-20250514)
+- **Controller**: `AiController` with REST endpoints
+- **Config**: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `AI_TRIAGE_ENABLED`, `AI_TRIAGE_BATCH_SIZE`
 - **Returns**: Analysis, suggested severity, false positive likelihood, exploitability, remediation, references
+
+### AI Triage API Endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /ai/status | Check if AI is available |
+| POST | /ai/triage/:findingId | Triage single finding |
+| POST | /ai/triage/batch | Triage multiple findings |
+| GET | /ai/triage/:findingId | Get triage result |
+
+### Auto-Triage During Scan
+- When `AI_TRIAGE_ENABLED=true`, high/critical findings are auto-triaged after scan
+- Configurable batch size via `AI_TRIAGE_BATCH_SIZE` (default: 10)
+- Results stored in finding: `aiAnalysis`, `aiConfidence`, `aiSeverity`, `aiFalsePositive`, `aiExploitability`, `aiRemediation`, `aiTriagedAt`
+
+### Dashboard UI
+- AI column in findings table shows triage status (FP/OK + confidence %)
+- Finding modal has AI Triage section with:
+  - "Run AI Triage" / "Re-analyze" buttons
+  - Confidence score with color coding
+  - False positive indicator
+  - Suggested severity
+  - Exploitability rating
+  - AI analysis text
+  - Suggested remediation
 
 ## Debug Logs
 API logs for scan debugging: `C:\Users\ayazg\AppData\Local\Temp\claude\C--dev-threatdiviner\tasks\bd7676b.output`

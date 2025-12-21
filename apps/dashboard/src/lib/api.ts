@@ -97,6 +97,25 @@ export interface Finding {
   lastSeenAt?: string;
   createdAt?: string;
   scan?: Scan;
+  // AI Triage fields
+  aiAnalysis?: string | null;
+  aiConfidence?: number | null;
+  aiSeverity?: string | null;
+  aiFalsePositive?: boolean | null;
+  aiExploitability?: string | null;
+  aiRemediation?: string | null;
+  aiTriagedAt?: string | null;
+}
+
+export interface AiTriageResult {
+  id: string;
+  aiAnalysis: string | null;
+  aiConfidence: number | null;
+  aiSeverity: string | null;
+  aiFalsePositive: boolean | null;
+  aiExploitability: string | null;
+  aiRemediation: string | null;
+  aiTriagedAt: string | null;
 }
 
 export interface DashboardStats {
@@ -284,4 +303,24 @@ export const findingsApi = {
 export const dashboardApi = {
   getStats: () =>
     fetchApi<DashboardStats>('/dashboard/stats'),
+};
+
+// AI Triage API
+export const aiApi = {
+  getStatus: () =>
+    fetchApi<{ available: boolean; model: string }>('/ai/status'),
+
+  triageFinding: (findingId: string) =>
+    fetchApi<AiTriageResult>(`/ai/triage/${findingId}`, {
+      method: 'POST',
+    }),
+
+  batchTriage: (findingIds: string[]) =>
+    fetchApi<{ processed: number; results: AiTriageResult[] }>('/ai/triage/batch', {
+      method: 'POST',
+      body: JSON.stringify({ findingIds }),
+    }),
+
+  getTriageResult: (findingId: string) =>
+    fetchApi<AiTriageResult>(`/ai/triage/${findingId}`),
 };
