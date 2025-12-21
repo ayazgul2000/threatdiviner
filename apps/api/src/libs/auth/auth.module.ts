@@ -12,6 +12,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { TenantMiddleware } from './middleware/tenant.middleware';
+import { PermissionsGuard } from './permissions/permissions.guard';
 import { AltanicheAuthConfig } from './interfaces';
 import { AUTH_CONFIG } from './auth.constants';
 
@@ -72,6 +73,7 @@ export class AuthModule implements NestModule {
       },
       AuthService,
       JwtStrategy,
+      PermissionsGuard,
     ];
 
     if (options.config.multiTenant !== false && options.config.setTenantContext) {
@@ -91,7 +93,7 @@ export class AuthModule implements NestModule {
       ],
       controllers: options.useController !== false ? [AuthController] : [],
       providers,
-      exports: [AuthService, JwtModule, AUTH_CONFIG],
+      exports: [AuthService, JwtModule, AUTH_CONFIG, PermissionsGuard],
     };
   }
 
@@ -136,8 +138,9 @@ export class AuthModule implements NestModule {
         AuthService,
         JwtStrategy,
         TenantMiddleware,
+        PermissionsGuard,
       ],
-      exports: [AuthService, JwtService, AUTH_CONFIG],
+      exports: [AuthService, JwtService, AUTH_CONFIG, PermissionsGuard],
     };
   }
 

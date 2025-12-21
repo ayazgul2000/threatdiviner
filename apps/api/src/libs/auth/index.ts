@@ -19,3 +19,6 @@ export * from './guards';
 
 // Middleware
 export * from './middleware';
+
+// Permissions
+export * from './permissions';
