@@ -8,6 +8,7 @@ import { CustomBullModule } from './queue/custom-bull.module';
 import { QueueModule } from './queue/queue.module';
 import { ScannersModule } from './scanners/scanners.module';
 import { AiModule } from './ai/ai.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AiModule } from './ai/ai.module';
     QueueModule,
     ScannersModule,
     AiModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [],

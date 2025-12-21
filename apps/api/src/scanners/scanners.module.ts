@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ScmModule } from '../scm/scm.module';
 import { QueueModule } from '../queue/queue.module';
 import { AiModule } from '../ai/ai.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 // Utils
 import { GitService } from './utils/git.service';
@@ -32,7 +33,7 @@ import { FindingProcessorService } from './services/finding-processor.service';
 import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule],
+  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule, forwardRef(() => NotificationsModule)],
   providers: [
     // Utils
     GitService,

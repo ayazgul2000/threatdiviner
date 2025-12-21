@@ -15,12 +15,13 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users          User[]
-  scmConnections ScmConnection[]
-  repositories   Repository[]
-  scanConfigs    ScanConfig[]
-  scans          Scan[]
-  findings       Finding[]
+  users              User[]
+  scmConnections     ScmConnection[]
+  repositories       Repository[]
+  scanConfigs        ScanConfig[]
+  scans              Scan[]
+  findings           Finding[]
+  notificationConfig NotificationConfig?
 
   @@map("tenants")
 }
@@ -206,4 +207,48 @@ model WebhookEvent {
   @@index([provider, deliveryId])
   @@index([processed])
   @@map("webhook_events")
+}
+
+// Notification settings per tenant
+model NotificationConfig {
+  id                   String   @id @default(uuid())
+  tenantId             String   @unique @map("tenant_id")
+  slackWebhookUrl      String?  @map("slack_webhook_url") // Encrypted
+  slackChannel         String?  @map("slack_channel")
+  slackEnabled         Boolean  @default(false) @map("slack_enabled")
+  notifyOnScanStart    Boolean  @default(false) @map("notify_on_scan_start")
+  notifyOnScanComplete Boolean  @default(true) @map("notify_on_scan_complete")
+  notifyOnCritical     Boolean  @default(true) @map("notify_on_critical")
+  notifyOnHigh         Boolean  @default(false) @map("notify_on_high")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("notification_configs")
+}
+
+// Platform-wide configuration (for admin portal)
+model PlatformConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  encrypted   Boolean  @default(false)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_configs")
+}
+
+// Platform administrator accounts
+model PlatformAdmin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_admins")
 }

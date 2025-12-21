@@ -17,6 +17,7 @@ import { ScanJobData, NotifyJobData, FindingsCount } from '../jobs';
 import { IScanner, NormalizedFinding, ScanContext } from '../../scanners/interfaces';
 import { BULL_CONNECTION } from '../custom-bull.module';
 import { AiService, TriageRequest } from '../../ai/ai.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 type ScanStatus = 'pending' | 'queued' | 'cloning' | 'scanning' | 'analyzing' | 'storing' | 'notifying' | 'completed' | 'failed';
 
@@ -42,6 +43,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly queueService: QueueService,
     private readonly githubProvider: GitHubProvider,
     private readonly aiService: AiService,
+    private readonly notificationsService: NotificationsService,
     @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
   ) {
     this.aiTriageEnabled = this.configService.get('AI_TRIAGE_ENABLED', 'false') === 'true';
@@ -141,6 +143,9 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       // 8. Complete
       await this.completeScan(scanId, storedCount, Date.now() - startTime);
       await job.updateProgress(100);
+
+      // 9. Send Slack notifications
+      await this.sendSlackNotification(job.data, findingsCount, Math.round((Date.now() - startTime) / 1000));
 
       this.logger.log(`Scan ${scanId} completed: ${storedCount} findings stored`);
 
@@ -482,6 +487,37 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       // Log but don't fail the scan if AI triage fails
       this.logger.error(`Auto-triage failed: ${error}`);
+    }
+  }
+
+  private async sendSlackNotification(
+    data: ScanJobData,
+    findingsCount: FindingsCount,
+    durationSeconds: number,
+  ): Promise<void> {
+    try {
+      const status = this.determineStatus(findingsCount);
+
+      await this.notificationsService.notifyScanCompleted({
+        scanId: data.scanId,
+        tenantId: data.tenantId,
+        repositoryName: data.fullName,
+        branch: data.branch,
+        commitSha: data.commitSha,
+        triggeredBy: data.triggeredBy || 'manual',
+        status,
+        duration: durationSeconds,
+        findings: {
+          critical: findingsCount.critical,
+          high: findingsCount.high,
+          medium: findingsCount.medium,
+          low: findingsCount.low,
+          total: findingsCount.critical + findingsCount.high + findingsCount.medium + findingsCount.low + findingsCount.info,
+        },
+      });
+    } catch (error) {
+      // Log but don't fail the scan if notifications fail
+      this.logger.error(`Slack notification failed: ${error}`);
     }
   }
 }
