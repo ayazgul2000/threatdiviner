@@ -9,6 +9,7 @@ import { QueueModule } from './queue/queue.module';
 import { ScannersModule } from './scanners/scanners.module';
 import { AiModule } from './ai/ai.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ReportingModule } from './reporting/reporting.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     ScannersModule,
     AiModule,
     NotificationsModule,
+    ReportingModule,
   ],
   controllers: [HealthController],
   providers: [],
