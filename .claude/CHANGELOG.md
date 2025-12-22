@@ -2,7 +2,100 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - 2024-12-22
+## [Unreleased] - 2024-12-22 (Overnight Session)
+
+### Session 4: Phase 2 Features - Scanners, Notifications, Audit, Rate Limiting
+
+#### Added - TruffleHog Secrets Scanner
+- `apps/api/src/scanners/secrets/trufflehog/trufflehog.scanner.ts` - Scanner implementation
+- `apps/api/src/scanners/secrets/trufflehog/index.ts` - Module exports
+- Parses JSONL output format
+- Supports verified credential detection
+- Integrated into scan processor alongside Gitleaks
+
+#### Added - Enhanced Trivy Container Image Scanning
+- Updated `apps/api/src/scanners/sca/trivy/trivy.scanner.ts`
+- Added `scanContainerImage()` method for `trivy image` scans
+- Added SARIF file merging for combined filesystem + container results
+- New config option: `containerImages: string[]`
+
+#### Added - Webhook Auto-Scan
+- Updated `apps/api/src/scm/webhooks.controller.ts`
+- Properly queues scan jobs via QueueService on push/PR events
+- Respects `autoScanOnPush` and `autoScanOnPR` config flags
+- Branch filtering for configured branches only
+- Creates GitHub check runs for PR scans
+
+#### Added - Email Notifications Module
+- `apps/api/src/notifications/email/email.service.ts` - Nodemailer integration
+- `apps/api/src/notifications/email/email.templates.ts` - HTML/text templates
+  - Scan complete notifications
+  - Critical finding alerts
+  - Team invitation emails
+  - Weekly summary emails
+- Updated `notifications.service.ts` to send both Slack and email
+- New config fields: `emailEnabled`, `emailRecipients`, `weeklyDigestEnabled`
+
+#### Added - Audit Logging Module
+- `apps/api/src/audit/audit.module.ts` - Global module
+- `apps/api/src/audit/audit.service.ts` - Logging and query service
+  - `log()` - Create audit entries
+  - `query()` - Paginated log queries
+  - `getRecentActivity()` - Recent activity for tenant
+  - `getUserActivity()` - Activity for specific user
+  - `getResourceHistory()` - History for specific resource
+  - `getStats()` - Platform-wide statistics
+  - `cleanup()` - Delete old logs
+- `apps/api/src/audit/audit.controller.ts` - REST endpoints
+- `apps/api/src/audit/audit.service.spec.ts` - Unit tests
+
+#### Added - Rate Limiting
+- `apps/api/src/common/throttle/throttle.guard.ts` - Custom throttler guard
+- Uses `@nestjs/throttler` with tenant-aware tracking
+- Three throttle tiers: short (1s), medium (1m), long (1h)
+- Configurable via environment variables
+
+#### Added - Swagger API Documentation
+- Updated `apps/api/src/main.ts` with SwaggerModule setup
+- API documentation available at `/api/docs`
+- Tags for all API groups (auth, scm, scans, findings, etc.)
+- Bearer auth support
+
+#### Added - Team Management API
+- `apps/api/src/team/team.module.ts` - Module setup
+- `apps/api/src/team/team.service.ts` - Business logic
+- `apps/api/src/team/team.controller.ts` - REST endpoints
+  - `GET /team/users` - List tenant users
+  - `POST /team/invite` - Invite user
+  - `PUT /team/users/:id/role` - Update role
+  - `DELETE /team/users/:id` - Remove user
+  - `POST /team/resend-invite/:id` - Resend invitation
+- DTOs for invite and role update
+
+#### Added - Unit Tests
+- `apps/api/src/audit/audit.service.spec.ts`
+- `apps/api/src/notifications/notifications.service.spec.ts`
+
+#### Changed - Prisma Schema
+- `ScanConfig` model: Added `enableContainerScan`, `containerImages`, `autoScanOnPush`, `autoScanOnPR`
+- `NotificationConfig` model: Added `emailEnabled`, `emailRecipients`, `weeklyDigestEnabled`
+- New `AuditLog` model for tracking all actions
+
+#### Changed - Scan Processor
+- Updated to include TruffleHog in secrets scanning
+- Passes `containerImages` config to Trivy scanner
+- Passes `targetUrls` config to Nuclei scanner
+
+#### Dependencies Added
+- `@nestjs/throttler` - Rate limiting
+- `@nestjs/swagger` - API documentation
+- `swagger-ui-express` - Swagger UI
+- `nodemailer` - Email sending
+- `@types/nodemailer` - TypeScript types
+
+---
+
+## [Previous] - 2024-12-22
 
 ### Session 3: Platform Features + Admin Portal
 
@@ -62,7 +155,7 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## [Previous Session] - 2024-12-21
+## [Previous] - 2024-12-21
 
 ### Session 2: Multi-Scanner + AI Triage
 
@@ -72,6 +165,8 @@ All notable changes to this project will be documented in this file.
 - Trivy scanner (container/dependency vulnerabilities)
 - Bandit scanner (Python security)
 - Gosec scanner (Go security - requires Go installation)
+- Checkov scanner (IaC security)
+- Nuclei scanner (DAST)
 
 #### Added - AI Triage System
 - `apps/api/src/ai/ai.module.ts` - AI module setup

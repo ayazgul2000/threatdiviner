@@ -1,19 +1,22 @@
 # ThreatDiviner - Session Handoff
 
-Last updated: 2024-12-22
+Last updated: 2024-12-22 (Overnight Session)
 
 ## Current State
 
-The platform is feature-complete for Phase 1 with all major components implemented:
+The platform is feature-complete for Phase 2 with all major components implemented:
 
 ### Completed Features
 
-1. **Multi-Scanner Security Scanning**
-   - Semgrep (SAST)
-   - Gitleaks (secrets)
-   - Trivy (containers/dependencies)
-   - Bandit (Python)
-   - Gosec (Go - requires Go installation)
+1. **Multi-Scanner Security Scanning** (8 scanners total)
+   - Semgrep (SAST - multi-language)
+   - Bandit (Python SAST)
+   - Gosec (Go SAST - requires Go installation)
+   - Gitleaks (secrets detection)
+   - **TruffleHog** (advanced secrets detection) - NEW
+   - Trivy (SCA + container images) - ENHANCED
+   - **Checkov** (IaC security) - NEW
+   - **Nuclei** (DAST web scanning) - NEW
 
 2. **AI-Powered Triage**
    - Claude API integration for finding analysis
@@ -21,10 +24,14 @@ The platform is feature-complete for Phase 1 with all major components implement
    - Manual triage via dashboard
    - Batch triage support
 
-3. **Slack Notifications**
-   - Webhook integration
+3. **Notifications**
+   - Slack webhook integration
+   - **Email notifications** (nodemailer) - NEW
+     - Scan complete emails
+     - Critical finding alerts
+     - Team invitation emails
+     - Weekly digest support
    - Configurable events (scan start, complete, critical/high findings)
-   - Block Kit message templates
 
 4. **PDF Reporting**
    - Scan reports
@@ -37,18 +44,45 @@ The platform is feature-complete for Phase 1 with all major components implement
    - Granular permissions system
    - Permission guard and decorator
 
-6. **Dashboard Settings**
-   - Notification configuration
-   - Team management (UI ready, API TODO)
-   - Profile/password management (UI ready, API TODO)
+6. **Team Management** - NEW
+   - `GET /team/users` - List tenant users
+   - `POST /team/invite` - Invite user by email
+   - `PUT /team/users/:id/role` - Update user role
+   - `DELETE /team/users/:id` - Remove user from tenant
+   - `POST /team/resend-invite/:id` - Resend invitation
 
-7. **Platform Admin Portal**
-   - Separate Next.js app at `apps/admin`
-   - Platform admin authentication
-   - Tenant management (CRUD)
-   - System health monitoring
-   - AI configuration
-   - Maintenance mode
+7. **Profile Management** - NEW
+   - `PUT /auth/profile` - Update name, email
+   - `PUT /auth/password` - Change password
+
+8. **Webhook Auto-Scan** - NEW
+   - Auto-scan on push to configured branches
+   - Auto-scan on PR open/sync/reopen
+   - Configurable via `autoScanOnPush` and `autoScanOnPR` flags
+   - GitHub check run integration
+
+9. **Audit Logging** - NEW
+   - Full action tracking (scan, finding, user, config changes)
+   - Query and stats endpoints
+   - Resource history lookup
+   - Automatic cleanup of old logs
+
+10. **Rate Limiting** - NEW
+    - Global throttling with `@nestjs/throttler`
+    - Per-tenant tracking
+    - Configurable limits via env vars
+
+11. **API Documentation** - NEW
+    - Swagger UI at `/api/docs`
+    - Full OpenAPI spec
+
+12. **Platform Admin Portal**
+    - Separate Next.js app at `apps/admin`
+    - Platform admin authentication
+    - Tenant management (CRUD)
+    - System health monitoring
+    - AI configuration
+    - Maintenance mode
 
 ---
 
@@ -59,99 +93,67 @@ apps/
 ├── api/                  # NestJS backend (port 3001)
 │   └── src/
 │       ├── ai/           # AI triage module
+│       ├── audit/        # Audit logging (NEW)
 │       ├── auth/         # Tenant auth
+│       ├── common/       # Throttle guard (NEW)
 │       ├── libs/auth/    # Auth package with RBAC
-│       ├── notifications/ # Slack notifications
+│       ├── notifications/
+│       │   ├── slack/    # Slack integration
+│       │   └── email/    # Email integration (NEW)
 │       ├── platform/     # Platform admin API
 │       ├── prisma/       # Database
 │       ├── queue/        # BullMQ job processing
 │       ├── reporting/    # PDF generation
-│       ├── scanners/     # Security scanners
-│       └── scm/          # GitHub/GitLab integration
+│       ├── scanners/
+│       │   ├── sast/     # Semgrep, Bandit, Gosec
+│       │   ├── sca/      # Trivy (enhanced)
+│       │   ├── secrets/  # Gitleaks, TruffleHog (NEW)
+│       │   ├── iac/      # Checkov (NEW)
+│       │   └── dast/     # Nuclei (NEW)
+│       ├── scm/          # GitHub/GitLab integration
+│       └── team/         # Team management (NEW)
 │
 ├── dashboard/            # Next.js customer dashboard (port 3000)
-│   └── src/
-│       └── app/dashboard/
-│           ├── connections/
-│           ├── repositories/
-│           ├── scans/
-│           ├── findings/
-│           └── settings/
 │
 └── admin/                # Next.js platform admin (port 3002)
-    └── src/
-        └── app/
-            ├── login/
-            └── (dashboard)/
-                ├── tenants/
-                └── settings/
 ```
 
 ---
 
-## Database Schema (Key Models)
+## Database Schema (Key Changes)
 
 ```prisma
-model Tenant {
-  id               String   @id
-  name             String
-  slug             String   @unique
-  plan             String   // free, pro, enterprise
-  maxUsers         Int
-  maxRepositories  Int
-  aiTriageEnabled  Boolean
-  isActive         Boolean
+model ScanConfig {
+  // ... existing fields ...
+  enableDast          Boolean  @default(false)
+  enableContainerScan Boolean  @default(false)  // NEW
+  targetUrls          String[] @default([])
+  containerImages     String[] @default([])      // NEW
+  autoScanOnPush      Boolean  @default(true)    // NEW
+  autoScanOnPR        Boolean  @default(true)    // NEW
 }
 
-model Finding {
-  // ... standard fields ...
-  aiAnalysis       String?
-  aiConfidence     Float?
-  aiSeverity       String?
-  aiFalsePositive  Boolean?
-  aiExploitability String?
-  aiRemediation    String?
-  aiTriagedAt      DateTime?
+model NotificationConfig {
+  // ... existing fields ...
+  emailEnabled         Boolean  @default(false)  // NEW
+  emailRecipients      String[] @default([])     // NEW
+  weeklyDigestEnabled  Boolean  @default(false)  // NEW
 }
 
-model PlatformConfig {
-  aiProvider             String
-  aiModel                String
-  aiApiKey               String?
-  defaultPlan            String
-  defaultMaxUsers        Int
-  defaultMaxRepositories Int
-  maintenanceMode        Boolean
-}
-
-model PlatformAdmin {
-  email        String   @unique
-  passwordHash String
-  name         String
-  isSuperAdmin Boolean
-  lastLoginAt  DateTime?
+model AuditLog {  // NEW
+  id          String    @id @default(uuid())
+  tenantId    String?
+  userId      String?
+  userEmail   String?
+  action      String    // e.g., 'scan.trigger', 'user.invite'
+  resource    String    // e.g., 'scan', 'finding', 'user'
+  resourceId  String?
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
 }
 ```
-
----
-
-## Pending Tasks
-
-### High Priority
-1. **Gosec binary installation** - Requires Go to be installed
-2. **Prisma migrate** - Run `npx prisma migrate dev` after stopping API
-3. **Team management API** - Backend endpoints for inviting/managing users
-4. **Profile update API** - Backend endpoints for profile/password changes
-
-### Medium Priority
-1. **User model enhancements** - Add `name`, `status`, `lastLoginAt` fields
-2. **Invitation system** - Email-based team member invitations
-3. **Webhook events** - GitHub/GitLab webhook handlers for auto-scan
-
-### Low Priority
-1. **Rate limiting** - Add rate limits to API endpoints
-2. **Audit logging** - Track admin actions
-3. **Email notifications** - Alternative to Slack
 
 ---
 
@@ -179,6 +181,24 @@ MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=threatdiviner
 
+# Email (NEW)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM_ADDRESS=noreply@threatdiviner.com
+SMTP_FROM_NAME=ThreatDiviner
+
+# Rate Limiting (NEW)
+THROTTLE_SHORT_LIMIT=10    # per second
+THROTTLE_MEDIUM_LIMIT=100  # per minute
+THROTTLE_LONG_LIMIT=1000   # per hour
+
+# Scanner Paths (optional)
+TRUFFLEHOG_PATH=trufflehog
+NUCLEI_PATH=nuclei
+CHECKOV_PATH=checkov
+
 # GitHub OAuth (optional)
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
@@ -196,7 +216,7 @@ docker-compose up -d
 cd apps/api
 pnpm install
 npx prisma generate
-npx prisma db push
+npx prisma db push  # or: npx prisma migrate dev
 pnpm start:dev
 
 # Dashboard (port 3000)
@@ -214,31 +234,42 @@ pnpm dev
 
 ## Git Status
 
-Uncommitted changes in:
-- `apps/` - All new code
-- `docker-compose.yml`
+**Branch:** `main` (13 commits ahead of origin)
 
-Consider committing with:
-```bash
-git add apps/ docker-compose.yml
-git commit -m "feat: complete phase 1 - multi-scanner, AI triage, notifications, reporting, RBAC, admin portal"
+**Latest commit:**
 ```
+4a2fd26 feat: Phase 2 complete - TruffleHog, Trivy container, webhooks, email, audit, rate limiting, Swagger
+```
+
+---
+
+## Pending Tasks
+
+### High Priority
+1. **Prisma migrate** - Run `npx prisma migrate dev --name phase2_features`
+2. **Install scanner binaries** - TruffleHog, Nuclei, Checkov need to be installed
+3. **Test end-to-end** - Verify all new features work correctly
+
+### Medium Priority
+1. **Weekly digest scheduler** - Add cron job for weekly email summaries
+2. **GitLab support** - Extend webhook controller for GitLab events
+3. **Dashboard updates** - Add UI for new team management endpoints
+
+### Low Priority
+1. **More test coverage** - Expand unit and e2e tests
+2. **Performance tuning** - Optimize scan processor for large repos
+3. **CI/CD pipeline** - GitHub Actions for build/test/deploy
 
 ---
 
 ## Notes for Next Session
 
 1. Run `npx prisma migrate dev` to apply schema changes
-2. Create initial platform admin:
-   ```typescript
-   await prisma.platformAdmin.create({
-     data: {
-       email: 'admin@example.com',
-       passwordHash: await bcrypt.hash('password', 10),
-       name: 'Admin',
-       isSuperAdmin: true,
-     }
-   });
+2. Install scanner binaries:
+   ```bash
+   pip install trufflehog checkov
+   # Nuclei: https://github.com/projectdiscovery/nuclei/releases
    ```
-3. Install Go for Gosec scanner if needed
-4. Test all features end-to-end before production
+3. Configure SMTP for email notifications
+4. Test webhook auto-scan with a real GitHub webhook
+5. API docs available at `http://localhost:3001/api/docs`
