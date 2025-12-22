@@ -1,0 +1,121 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to deploy (tag or sha)'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_NAME }} --region ${{ vars.AWS_REGION }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Update image tags in deployment manifests
+          IMAGE_TAG="${{ inputs.version }}"
+
+          # Apply Kubernetes manifests
+          kubectl set image deployment/threatdiviner-api \
+            api=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/api:${IMAGE_TAG} \
+            -n threatdiviner-${{ inputs.environment }}
+
+          kubectl set image deployment/threatdiviner-dashboard \
+            dashboard=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/dashboard:${IMAGE_TAG} \
+            -n threatdiviner-${{ inputs.environment }}
+
+          kubectl set image deployment/threatdiviner-admin \
+            admin=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/admin:${IMAGE_TAG} \
+            -n threatdiviner-${{ inputs.environment }}
+
+          # Wait for rollout
+          kubectl rollout status deployment/threatdiviner-api -n threatdiviner-${{ inputs.environment }} --timeout=300s
+          kubectl rollout status deployment/threatdiviner-dashboard -n threatdiviner-${{ inputs.environment }} --timeout=300s
+          kubectl rollout status deployment/threatdiviner-admin -n threatdiviner-${{ inputs.environment }} --timeout=300s
+
+      - name: Run database migrations
+        run: |
+          # Run migrations via job
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: db-migrate-${{ github.run_id }}
+            namespace: threatdiviner-${{ inputs.environment }}
+          spec:
+            ttlSecondsAfterFinished: 300
+            template:
+              spec:
+                containers:
+                - name: migrate
+                  image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/api:${{ inputs.version }}
+                  command: ["npx", "prisma", "migrate", "deploy"]
+                  envFrom:
+                  - secretRef:
+                      name: threatdiviner-api-secrets
+                restartPolicy: Never
+            backoffLimit: 3
+          EOF
+
+          # Wait for migration to complete
+          kubectl wait --for=condition=complete job/db-migrate-${{ github.run_id }} \
+            -n threatdiviner-${{ inputs.environment }} --timeout=300s
+
+      - name: Verify deployment
+        run: |
+          # Health check the API
+          API_URL="${{ vars.API_URL }}/health"
+          for i in {1..10}; do
+            if curl -sf "$API_URL"; then
+              echo "API is healthy!"
+              exit 0
+            fi
+            echo "Waiting for API... attempt $i"
+            sleep 10
+          done
+          echo "API health check failed"
+          exit 1
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "Deployment to ${{ inputs.environment }} completed successfully"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Deployment to ${{ inputs.environment }} failed"

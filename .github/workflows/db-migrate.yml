@@ -1,0 +1,106 @@
+name: Database Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      action:
+        description: 'Migration action'
+        required: true
+        type: choice
+        options:
+          - deploy
+          - status
+          - reset-dev
+
+jobs:
+  migrate:
+    name: Run Migration - ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter api prisma generate
+
+      - name: Check migration status
+        if: inputs.action == 'status'
+        run: pnpm --filter api prisma migrate status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Deploy migrations
+        if: inputs.action == 'deploy'
+        run: pnpm --filter api prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Reset development database
+        if: inputs.action == 'reset-dev' && inputs.environment == 'staging'
+        run: |
+          pnpm --filter api prisma migrate reset --force
+          pnpm --filter api prisma db seed
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  create-migration:
+    name: Create Migration (Dev Only)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check for schema changes
+        id: schema-check
+        run: |
+          pnpm --filter api prisma generate
+          if pnpm --filter api prisma migrate diff --from-migrations ./apps/api/prisma/migrations --to-schema-datamodel ./apps/api/prisma/schema.prisma --exit-code; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Display schema diff
+        if: steps.schema-check.outputs.has_changes == 'true'
+        run: |
+          echo "Schema changes detected:"
+          pnpm --filter api prisma migrate diff \
+            --from-migrations ./apps/api/prisma/migrations \
+            --to-schema-datamodel ./apps/api/prisma/schema.prisma

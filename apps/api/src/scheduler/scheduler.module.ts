@@ -5,6 +5,7 @@ import { ScheduleController } from './schedule.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
 import { ScmModule } from '../scm/scm.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../libs/auth';
 
 @Module({
@@ -13,6 +14,7 @@ import { AuthModule } from '../libs/auth';
     PrismaModule,
     QueueModule,
     forwardRef(() => ScmModule),
+    NotificationsModule,
     AuthModule,
   ],
   controllers: [ScheduleController],

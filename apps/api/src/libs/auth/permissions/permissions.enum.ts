@@ -35,6 +35,19 @@ export enum Permission {
 
   // AI
   AI_TRIAGE = 'ai:triage',
+
+  // Audit Logs
+  AUDIT_LOGS_READ = 'audit_logs:read',
+
+  // Baselines
+  BASELINES_READ = 'baselines:read',
+  BASELINES_WRITE = 'baselines:write',
+
+  // API Keys
+  API_KEYS_MANAGE = 'api_keys:manage',
+
+  // Retention
+  RETENTION_MANAGE = 'retention:manage',
 }
 
 export enum Role {

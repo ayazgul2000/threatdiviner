@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { QueueService } from '../queue/services/queue.service';
 import { CryptoService } from '../scm/services/crypto.service';
 import { GitHubProvider } from '../scm/providers';
+import { EmailService } from '../notifications/email/email.service';
 import { ScanJobData } from '../queue/jobs';
 import CronExpressionParser from 'cron-parser';
 import { SCHEDULE_PRESETS, getPresetFromCron } from './dto/schedule-config.dto';
@@ -19,6 +20,8 @@ export class SchedulerService {
     private readonly cryptoService: CryptoService,
     @Inject(forwardRef(() => GitHubProvider))
     private readonly githubProvider: GitHubProvider,
+    @Inject(forwardRef(() => EmailService))
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -286,5 +289,143 @@ export class SchedulerService {
     });
 
     return scan?.id || 'unknown';
+  }
+
+  /**
+   * Send weekly digest emails every Monday at 9am
+   */
+  @Cron('0 9 * * 1') // Monday 9am
+  async sendWeeklyDigests(): Promise<void> {
+    this.logger.log('Starting weekly digest processing...');
+
+    try {
+      // Get all tenants with weekly digest enabled
+      const configs = await this.prisma.notificationConfig.findMany({
+        where: {
+          weeklyDigestEnabled: true,
+          emailEnabled: true,
+          emailRecipients: { isEmpty: false },
+        },
+        include: {
+          tenant: true,
+        },
+      });
+
+      this.logger.log(`Found ${configs.length} tenants with weekly digest enabled`);
+
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      for (const config of configs) {
+        try {
+          await this.sendTenantWeeklyDigest(config.tenantId, config.tenant.name, config.emailRecipients, oneWeekAgo, now);
+        } catch (error) {
+          this.logger.error(`Failed to send weekly digest for tenant ${config.tenantId}: ${error}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Weekly digest processing failed: ${error}`);
+    }
+  }
+
+  private async sendTenantWeeklyDigest(
+    tenantId: string,
+    tenantName: string,
+    recipients: string[],
+    startDate: Date,
+    endDate: Date,
+  ): Promise<void> {
+    // Get scans from this week
+    const scans = await this.prisma.scan.findMany({
+      where: {
+        tenantId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+    });
+
+    // Get new findings from this week
+    const newFindings = await this.prisma.finding.groupBy({
+      by: ['severity'],
+      where: {
+        tenantId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      _count: true,
+    });
+
+    const findingsByCategory = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+    };
+
+    for (const f of newFindings) {
+      if (f.severity in findingsByCategory) {
+        findingsByCategory[f.severity as keyof typeof findingsByCategory] = f._count;
+      }
+    }
+
+    const totalFindings = findingsByCategory.critical + findingsByCategory.high +
+                          findingsByCategory.medium + findingsByCategory.low;
+
+    // Get top 5 repositories by findings count
+    const topRepoFindings = await this.prisma.finding.groupBy({
+      by: ['scanId'],
+      where: {
+        tenantId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      _count: true,
+      orderBy: {
+        _count: {
+          scanId: 'desc',
+        },
+      },
+      take: 10,
+    });
+
+    // Get repository names for top findings
+    const topRepositories: Array<{ name: string; findings: number }> = [];
+    const repoFindingsMap = new Map<string, number>();
+
+    for (const item of topRepoFindings) {
+      const scan = await this.prisma.scan.findUnique({
+        where: { id: item.scanId },
+        include: { repository: true },
+      });
+      if (scan?.repository) {
+        const existing = repoFindingsMap.get(scan.repository.fullName) || 0;
+        repoFindingsMap.set(scan.repository.fullName, existing + item._count);
+      }
+    }
+
+    // Convert to sorted array
+    Array.from(repoFindingsMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .forEach(([name, findings]) => {
+        topRepositories.push({ name, findings });
+      });
+
+    // Format dates for display
+    const formatDate = (d: Date) => d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    // Send the digest email
+    await this.emailService.sendWeeklySummary(recipients, {
+      tenantName,
+      periodStart: formatDate(startDate),
+      periodEnd: formatDate(endDate),
+      totalScans: scans.length,
+      totalFindings,
+      findingsByCategory,
+      topRepositories,
+    });
+
+    this.logger.log(`Sent weekly digest to ${recipients.length} recipients for tenant ${tenantId}`);
   }
 }

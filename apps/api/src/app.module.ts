@@ -17,6 +17,10 @@ import { TeamModule } from './team/team.module';
 import { AuditModule } from './audit/audit.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { JiraModule } from './integrations/jira/jira.module';
+import { ExportModule } from './export/export.module';
+import { BaselineModule } from './baseline/baseline.module';
+import { ApiKeysModule } from './apikeys/apikeys.module';
+import { RetentionModule } from './retention/retention.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -62,6 +66,10 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     TeamModule,
     SchedulerModule,
     JiraModule,
+    ExportModule,
+    BaselineModule,
+    ApiKeysModule,
+    RetentionModule,
   ],
   controllers: [HealthController],
   providers: [

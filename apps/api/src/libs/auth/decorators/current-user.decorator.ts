@@ -20,3 +20,17 @@ export const CurrentUser = createParamDecorator(
     return data ? user?.[data] : user;
   },
 );
+
+/**
+ * Extract current tenant ID from request
+ *
+ * @example
+ * @CurrentTenant() tenantId: string
+ */
+export const CurrentTenant = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    // Check for tenantId set by API key auth first, then JWT
+    return request.tenantId || request.user?.tenantId;
+  },
+);
