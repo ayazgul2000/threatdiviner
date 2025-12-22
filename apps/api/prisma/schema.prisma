@@ -389,3 +389,53 @@ model ApiKey {
   @@index([userId])
   @@map("api_keys")
 }
+
+// Cloud account for CSPM scanning
+model CloudAccount {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  provider     String    // aws, azure, gcp
+  name         String
+  accountId    String    @map("account_id") // AWS account ID, Azure subscription, GCP project
+  credentials  Json      // Encrypted credentials
+  regions      String[]  @default([])
+  enabled      Boolean   @default(true)
+  lastScanAt   DateTime? @map("last_scan_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  findings CspmFinding[]
+
+  @@unique([tenantId, provider, accountId])
+  @@index([tenantId])
+  @@map("cloud_accounts")
+}
+
+// CSPM finding from cloud security scan
+model CspmFinding {
+  id           String   @id @default(uuid())
+  accountId    String   @map("account_id")
+  provider     String   // aws, azure, gcp
+  service      String   // s3, ec2, iam, etc
+  region       String
+  resourceId   String   @map("resource_id")
+  resourceType String   @map("resource_type")
+  severity     String   // critical, high, medium, low, info
+  title        String
+  description  String
+  remediation  String?
+  compliance   String[] @default([]) // Compliance frameworks affected
+  status       String   @default("open") // open, resolved, suppressed
+  firstSeenAt  DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt   DateTime @default(now()) @map("last_seen_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  account CloudAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([severity])
+  @@index([status])
+  @@index([service])
+  @@map("cspm_findings")
+}

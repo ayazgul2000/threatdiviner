@@ -21,6 +21,7 @@ import { ExportModule } from './export/export.module';
 import { BaselineModule } from './baseline/baseline.module';
 import { ApiKeysModule } from './apikeys/apikeys.module';
 import { RetentionModule } from './retention/retention.module';
+import { CspmModule } from './cspm/cspm.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -70,6 +71,7 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     BaselineModule,
     ApiKeysModule,
     RetentionModule,
+    CspmModule,
   ],
   controllers: [HealthController],
   providers: [
