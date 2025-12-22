@@ -439,3 +439,53 @@ model CspmFinding {
   @@index([service])
   @@map("cspm_findings")
 }
+
+// SIEM alert rule
+model AlertRule {
+  id                 String    @id @default(uuid())
+  tenantId           String    @map("tenant_id")
+  name               String
+  description        String?
+  enabled            Boolean   @default(true)
+  // Conditions
+  eventTypes         String[]  @default([]) @map("event_types")
+  sources            String[]  @default([])
+  severities         String[]  @default([])
+  titlePattern       String?   @map("title_pattern")
+  // Thresholds
+  threshold          Int       @default(1)
+  timeWindowMinutes  Int       @default(5) @map("time_window_minutes")
+  // Actions
+  notifySlack        Boolean   @default(false) @map("notify_slack")
+  notifyEmail        Boolean   @default(true) @map("notify_email")
+  createJiraIssue    Boolean   @default(false) @map("create_jira_issue")
+  // Tracking
+  lastTriggeredAt    DateTime? @map("last_triggered_at")
+  triggerCount       Int       @default(0) @map("trigger_count")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  history AlertHistory[]
+
+  @@index([tenantId])
+  @@index([enabled])
+  @@map("alert_rules")
+}
+
+// Alert trigger history
+model AlertHistory {
+  id            String   @id @default(uuid())
+  ruleId        String   @map("rule_id")
+  tenantId      String   @map("tenant_id")
+  matchedEvents Int      @map("matched_events")
+  sampleEvents  Json     @map("sample_events")
+  triggeredAt   DateTime @map("triggered_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([ruleId])
+  @@index([triggeredAt])
+  @@map("alert_history")
+}
