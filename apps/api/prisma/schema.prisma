@@ -16,6 +16,10 @@ model Tenant {
   maxRepositories  Int      @default(10) @map("max_repositories")
   aiTriageEnabled  Boolean  @default(false) @map("ai_triage_enabled")
   isActive         Boolean  @default(true) @map("is_active")
+  // Retention policies
+  scanRetentionDays     Int @default(90) @map("scan_retention_days")
+  findingRetentionDays  Int @default(365) @map("finding_retention_days")
+  auditRetentionDays    Int @default(90) @map("audit_retention_days")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -26,6 +30,9 @@ model Tenant {
   scans              Scan[]
   findings           Finding[]
   notificationConfig NotificationConfig?
+  jiraConfig         JiraConfig?
+  findingBaselines   FindingBaseline[]
+  apiKeys            ApiKey[]
 
   @@map("tenants")
 }
@@ -45,7 +52,8 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  apiKeys ApiKey[]
 
   @@unique([tenantId, email])
   @@map("users")
@@ -93,10 +101,11 @@ model Repository {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  connection ScmConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  scanConfig ScanConfig?
-  scans      Scan[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection       ScmConnection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  scanConfig       ScanConfig?
+  scans            Scan[]
+  findingBaselines FindingBaseline[]
 
   @@unique([tenantId, fullName])
   @@index([tenantId])
@@ -122,6 +131,16 @@ model ScanConfig {
   autoScanOnPR        Boolean  @default(true) @map("auto_scan_on_pr")
   skipPaths     String[] @default(["node_modules", "vendor", ".git"]) @map("skip_paths")
   customRules   Json?    @map("custom_rules") // Semgrep custom rules etc
+  // Scheduled scanning
+  scheduleEnabled     Boolean  @default(false) @map("schedule_enabled")
+  scheduleCron        String?  @map("schedule_cron") // e.g., "0 2 * * *" (2am daily)
+  scheduleTimezone    String   @default("UTC") @map("schedule_timezone")
+  lastScheduledScan   DateTime? @map("last_scheduled_scan")
+  nextScheduledScan   DateTime? @map("next_scheduled_scan")
+  // PR comment settings
+  prCommentsEnabled   Boolean  @default(true) @map("pr_comments_enabled")
+  prCommentMaxFindings Int     @default(20) @map("pr_comment_max_findings")
+  prCommentSeverities String[] @default(["critical", "high", "medium"]) @map("pr_comment_severities")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -180,10 +199,16 @@ model Finding {
   cveId         String?   @map("cve_id") // CVE-2024-xxxx
   owasp         String? // A01:2021, etc
   confidence    String? // high, medium, low
-  status        String    @default("open") // open, triaged, fixed, false_positive, accepted
+  status        String    @default("open") // open, triaged, fixed, false_positive, accepted, baselined
   triagedBy     String?   @map("triaged_by") // user ID who triaged
   triagedAt     DateTime? @map("triaged_at")
   fixedInCommit String?   @map("fixed_in_commit")
+  // Fingerprint for deduplication and baseline matching
+  fingerprint   String?   // Unique identifier: hash of (ruleId + filePath + snippet)
+  // Jira integration
+  jiraIssueKey  String?   @map("jira_issue_key") // e.g., SEC-123
+  jiraIssueUrl  String?   @map("jira_issue_url")
+  // AI triage fields
   aiAnalysis       String?   @map("ai_analysis") // Claude's assessment
   aiConfidence     Float?    @map("ai_confidence") // AI confidence score 0-1
   aiSeverity       String?   @map("ai_severity") // AI-suggested severity
@@ -203,6 +228,7 @@ model Finding {
   @@index([repositoryId])
   @@index([severity])
   @@index([status])
+  @@index([fingerprint])
   @@map("findings")
 }
 
@@ -300,4 +326,66 @@ model PlatformAdmin {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@map("platform_admins")
+}
+
+// Jira integration configuration per tenant
+model JiraConfig {
+  id                   String   @id @default(uuid())
+  tenantId             String   @unique @map("tenant_id")
+  jiraUrl              String   @map("jira_url") // e.g., https://company.atlassian.net
+  email                String   // Jira account email
+  apiToken             String   @map("api_token") // Encrypted API token
+  projectKey           String   @map("project_key") // Default project key (e.g., SEC)
+  issueType            String   @default("Bug") @map("issue_type")
+  enabled              Boolean  @default(false)
+  autoCreate           Boolean  @default(false) @map("auto_create") // Auto-create for critical/high
+  autoCreateSeverities String[] @default(["critical", "high"]) @map("auto_create_severities")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("jira_configs")
+}
+
+// Baseline for suppressing known/accepted findings
+model FindingBaseline {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  repositoryId String    @map("repository_id")
+  fingerprint  String    // Unique finding identifier
+  reason       String    // Why it's baselined
+  baselinedBy  String    @map("baselined_by") // User ID
+  expiresAt    DateTime? @map("expires_at") // Optional expiry
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, repositoryId, fingerprint])
+  @@index([tenantId])
+  @@index([repositoryId])
+  @@map("finding_baselines")
+}
+
+// API keys for programmatic access
+model ApiKey {
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  userId     String    @map("user_id")
+  name       String    // "CI/CD Key", "Jenkins", etc.
+  keyHash    String    @map("key_hash") // SHA256 hash of the key
+  keyPrefix  String    @map("key_prefix") // First 8 chars for display: "td_abc123..."
+  scopes     String[]  // ["scans:trigger", "findings:read"]
+  expiresAt  DateTime? @map("expires_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("api_keys")
 }

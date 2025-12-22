@@ -15,6 +15,7 @@ import { ReportingModule } from './reporting/reporting.module';
 import { PlatformModule } from './platform/platform.module';
 import { TeamModule } from './team/team.module';
 import { AuditModule } from './audit/audit.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -58,6 +59,7 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     ReportingModule,
     PlatformModule,
     TeamModule,
+    SchedulerModule,
   ],
   controllers: [HealthController],
   providers: [
