@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from './crypto.service';
-import { GitHubProvider, ScmProvider, ScmRepository } from '../providers';
+import { GitHubProvider, GitLabProvider, ScmProvider, ScmRepository } from '../providers';
 import { QueueService } from '../../queue/services/queue.service';
 import { ScanJobData } from '../../queue/jobs';
 import * as crypto from 'crypto';
@@ -11,7 +11,7 @@ import * as crypto from 'crypto';
 export class ScmService {
   private readonly logger = new Logger(ScmService.name);
   private readonly providers: Map<string, ScmProvider> = new Map();
-  private readonly oauthStates: Map<string, { tenantId: string; expiresAt: number }> = new Map();
+  private readonly oauthStates: Map<string, { tenantId: string; expiresAt: number; provider: string }> = new Map();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -19,8 +19,10 @@ export class ScmService {
     private readonly configService: ConfigService,
     private readonly queueService: QueueService,
     githubProvider: GitHubProvider,
+    gitlabProvider: GitLabProvider,
   ) {
     this.providers.set('github', githubProvider);
+    this.providers.set('gitlab', gitlabProvider);
   }
 
   private getProvider(provider: string): ScmProvider {
@@ -39,6 +41,7 @@ export class ScmService {
     // Store state for verification (expires in 10 minutes)
     this.oauthStates.set(state, {
       tenantId,
+      provider,
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
 
@@ -54,10 +57,10 @@ export class ScmService {
     }
 
     this.oauthStates.delete(state);
-    const { tenantId } = stateData;
+    const { tenantId, provider: providerName } = stateData;
 
-    // Extract provider from state or assume GitHub for now
-    const provider = this.getProvider('github');
+    // Get the provider from the stored state
+    const provider = this.getProvider(providerName);
     const redirectUri = `${this.configService.get('API_BASE_URL')}/scm/oauth/callback`;
 
     const tokenResponse = await provider.exchangeCodeForToken(code, redirectUri);
@@ -74,7 +77,7 @@ export class ScmService {
       where: {
         tenantId_provider_externalId: {
           tenantId,
-          provider: 'github',
+          provider: providerName,
           externalId: user.id,
         },
       },
@@ -88,7 +91,7 @@ export class ScmService {
       },
       create: {
         tenantId,
-        provider: 'github',
+        provider: providerName,
         authMethod: 'oauth',
         accessToken: encryptedAccessToken,
         refreshToken: encryptedRefreshToken,
