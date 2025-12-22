@@ -32,6 +32,7 @@ import { CheckovScanner } from './iac/checkov/checkov.scanner';
 
 // DAST Scanners
 import { NucleiScanner } from './dast/nuclei/nuclei.scanner';
+import { ZapScanner } from './dast/zap/zap.scanner';
 
 // Services
 import { FindingProcessorService } from './services/finding-processor.service';
@@ -68,6 +69,7 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 
     // DAST Scanners
     NucleiScanner,
+    ZapScanner,
 
     // Services
     FindingProcessorService,
@@ -88,6 +90,7 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     TruffleHogScanner,
     CheckovScanner,
     NucleiScanner,
+    ZapScanner,
     FindingProcessorService,
   ],
 })
