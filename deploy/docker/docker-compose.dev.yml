@@ -1,0 +1,63 @@
+version: '3.8'
+
+# Development-only services (PostgreSQL and Redis)
+# Application services run locally via pnpm dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: threatdiviner-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: threatdiviner
+      POSTGRES_PASSWORD: threatdiviner
+      POSTGRES_DB: threatdiviner
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U threatdiviner"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: threatdiviner-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Optional: OpenSearch for SIEM development
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: threatdiviner-opensearch-dev
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    environment:
+      - cluster.name=threatdiviner-dev
+      - node.name=opensearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+      - "DISABLE_SECURITY_PLUGIN=true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch_dev_data:/usr/share/opensearch/data
+    profiles:
+      - siem
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  opensearch_dev_data:

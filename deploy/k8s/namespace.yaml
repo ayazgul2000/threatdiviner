@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: threatdiviner
+  labels:
+    app.kubernetes.io/name: threatdiviner
+    app.kubernetes.io/part-of: threatdiviner-platform

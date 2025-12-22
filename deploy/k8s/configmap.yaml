@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: threatdiviner-config
+  namespace: threatdiviner
+data:
+  NODE_ENV: "production"
+  PORT: "3001"
+  JWT_EXPIRES_IN: "1d"
+  OPENSEARCH_ENABLED: "true"
+  CORS_ORIGIN: "https://app.threatdiviner.com"

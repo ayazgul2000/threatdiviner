@@ -1,0 +1,52 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: threatdiviner-ingress
+  namespace: threatdiviner
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+spec:
+  tls:
+    - hosts:
+        - app.threatdiviner.com
+        - api.threatdiviner.com
+        - admin.threatdiviner.com
+      secretName: threatdiviner-tls
+  rules:
+    - host: app.threatdiviner.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: threatdiviner-dashboard
+                port:
+                  number: 3000
+    - host: api.threatdiviner.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: threatdiviner-api
+                port:
+                  number: 3001
+    - host: admin.threatdiviner.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: threatdiviner-admin
+                port:
+                  number: 3002

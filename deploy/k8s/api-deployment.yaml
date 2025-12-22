@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: threatdiviner-api
+  namespace: threatdiviner
+  labels:
+    app: threatdiviner-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: threatdiviner-api
+  template:
+    metadata:
+      labels:
+        app: threatdiviner-api
+    spec:
+      containers:
+        - name: api
+          image: threatdiviner/api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: threatdiviner-config
+            - secretRef:
+                name: threatdiviner-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - threatdiviner-api
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: threatdiviner-api
+  namespace: threatdiviner
+spec:
+  selector:
+    app: threatdiviner-api
+  ports:
+    - port: 3001
+      targetPort: 3001
+  type: ClusterIP
