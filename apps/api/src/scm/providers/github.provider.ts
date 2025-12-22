@@ -226,6 +226,169 @@ export class GitHubProvider implements ScmProvider {
     });
   }
 
+  /**
+   * Update check run with annotations for inline findings
+   */
+  async updateCheckRunWithAnnotations(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    checkRunId: string,
+    status: 'queued' | 'in_progress' | 'completed',
+    conclusion?: 'success' | 'failure' | 'neutral',
+    output?: {
+      title: string;
+      summary: string;
+      text?: string;
+      annotations?: Array<{
+        path: string;
+        start_line: number;
+        end_line: number;
+        annotation_level: 'notice' | 'warning' | 'failure';
+        title: string;
+        message: string;
+        raw_details?: string;
+      }>;
+    },
+  ): Promise<void> {
+    const body: any = { status };
+
+    if (status === 'completed' && conclusion) {
+      body.conclusion = conclusion;
+      body.completed_at = new Date().toISOString();
+    }
+
+    if (output) {
+      body.output = output;
+    }
+
+    await this.apiRequest(accessToken, `/repos/${owner}/${repo}/check-runs/${checkRunId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
+  /**
+   * Create a PR review comment (inline comment on a diff)
+   */
+  async createPRReviewComment(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    prNumber: number,
+    commitSha: string,
+    path: string,
+    line: number,
+    body: string,
+    side: 'LEFT' | 'RIGHT' = 'RIGHT',
+  ): Promise<string> {
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/pulls/${prNumber}/comments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          body,
+          commit_id: commitSha,
+          path,
+          line,
+          side,
+        }),
+      },
+    );
+
+    return String(response.id);
+  }
+
+  /**
+   * Create a general PR comment (not inline)
+   */
+  async createPRComment(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    prNumber: number,
+    body: string,
+  ): Promise<string> {
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/issues/${prNumber}/comments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+      },
+    );
+
+    return String(response.id);
+  }
+
+  /**
+   * Get the list of files changed in a PR
+   */
+  async getPRFiles(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<Array<{ filename: string; status: string; additions: number; deletions: number }>> {
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/pulls/${prNumber}/files`,
+    );
+
+    return response.map((file: any) => ({
+      filename: file.filename,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+    }));
+  }
+
+  /**
+   * Create a PR review with multiple comments
+   */
+  async createPRReview(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    prNumber: number,
+    commitSha: string,
+    event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT',
+    body: string,
+    comments?: Array<{
+      path: string;
+      line: number;
+      body: string;
+      side?: 'LEFT' | 'RIGHT';
+    }>,
+  ): Promise<string> {
+    const reviewBody: any = {
+      commit_id: commitSha,
+      event,
+      body,
+    };
+
+    if (comments && comments.length > 0) {
+      reviewBody.comments = comments.map(c => ({
+        path: c.path,
+        line: c.line,
+        body: c.body,
+        side: c.side || 'RIGHT',
+      }));
+    }
+
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
+      {
+        method: 'POST',
+        body: JSON.stringify(reviewBody),
+      },
+    );
+
+    return String(response.id);
+  }
+
   getAuthenticatedCloneUrl(accessToken: string, cloneUrl: string): string {
     // Convert https://github.com/owner/repo.git to https://x-access-token:TOKEN@github.com/owner/repo.git
     const url = new URL(cloneUrl);

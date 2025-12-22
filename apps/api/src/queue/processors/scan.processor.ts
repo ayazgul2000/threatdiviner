@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from '../../scm/services/crypto.service';
+import { PRCommentsService } from '../../scm/services/pr-comments.service';
 import { GitHubProvider } from '../../scm/providers';
 import { GitService, LanguageStats } from '../../scanners/utils';
 import { SemgrepScanner } from '../../scanners/sast/semgrep';
@@ -50,6 +51,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly githubProvider: GitHubProvider,
     private readonly aiService: AiService,
     private readonly notificationsService: NotificationsService,
+    private readonly prCommentsService: PRCommentsService,
     @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
   ) {
     this.aiTriageEnabled = this.configService.get('AI_TRIAGE_ENABLED', 'false') === 'true';
@@ -152,6 +154,11 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       if (job.data.pullRequestId || job.data.checkRunId) {
         await this.updateScanStatus(scanId, 'notifying');
         await this.enqueueNotification(job.data, findingsCount, startTime);
+      }
+
+      // 7b. Post PR inline comments (if PR scan)
+      if (job.data.pullRequestId) {
+        await this.postPRComments(scanId, job.data.checkRunId);
       }
 
       // 8. Complete
@@ -550,6 +557,22 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       // Log but don't fail the scan if notifications fail
       this.logger.error(`Slack notification failed: ${error}`);
+    }
+  }
+
+  private async postPRComments(scanId: string, checkRunId?: string): Promise<void> {
+    try {
+      // Post inline comments on PR
+      const { posted, skipped } = await this.prCommentsService.postPRComments(scanId);
+      this.logger.log(`Posted ${posted} PR comments (${skipped} skipped due to limit)`);
+
+      // Update check run with annotations
+      if (checkRunId) {
+        await this.prCommentsService.updateCheckRunWithAnnotations(scanId, checkRunId);
+      }
+    } catch (error) {
+      // Log but don't fail the scan if PR comments fail
+      this.logger.error(`PR comments failed: ${error}`);
     }
   }
 }
