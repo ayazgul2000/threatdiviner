@@ -9,6 +9,7 @@ export interface ScanJobData {
   fullName: string;
   pullRequestId?: string;
   checkRunId?: string;
+  triggeredBy?: string;
   config: ScanConfig;
 }
 
@@ -17,6 +18,10 @@ export interface ScanConfig {
   enableSca: boolean;
   enableSecrets: boolean;
   enableIac: boolean;
+  enableDast: boolean;
+  enableContainerScan: boolean;
+  targetUrls?: string[];
+  containerImages?: string[];
   skipPaths: string[];
   branches: string[];
 }

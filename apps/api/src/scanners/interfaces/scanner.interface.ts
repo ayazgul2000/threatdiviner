@@ -9,7 +9,15 @@ export interface ScanContext {
   excludePaths: string[];
   languages: string[];
   timeout: number;
-  config?: Record<string, unknown>;
+  config?: {
+    hasTerraform?: boolean;
+    hasDockerfile?: boolean;
+    hasKubernetes?: boolean;
+    hasCloudFormation?: boolean;
+    targetUrls?: string[];
+    containerImages?: string[];
+    [key: string]: unknown;
+  };
 }
 
 export interface ScanOutput {

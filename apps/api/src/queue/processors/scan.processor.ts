@@ -10,6 +10,9 @@ import { BanditScanner } from '../../scanners/sast/bandit';
 import { GosecScanner } from '../../scanners/sast/gosec';
 import { TrivyScanner } from '../../scanners/sca/trivy';
 import { GitleaksScanner } from '../../scanners/secrets/gitleaks';
+import { TruffleHogScanner } from '../../scanners/secrets/trufflehog';
+import { CheckovScanner } from '../../scanners/iac/checkov';
+import { NucleiScanner } from '../../scanners/dast/nuclei';
 import { FindingProcessorService } from '../../scanners/services/finding-processor.service';
 import { QueueService } from '../services/queue.service';
 import { QUEUE_NAMES } from '../queue.constants';
@@ -39,6 +42,9 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly gosecScanner: GosecScanner,
     private readonly trivyScanner: TrivyScanner,
     private readonly gitleaksScanner: GitleaksScanner,
+    private readonly trufflehogScanner: TruffleHogScanner,
+    private readonly checkovScanner: CheckovScanner,
+    private readonly nucleiScanner: NucleiScanner,
     private readonly findingProcessor: FindingProcessorService,
     private readonly queueService: QueueService,
     private readonly githubProvider: GitHubProvider,
@@ -107,6 +113,14 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
         languages: Object.keys(languages.languages),
         excludePaths: job.data.config.skipPaths,
         timeout: 300000, // 5 min per scanner
+        config: {
+          hasTerraform: languages.hasTerraform,
+          hasDockerfile: languages.hasDockerfile,
+          hasKubernetes: languages.hasKubernetes,
+          hasCloudFormation: languages.hasCloudFormation,
+          targetUrls: job.data.config.targetUrls,
+          containerImages: job.data.config.containerImages,
+        },
       });
       await job.updateProgress(70);
 
@@ -230,10 +244,28 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       this.logger.log('Added Trivy scanner (SCA)');
     }
 
-    // Secrets Scanner (Gitleaks) - always run for secrets detection
+    // Secrets Scanners - always run for secrets detection
     if (config.enableSecrets !== false) {
       scanners.push(this.gitleaksScanner);
       this.logger.log('Added Gitleaks scanner (secrets)');
+      scanners.push(this.trufflehogScanner);
+      this.logger.log('Added TruffleHog scanner (secrets)');
+    }
+
+    // IaC Scanner (Checkov) - run when IaC files detected
+    if (config.enableIac !== false) {
+      const hasIacFiles = languages.hasTerraform || languages.hasDockerfile ||
+        languages.hasKubernetes || languages.hasCloudFormation;
+      if (hasIacFiles) {
+        scanners.push(this.checkovScanner);
+        this.logger.log('Added Checkov scanner (IaC)');
+      }
+    }
+
+    // DAST Scanner (Nuclei) - run when target URLs configured
+    if (config.enableDast && config.targetUrls && config.targetUrls.length > 0) {
+      scanners.push(this.nucleiScanner);
+      this.logger.log('Added Nuclei scanner (DAST)');
     }
 
     this.logger.log(`Selected ${scanners.length} scanners: ${scanners.map(s => s.name).join(', ')}`);

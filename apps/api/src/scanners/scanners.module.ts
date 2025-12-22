@@ -25,6 +25,13 @@ import { TrivyScanner } from './sca/trivy/trivy.scanner';
 
 // Secrets Scanners
 import { GitleaksScanner } from './secrets/gitleaks/gitleaks.scanner';
+import { TruffleHogScanner } from './secrets/trufflehog/trufflehog.scanner';
+
+// IaC Scanners
+import { CheckovScanner } from './iac/checkov/checkov.scanner';
+
+// DAST Scanners
+import { NucleiScanner } from './dast/nuclei/nuclei.scanner';
 
 // Services
 import { FindingProcessorService } from './services/finding-processor.service';
@@ -54,6 +61,13 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 
     // Secrets Scanners
     GitleaksScanner,
+    TruffleHogScanner,
+
+    // IaC Scanners
+    CheckovScanner,
+
+    // DAST Scanners
+    NucleiScanner,
 
     // Services
     FindingProcessorService,
@@ -71,6 +85,9 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     GosecScanner,
     TrivyScanner,
     GitleaksScanner,
+    TruffleHogScanner,
+    CheckovScanner,
+    NucleiScanner,
     FindingProcessorService,
   ],
 })

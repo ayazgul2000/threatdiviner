@@ -2,16 +2,20 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../scm/services/crypto.service';
 import { SlackService } from './slack/slack.service';
+import { EmailService } from './email/email.service';
 import { NotificationConfig } from '@prisma/client';
 
 export interface UpdateNotificationConfigDto {
   slackWebhookUrl?: string;
   slackChannel?: string;
   slackEnabled?: boolean;
+  emailEnabled?: boolean;
+  emailRecipients?: string[];
   notifyOnScanStart?: boolean;
   notifyOnScanComplete?: boolean;
   notifyOnCritical?: boolean;
   notifyOnHigh?: boolean;
+  weeklyDigestEnabled?: boolean;
 }
 
 export interface ScanNotificationData {
@@ -51,6 +55,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly cryptoService: CryptoService,
     private readonly slackService: SlackService,
+    private readonly emailService: EmailService,
   ) {}
 
   async getConfig(tenantId: string): Promise<NotificationConfig | null> {
@@ -84,10 +89,13 @@ export class NotificationsService {
 
     if (dto.slackChannel !== undefined) data.slackChannel = dto.slackChannel;
     if (dto.slackEnabled !== undefined) data.slackEnabled = dto.slackEnabled;
+    if (dto.emailEnabled !== undefined) data.emailEnabled = dto.emailEnabled;
+    if (dto.emailRecipients !== undefined) data.emailRecipients = dto.emailRecipients;
     if (dto.notifyOnScanStart !== undefined) data.notifyOnScanStart = dto.notifyOnScanStart;
     if (dto.notifyOnScanComplete !== undefined) data.notifyOnScanComplete = dto.notifyOnScanComplete;
     if (dto.notifyOnCritical !== undefined) data.notifyOnCritical = dto.notifyOnCritical;
     if (dto.notifyOnHigh !== undefined) data.notifyOnHigh = dto.notifyOnHigh;
+    if (dto.weeklyDigestEnabled !== undefined) data.weeklyDigestEnabled = dto.weeklyDigestEnabled;
 
     const config = await this.prisma.notificationConfig.upsert({
       where: { tenantId },
@@ -147,7 +155,7 @@ export class NotificationsService {
   async notifyScanCompleted(data: ScanNotificationData): Promise<void> {
     try {
       const config = await this.getConfigInternal(data.tenantId);
-      if (!config?.slackEnabled || !config.notifyOnScanComplete || !config.slackWebhookUrl) {
+      if (!config?.notifyOnScanComplete) {
         return;
       }
 
@@ -156,29 +164,58 @@ export class NotificationsService {
         return;
       }
 
-      const webhookUrl = this.cryptoService.decrypt(config.slackWebhookUrl);
-      await this.slackService.sendScanCompleted(webhookUrl, {
-        repositoryName: data.repositoryName,
-        branch: data.branch,
-        commitSha: data.commitSha,
-        status: data.status,
-        duration: data.duration,
-        findings: data.findings,
-        scanId: data.scanId,
-      });
+      // Send Slack notification
+      if (config.slackEnabled && config.slackWebhookUrl) {
+        const webhookUrl = this.cryptoService.decrypt(config.slackWebhookUrl);
+        await this.slackService.sendScanCompleted(webhookUrl, {
+          repositoryName: data.repositoryName,
+          branch: data.branch,
+          commitSha: data.commitSha,
+          status: data.status,
+          duration: data.duration,
+          findings: data.findings,
+          scanId: data.scanId,
+        });
 
-      // Also send critical finding alerts if enabled
-      if (config.notifyOnCritical && data.findings.critical > 0) {
-        await this.notifyCriticalFindings(data.tenantId, data.scanId, webhookUrl, data.repositoryName);
+        // Also send critical finding alerts if enabled
+        if (config.notifyOnCritical && data.findings.critical > 0) {
+          await this.notifyCriticalFindings(data.tenantId, data.scanId, webhookUrl, data.repositoryName);
+        }
+
+        // Send high severity alerts if enabled
+        if (config.notifyOnHigh && data.findings.high > 0) {
+          await this.notifyHighFindings(data.tenantId, data.scanId, webhookUrl, data.repositoryName);
+        }
       }
 
-      // Send high severity alerts if enabled
-      if (config.notifyOnHigh && data.findings.high > 0) {
-        await this.notifyHighFindings(data.tenantId, data.scanId, webhookUrl, data.repositoryName);
+      // Send Email notification
+      if (config.emailEnabled && config.emailRecipients && config.emailRecipients.length > 0) {
+        await this.emailService.sendScanComplete(config.emailRecipients, {
+          repositoryName: data.repositoryName,
+          branch: data.branch,
+          commitSha: data.commitSha,
+          status: data.status,
+          duration: data.duration,
+          findings: data.findings,
+          scanId: data.scanId,
+        });
+
+        // Also send critical finding email alerts if enabled
+        if (config.notifyOnCritical && data.findings.critical > 0) {
+          await this.notifyCriticalFindingsEmail(data.tenantId, data.scanId, config.emailRecipients, data.repositoryName);
+        }
       }
     } catch (error) {
       this.logger.error(`Failed to send scan completed notification: ${error}`);
     }
+  }
+
+  async testEmail(_tenantId: string, email: string): Promise<{ success: boolean; message: string }> {
+    const success = await this.emailService.sendTestEmail(email);
+    return {
+      success,
+      message: success ? 'Test email sent successfully' : 'Failed to send test email',
+    };
   }
 
   async notifyCriticalFinding(data: FindingNotificationData): Promise<void> {
@@ -210,7 +247,7 @@ export class NotificationsService {
   }
 
   private async notifyCriticalFindings(
-    tenantId: string,
+    _tenantId: string,
     scanId: string,
     webhookUrl: string,
     repositoryName: string,
@@ -234,7 +271,7 @@ export class NotificationsService {
   }
 
   private async notifyHighFindings(
-    tenantId: string,
+    _tenantId: string,
     scanId: string,
     webhookUrl: string,
     repositoryName: string,
@@ -252,6 +289,31 @@ export class NotificationsService {
         filePath: finding.filePath,
         line: finding.startLine || 0,
         ruleId: finding.ruleId,
+        findingId: finding.id,
+      });
+    }
+  }
+
+  private async notifyCriticalFindingsEmail(
+    _tenantId: string,
+    scanId: string,
+    recipients: string[],
+    repositoryName: string,
+  ): Promise<void> {
+    const findings = await this.prisma.finding.findMany({
+      where: { scanId, severity: 'critical' },
+      take: 5, // Limit to top 5 to avoid spam
+    });
+
+    for (const finding of findings) {
+      await this.emailService.sendCriticalFinding(recipients, {
+        repositoryName,
+        title: finding.title,
+        severity: finding.severity,
+        filePath: finding.filePath,
+        line: finding.startLine || 0,
+        ruleId: finding.ruleId,
+        description: finding.description || undefined,
         findingId: finding.id,
       });
     }

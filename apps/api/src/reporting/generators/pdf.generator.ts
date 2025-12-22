@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import * as PDFDocument from 'pdfkit';
+import { Injectable } from '@nestjs/common';
+import PDFDocument from 'pdfkit';
 import { Scan, Finding, Repository } from '@prisma/client';
 
 export interface ReportData {
@@ -22,8 +22,6 @@ export interface ReportData {
 
 @Injectable()
 export class PdfGenerator {
-  private readonly logger = new Logger(PdfGenerator.name);
-
   async generateScanReport(data: ReportData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
@@ -38,7 +36,7 @@ export class PdfGenerator {
           },
         });
 
-        doc.on('data', (chunk) => chunks.push(chunk));
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
 
@@ -271,7 +269,7 @@ export class PdfGenerator {
     const findingsToShow = data.findings.slice(0, 50);
     doc.font('Helvetica').fontSize(8).fillColor('#4a5568');
 
-    findingsToShow.forEach((finding, index) => {
+    findingsToShow.forEach((finding) => {
       if (doc.y > 750) {
         doc.addPage();
         doc.y = 50;

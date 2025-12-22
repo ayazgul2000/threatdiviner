@@ -31,12 +31,19 @@ model Tenant {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  tenantId     String   @map("tenant_id")
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
   email        String
-  passwordHash String   @map("password_hash")
-  role         String   @default("member")
-  createdAt    DateTime @default(now()) @map("created_at")
+  name         String?
+  passwordHash String?   @map("password_hash")
+  role         String    @default("member")
+  status       String    @default("active") // active, invited, disabled
+  inviteToken  String?   @unique @map("invite_token")
+  invitedBy    String?   @map("invited_by")
+  invitedAt    DateTime? @map("invited_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -106,8 +113,13 @@ model ScanConfig {
   enableSca     Boolean  @default(true) @map("enable_sca")
   enableSecrets Boolean  @default(true) @map("enable_secrets")
   enableIac     Boolean  @default(true) @map("enable_iac")
-  enableDast    Boolean  @default(false) @map("enable_dast") // requires URL
-  branches      String[] @default(["main", "master"])
+  enableDast          Boolean  @default(false) @map("enable_dast") // requires URL
+  enableContainerScan Boolean  @default(false) @map("enable_container_scan")
+  targetUrls          String[] @default([]) @map("target_urls") // DAST target URLs
+  containerImages     String[] @default([]) @map("container_images") // Container images to scan
+  branches            String[] @default(["main", "master"])
+  autoScanOnPush      Boolean  @default(true) @map("auto_scan_on_push")
+  autoScanOnPR        Boolean  @default(true) @map("auto_scan_on_pr")
   skipPaths     String[] @default(["node_modules", "vendor", ".git"]) @map("skip_paths")
   customRules   Json?    @map("custom_rules") // Semgrep custom rules etc
   createdAt     DateTime @default(now()) @map("created_at")
@@ -217,13 +229,19 @@ model WebhookEvent {
 model NotificationConfig {
   id                   String   @id @default(uuid())
   tenantId             String   @unique @map("tenant_id")
+  // Slack settings
   slackWebhookUrl      String?  @map("slack_webhook_url") // Encrypted
   slackChannel         String?  @map("slack_channel")
   slackEnabled         Boolean  @default(false) @map("slack_enabled")
+  // Email settings
+  emailEnabled         Boolean  @default(false) @map("email_enabled")
+  emailRecipients      String[] @default([]) @map("email_recipients")
+  // Notification triggers
   notifyOnScanStart    Boolean  @default(false) @map("notify_on_scan_start")
   notifyOnScanComplete Boolean  @default(true) @map("notify_on_scan_complete")
   notifyOnCritical     Boolean  @default(true) @map("notify_on_critical")
   notifyOnHigh         Boolean  @default(false) @map("notify_on_high")
+  weeklyDigestEnabled  Boolean  @default(false) @map("weekly_digest_enabled")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
@@ -246,6 +264,28 @@ model PlatformConfig {
   updatedAt              DateTime @updatedAt @map("updated_at")
 
   @@map("platform_config")
+}
+
+// Audit log for tracking important actions
+model AuditLog {
+  id          String    @id @default(uuid())
+  tenantId    String?   @map("tenant_id")
+  userId      String?   @map("user_id")
+  userEmail   String?   @map("user_email")
+  action      String    // e.g., 'scan.trigger', 'finding.status_change', 'user.invite'
+  resource    String    // e.g., 'scan', 'finding', 'user', 'repository'
+  resourceId  String?   @map("resource_id")
+  details     Json?     // Additional context about the action
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 // Platform administrator accounts

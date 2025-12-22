@@ -76,7 +76,8 @@
       "Bash(gosec:*)",
       "Bash(choco --version)",
       "Bash(choco install:*)",
-      "Bash(go version:*)"
+      "Bash(go version:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

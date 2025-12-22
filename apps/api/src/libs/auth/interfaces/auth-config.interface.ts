@@ -82,7 +82,8 @@ export interface AltanicheAuthConfig {
 export interface IUser {
   id: string;
   email: string;
-  passwordHash: string;
+  name?: string | null;
+  passwordHash: string | null;
   role: string;
   tenantId?: string;
   createdAt?: Date;
@@ -121,6 +122,11 @@ export interface IUserRepository {
     role: string;
     tenantId?: string;
   }): Promise<IUser>;
+
+  /**
+   * Update user data
+   */
+  update?(id: string, data: Partial<{ name: string; passwordHash: string }>): Promise<IUser>;
 
   /**
    * Find user by ID with tenant info
@@ -179,6 +185,7 @@ export interface TokenPair {
 export interface AuthUser {
   id: string;
   email: string;
+  name?: string | null;
   role: string;
   tenantId?: string;
   tenantSlug?: string;

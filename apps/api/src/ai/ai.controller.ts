@@ -8,9 +8,8 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { AiService, TriageRequest, TriageResult } from './ai.service';
+import { JwtAuthGuard, CurrentUser } from '../libs/auth';
+import { AiService, TriageRequest } from './ai.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface TriageFindingDto {

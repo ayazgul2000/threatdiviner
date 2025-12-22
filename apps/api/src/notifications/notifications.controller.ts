@@ -6,8 +6,7 @@ import {
   Body,
   UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard, CurrentUser } from '../libs/auth';
 import { NotificationsService, UpdateNotificationConfigDto } from './notifications.service';
 
 @Controller('notifications')

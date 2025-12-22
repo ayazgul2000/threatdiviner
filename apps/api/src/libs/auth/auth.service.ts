@@ -254,7 +254,7 @@ export class AuthService {
    */
   async validatePassword(userId: string, password: string): Promise<boolean> {
     const user = await this.config.userRepository.findById(userId);
-    if (!user) {
+    if (!user || !user.passwordHash) {
       return false;
     }
     return bcrypt.compare(password, user.passwordHash);
@@ -265,6 +265,67 @@ export class AuthService {
    */
   async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, this.config.bcryptRounds || 10);
+  }
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(userId: string, data: { name?: string }): Promise<AuthUser> {
+    const { userRepository } = this.config;
+
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Update user using repository's update method if available
+    if (userRepository.update) {
+      const updatedUser = await userRepository.update(userId, data);
+      return {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        tenantId: updatedUser.tenantId,
+        name: updatedUser.name,
+      };
+    }
+
+    throw new Error('Update not supported');
+  }
+
+  /**
+   * Change user password
+   */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const { userRepository, bcryptRounds } = this.config;
+
+    const user = await userRepository.findById(userId);
+    if (!user || !user.passwordHash) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Verify current password
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Validate new password
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, bcryptRounds || 10);
+
+    // Update password using repository's update method
+    if (userRepository.update) {
+      await userRepository.update(userId, { passwordHash });
+      this.logger.log(`Password changed for user: ${user.email}`);
+      return;
+    }
+
+    throw new Error('Update not supported');
   }
 
   /**

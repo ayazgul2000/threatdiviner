@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfGenerator, ReportData } from './generators/pdf.generator';
 import * as Minio from 'minio';
-import * as crypto from 'crypto';
 
 @Injectable()
 export class ReportingService {

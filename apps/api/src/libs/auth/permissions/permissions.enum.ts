@@ -27,6 +27,7 @@ export enum Permission {
   USERS_READ = 'users:read',
   USERS_WRITE = 'users:write',
   USERS_DELETE = 'users:delete',
+  USERS_MANAGE = 'users:manage', // Invite, change roles, remove
 
   // Reports
   REPORTS_READ = 'reports:read',
@@ -112,6 +113,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.USERS_READ,
     Permission.USERS_WRITE,
     Permission.USERS_DELETE,
+    Permission.USERS_MANAGE,
     Permission.REPORTS_READ,
     Permission.REPORTS_GENERATE,
     Permission.AI_TRIAGE,

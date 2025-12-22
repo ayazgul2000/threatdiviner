@@ -354,11 +354,15 @@ export class ScmService {
     // Get scan config (use defaults if not configured)
     const scanConfig = repository.scanConfig || {
       enableSast: true,
-      enableSca: false,
-      enableSecrets: false,
-      enableIac: false,
-      skipPaths: [],
-      branches: [repository.defaultBranch],
+      enableSca: true,
+      enableSecrets: true,
+      enableIac: true,
+      enableDast: false,
+      enableContainerScan: false,
+      targetUrls: [] as string[],
+      containerImages: [] as string[],
+      skipPaths: ['node_modules', 'vendor', '.git'] as string[],
+      branches: [repository.defaultBranch] as string[],
     };
 
     // Build job data
@@ -376,6 +380,10 @@ export class ScmService {
         enableSca: scanConfig.enableSca,
         enableSecrets: scanConfig.enableSecrets,
         enableIac: scanConfig.enableIac,
+        enableDast: 'enableDast' in scanConfig ? scanConfig.enableDast : false,
+        enableContainerScan: 'enableContainerScan' in scanConfig ? scanConfig.enableContainerScan : false,
+        targetUrls: 'targetUrls' in scanConfig ? (scanConfig.targetUrls as string[]) : [],
+        containerImages: 'containerImages' in scanConfig ? (scanConfig.containerImages as string[]) : [],
         skipPaths: (scanConfig.skipPaths as string[]) || [],
         branches: (scanConfig.branches as string[]) || [repository.defaultBranch],
       },

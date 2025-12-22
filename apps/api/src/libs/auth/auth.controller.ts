@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Put,
   Body,
   UseGuards,
   Res,
@@ -155,6 +156,32 @@ export class AuthController {
       tenantId: user.tenantId,
       tenantSlug: user.tenantSlug,
     };
+  }
+
+  /**
+   * PUT /auth/profile
+   */
+  @UseGuards(JwtAuthGuard)
+  @Put('profile')
+  async updateProfile(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: { name?: string },
+  ) {
+    return this.authService.updateProfile(user.sub, dto);
+  }
+
+  /**
+   * PUT /auth/password
+   */
+  @UseGuards(JwtAuthGuard)
+  @Put('password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: { currentPassword: string; newPassword: string },
+  ) {
+    await this.authService.changePassword(user.sub, dto.currentPassword, dto.newPassword);
+    return { message: 'Password changed successfully' };
   }
 
   /**

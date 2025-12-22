@@ -10,6 +10,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { GitHubProvider } from './providers';
 import { CryptoService } from './services/crypto.service';
+import { QueueService } from '../queue/services/queue.service';
+import { ScanJobData } from '../queue/jobs';
 
 interface GitHubWebhookPayload {
   action?: string;
@@ -50,6 +52,7 @@ export class WebhooksController {
     private readonly prisma: PrismaService,
     private readonly githubProvider: GitHubProvider,
     private readonly cryptoService: CryptoService,
+    private readonly queueService: QueueService,
   ) {}
 
   @Post('github')
@@ -154,6 +157,12 @@ export class WebhooksController {
       return;
     }
 
+    // Check if auto-scan on push is enabled
+    if (repository.scanConfig && repository.scanConfig.autoScanOnPush === false) {
+      this.logger.log(`Auto-scan on push is disabled for ${repository.fullName}`);
+      return;
+    }
+
     // Extract branch name from ref (refs/heads/main -> main)
     const branch = payload.ref.replace('refs/heads/', '');
 
@@ -179,13 +188,40 @@ export class WebhooksController {
         branch,
         triggeredBy: 'webhook',
         triggerEvent: 'push',
-        status: 'pending',
+        status: 'queued',
       },
     });
 
     this.logger.log(`Created scan ${scan.id} for push to ${repository.fullName}@${branch}`);
 
-    // TODO: Queue scan job with BullMQ
+    // Queue scan job
+    const scanConfig = repository.scanConfig || {};
+    const jobData: ScanJobData = {
+      scanId: scan.id,
+      tenantId: repository.tenantId,
+      repositoryId: repository.id,
+      connectionId: repository.connectionId,
+      commitSha: payload.after,
+      branch,
+      cloneUrl: repository.cloneUrl,
+      fullName: repository.fullName,
+      triggeredBy: payload.sender?.login || 'webhook',
+      config: {
+        enableSast: scanConfig.enableSast ?? true,
+        enableSca: scanConfig.enableSca ?? true,
+        enableSecrets: scanConfig.enableSecrets ?? true,
+        enableIac: scanConfig.enableIac ?? true,
+        enableDast: scanConfig.enableDast ?? false,
+        enableContainerScan: scanConfig.enableContainerScan ?? false,
+        targetUrls: scanConfig.targetUrls || [],
+        containerImages: scanConfig.containerImages || [],
+        skipPaths: scanConfig.skipPaths || ['node_modules', 'vendor', '.git'],
+        branches: scanConfig.branches || ['main', 'master'],
+      },
+    };
+
+    await this.queueService.enqueueScan(jobData);
+    this.logger.log(`Queued scan job for ${repository.fullName}@${branch}`);
   }
 
   private async handlePullRequestEvent(
@@ -194,6 +230,12 @@ export class WebhooksController {
   ) {
     const pr = payload.pull_request;
     if (!pr) {
+      return;
+    }
+
+    // Check if auto-scan on PR is enabled
+    if (repository.scanConfig && repository.scanConfig.autoScanOnPR === false) {
+      this.logger.log(`Auto-scan on PR is disabled for ${repository.fullName}`);
       return;
     }
 
@@ -215,18 +257,19 @@ export class WebhooksController {
         triggerEvent: 'pull_request',
         pullRequestId: String(pr.number),
         pullRequestUrl: pr.html_url,
-        status: 'pending',
+        status: 'queued',
       },
     });
 
     this.logger.log(`Created scan ${scan.id} for PR #${pr.number} on ${repository.fullName}`);
 
     // Create GitHub check run
+    let checkRunId: string | undefined;
     try {
       const token = this.cryptoService.decrypt(repository.connection.accessToken);
       const [owner, repoName] = repository.fullName.split('/');
 
-      const checkRunId = await this.githubProvider.createCheckRun(
+      checkRunId = await this.githubProvider.createCheckRun(
         token,
         owner,
         repoName,
@@ -245,7 +288,36 @@ export class WebhooksController {
       this.logger.error(`Failed to create check run: ${error}`);
     }
 
-    // TODO: Queue scan job with BullMQ
+    // Queue scan job
+    const scanConfig = repository.scanConfig || {};
+    const jobData: ScanJobData = {
+      scanId: scan.id,
+      tenantId: repository.tenantId,
+      repositoryId: repository.id,
+      connectionId: repository.connectionId,
+      commitSha: pr.head.sha,
+      branch: pr.head.ref,
+      cloneUrl: repository.cloneUrl,
+      fullName: repository.fullName,
+      pullRequestId: String(pr.number),
+      checkRunId,
+      triggeredBy: payload.sender?.login || 'webhook',
+      config: {
+        enableSast: scanConfig.enableSast ?? true,
+        enableSca: scanConfig.enableSca ?? true,
+        enableSecrets: scanConfig.enableSecrets ?? true,
+        enableIac: scanConfig.enableIac ?? true,
+        enableDast: scanConfig.enableDast ?? false,
+        enableContainerScan: scanConfig.enableContainerScan ?? false,
+        targetUrls: scanConfig.targetUrls || [],
+        containerImages: scanConfig.containerImages || [],
+        skipPaths: scanConfig.skipPaths || ['node_modules', 'vendor', '.git'],
+        branches: scanConfig.branches || ['main', 'master'],
+      },
+    };
+
+    await this.queueService.enqueueScan(jobData);
+    this.logger.log(`Queued scan job for PR #${pr.number} on ${repository.fullName}`);
   }
 
   private sanitizePayload(payload: any): any {

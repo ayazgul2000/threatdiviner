@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { HealthController } from './health/health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -11,6 +13,9 @@ import { AiModule } from './ai/ai.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { PlatformModule } from './platform/platform.module';
+import { TeamModule } from './team/team.module';
+import { AuditModule } from './audit/audit.module';
+import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
   imports: [
@@ -18,8 +23,32 @@ import { PlatformModule } from './platform/platform.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          {
+            name: 'short',
+            ttl: 1000, // 1 second
+            limit: configService.get('THROTTLE_SHORT_LIMIT', 10),
+          },
+          {
+            name: 'medium',
+            ttl: 60000, // 1 minute
+            limit: configService.get('THROTTLE_MEDIUM_LIMIT', 100),
+          },
+          {
+            name: 'long',
+            ttl: 3600000, // 1 hour
+            limit: configService.get('THROTTLE_LONG_LIMIT', 1000),
+          },
+        ],
+      }),
+    }),
     CustomBullModule.forRoot(),
     PrismaModule,
+    AuditModule,
     AuthModule,
     ScmModule,
     QueueModule,
@@ -28,8 +57,14 @@ import { PlatformModule } from './platform/platform.module';
     NotificationsModule,
     ReportingModule,
     PlatformModule,
+    TeamModule,
   ],
   controllers: [HealthController],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: CustomThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
