@@ -16,6 +16,7 @@ import { PlatformModule } from './platform/platform.module';
 import { TeamModule } from './team/team.module';
 import { AuditModule } from './audit/audit.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { JiraModule } from './integrations/jira/jira.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -60,6 +61,7 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     PlatformModule,
     TeamModule,
     SchedulerModule,
+    JiraModule,
   ],
   controllers: [HealthController],
   providers: [
