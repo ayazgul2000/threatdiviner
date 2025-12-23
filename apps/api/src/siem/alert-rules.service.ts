@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { OpenSearchProvider, SecurityEvent } from './opensearch.provider';
+import { SecurityEvent } from './opensearch.provider';
 
 export interface AlertRule {
   id: string;
@@ -46,7 +46,6 @@ export class AlertRulesService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly opensearch: OpenSearchProvider,
     private readonly notificationsService: NotificationsService,
   ) {
     // Start periodic evaluation
@@ -116,7 +115,7 @@ export class AlertRulesService {
    * Update an alert rule
    */
   async updateRule(
-    tenantId: string,
+    _tenantId: string,
     ruleId: string,
     data: Partial<AlertRule>,
   ): Promise<AlertRule> {
@@ -144,7 +143,7 @@ export class AlertRulesService {
   /**
    * Delete an alert rule
    */
-  async deleteRule(tenantId: string, ruleId: string): Promise<void> {
+  async deleteRule(_tenantId: string, ruleId: string): Promise<void> {
     await this.prisma.alertRule.delete({
       where: { id: ruleId },
     });

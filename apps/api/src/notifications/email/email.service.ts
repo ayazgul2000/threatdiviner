@@ -153,4 +153,22 @@ export class EmailService {
       text: `Email Configuration Test\n\nIf you're seeing this message, your email notifications are configured correctly!\n\nSent at: ${new Date().toISOString()}`,
     });
   }
+
+  async sendGenericEmail(to: string | string[], subject: string, body: string): Promise<boolean> {
+    return this.sendEmail({
+      to,
+      subject,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px;">
+          <h1 style="color: #333;">${subject}</h1>
+          <div style="white-space: pre-wrap;">${body.replace(/\n/g, '<br>')}</div>
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;" />
+          <p style="color: #666; font-size: 12px;">
+            Sent by ThreatDiviner at ${new Date().toISOString()}
+          </p>
+        </div>
+      `,
+      text: `${subject}\n\n${body}\n\nSent by ThreatDiviner at ${new Date().toISOString()}`,
+    });
+  }
 }

@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 export interface AzureCredentials {
   tenantId: string;
@@ -21,7 +20,6 @@ export interface AzureResource {
 export class AzureProvider {
   private readonly logger = new Logger(AzureProvider.name);
 
-  constructor(private readonly configService: ConfigService) {}
 
   /**
    * Validate Azure credentials by getting an access token
@@ -70,7 +68,7 @@ export class AzureProvider {
    * List all resource groups
    */
   async listResourceGroups(
-    credentials: AzureCredentials,
+    _credentials: AzureCredentials,
   ): Promise<Array<{ name: string; location: string }>> {
     // In production, would call Azure Resource Management API
     return [];
@@ -80,7 +78,7 @@ export class AzureProvider {
    * List storage accounts for security audit
    */
   async listStorageAccounts(
-    credentials: AzureCredentials,
+    _credentials: AzureCredentials,
   ): Promise<AzureResource[]> {
     // In production, would call Azure Storage Management API
     return [];
@@ -90,7 +88,7 @@ export class AzureProvider {
    * List virtual machines for security audit
    */
   async listVirtualMachines(
-    credentials: AzureCredentials,
+    _credentials: AzureCredentials,
   ): Promise<AzureResource[]> {
     // In production, would call Azure Compute Management API
     return [];
@@ -100,7 +98,7 @@ export class AzureProvider {
    * List network security groups
    */
   async listNetworkSecurityGroups(
-    credentials: AzureCredentials,
+    _credentials: AzureCredentials,
   ): Promise<AzureResource[]> {
     // In production, would call Azure Network Management API
     return [];
@@ -110,7 +108,7 @@ export class AzureProvider {
    * Check Azure Security Center status
    */
   async checkSecurityCenter(
-    credentials: AzureCredentials,
+    _credentials: AzureCredentials,
   ): Promise<{ enabled: boolean; tier: string }> {
     // In production, would call Azure Security Center API
     return {
@@ -123,7 +121,7 @@ export class AzureProvider {
    * Check Key Vault configuration
    */
   async listKeyVaults(
-    credentials: AzureCredentials,
+    _credentials: AzureCredentials,
   ): Promise<AzureResource[]> {
     // In production, would call Azure Key Vault Management API
     return [];
@@ -133,7 +131,7 @@ export class AzureProvider {
    * Get Azure AD conditional access policies
    */
   async listConditionalAccessPolicies(
-    credentials: AzureCredentials,
+    _credentials: AzureCredentials,
   ): Promise<Array<{ id: string; displayName: string; state: string }>> {
     // In production, would call Microsoft Graph API
     return [];

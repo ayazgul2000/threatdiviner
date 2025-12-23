@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 export interface AwsCredentials {
   accessKeyId: string;
@@ -21,7 +20,6 @@ export interface AwsResource {
 export class AwsProvider {
   private readonly logger = new Logger(AwsProvider.name);
 
-  constructor(private readonly configService: ConfigService) {}
 
   /**
    * Validate AWS credentials by calling STS GetCallerIdentity
@@ -52,7 +50,7 @@ export class AwsProvider {
   /**
    * List all regions enabled for the account
    */
-  async listRegions(credentials: AwsCredentials): Promise<string[]> {
+  async listRegions(_credentials: AwsCredentials): Promise<string[]> {
     // Default enabled regions
     return [
       'us-east-1',
@@ -71,7 +69,7 @@ export class AwsProvider {
   /**
    * Get account info
    */
-  async getAccountInfo(credentials: AwsCredentials): Promise<{
+  async getAccountInfo(_credentials: AwsCredentials): Promise<{
     accountId: string;
     accountAlias?: string;
     arn: string;
@@ -87,7 +85,7 @@ export class AwsProvider {
    * List S3 buckets for security audit
    */
   async listS3Buckets(
-    credentials: AwsCredentials,
+    _credentials: AwsCredentials,
   ): Promise<AwsResource[]> {
     // In production, would call S3 ListBuckets
     return [];
@@ -97,8 +95,8 @@ export class AwsProvider {
    * List EC2 instances for security audit
    */
   async listEc2Instances(
-    credentials: AwsCredentials,
-    region: string,
+    _credentials: AwsCredentials,
+    _region: string,
   ): Promise<AwsResource[]> {
     // In production, would call EC2 DescribeInstances
     return [];
@@ -108,7 +106,7 @@ export class AwsProvider {
    * List IAM users for security audit
    */
   async listIamUsers(
-    credentials: AwsCredentials,
+    _credentials: AwsCredentials,
   ): Promise<AwsResource[]> {
     // In production, would call IAM ListUsers
     return [];
@@ -118,8 +116,8 @@ export class AwsProvider {
    * List Security Groups for audit
    */
   async listSecurityGroups(
-    credentials: AwsCredentials,
-    region: string,
+    _credentials: AwsCredentials,
+    _region: string,
   ): Promise<AwsResource[]> {
     // In production, would call EC2 DescribeSecurityGroups
     return [];
@@ -129,8 +127,8 @@ export class AwsProvider {
    * Check if CloudTrail is enabled
    */
   async checkCloudTrail(
-    credentials: AwsCredentials,
-    region: string,
+    _credentials: AwsCredentials,
+    _region: string,
   ): Promise<{ enabled: boolean; multiRegion: boolean; logValidation: boolean }> {
     // In production, would call CloudTrail DescribeTrails
     return {
@@ -144,8 +142,8 @@ export class AwsProvider {
    * Check GuardDuty status
    */
   async checkGuardDuty(
-    credentials: AwsCredentials,
-    region: string,
+    _credentials: AwsCredentials,
+    _region: string,
   ): Promise<{ enabled: boolean; detectorId?: string }> {
     // In production, would call GuardDuty ListDetectors
     return {

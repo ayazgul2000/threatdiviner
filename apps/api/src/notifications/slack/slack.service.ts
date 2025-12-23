@@ -72,4 +72,50 @@ export class SlackService {
     const message = buildTestMessage(tenantName);
     return this.sendMessage(webhookUrl, message);
   }
+
+  async sendGenericMessage(
+    webhookUrl: string,
+    title: string,
+    body: string,
+    severity?: string,
+  ): Promise<boolean> {
+    const color = this.getSeverityColor(severity);
+    const message: SlackMessage = {
+      attachments: [
+        {
+          color,
+          blocks: [
+            {
+              type: 'header',
+              text: { type: 'plain_text', text: title, emoji: true },
+            },
+            {
+              type: 'section',
+              text: { type: 'mrkdwn', text: body },
+            },
+            {
+              type: 'section',
+              text: { type: 'mrkdwn', text: `_Sent at: ${new Date().toISOString()}_` },
+            },
+          ],
+        },
+      ],
+    };
+    return this.sendMessage(webhookUrl, message);
+  }
+
+  private getSeverityColor(severity?: string): string {
+    switch (severity?.toLowerCase()) {
+      case 'critical':
+        return '#d32f2f';
+      case 'high':
+        return '#f57c00';
+      case 'medium':
+        return '#fbc02d';
+      case 'low':
+        return '#388e3c';
+      default:
+        return '#1976d2';
+    }
+  }
 }

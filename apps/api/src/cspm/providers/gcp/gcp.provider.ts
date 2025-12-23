@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 export interface GcpCredentials {
   projectId: string;
@@ -20,7 +19,6 @@ export interface GcpResource {
 export class GcpProvider {
   private readonly logger = new Logger(GcpProvider.name);
 
-  constructor(private readonly configService: ConfigService) {}
 
   /**
    * Validate GCP credentials by calling IAM testIamPermissions
@@ -71,7 +69,7 @@ export class GcpProvider {
   /**
    * List all regions
    */
-  async listRegions(credentials: GcpCredentials): Promise<string[]> {
+  async listRegions(_credentials: GcpCredentials): Promise<string[]> {
     return [
       'us-central1',
       'us-east1',
@@ -85,8 +83,8 @@ export class GcpProvider {
    * List Compute Engine instances
    */
   async listComputeInstances(
-    credentials: GcpCredentials,
-    zone?: string,
+    _credentials: GcpCredentials,
+    _zone?: string,
   ): Promise<GcpResource[]> {
     // In production, would call Compute Engine API
     return [];
@@ -96,7 +94,7 @@ export class GcpProvider {
    * List Cloud Storage buckets
    */
   async listStorageBuckets(
-    credentials: GcpCredentials,
+    _credentials: GcpCredentials,
   ): Promise<GcpResource[]> {
     // In production, would call Cloud Storage API
     return [];
@@ -106,7 +104,7 @@ export class GcpProvider {
    * List VPC firewall rules
    */
   async listFirewallRules(
-    credentials: GcpCredentials,
+    _credentials: GcpCredentials,
   ): Promise<GcpResource[]> {
     // In production, would call Compute Engine API
     return [];
@@ -116,7 +114,7 @@ export class GcpProvider {
    * List IAM service accounts
    */
   async listServiceAccounts(
-    credentials: GcpCredentials,
+    _credentials: GcpCredentials,
   ): Promise<GcpResource[]> {
     // In production, would call IAM API
     return [];
@@ -126,7 +124,7 @@ export class GcpProvider {
    * Check Cloud Audit Logs configuration
    */
   async checkAuditLogs(
-    credentials: GcpCredentials,
+    _credentials: GcpCredentials,
   ): Promise<{ enabled: boolean; dataAccess: boolean }> {
     // In production, would call Cloud Resource Manager API
     return {
@@ -139,7 +137,7 @@ export class GcpProvider {
    * Check Security Command Center status
    */
   async checkSecurityCommandCenter(
-    credentials: GcpCredentials,
+    _credentials: GcpCredentials,
   ): Promise<{ enabled: boolean; tier: string }> {
     // In production, would call Security Command Center API
     return {
@@ -152,7 +150,7 @@ export class GcpProvider {
    * List Cloud KMS keys
    */
   async listKmsKeys(
-    credentials: GcpCredentials,
+    _credentials: GcpCredentials,
   ): Promise<GcpResource[]> {
     // In production, would call Cloud KMS API
     return [];

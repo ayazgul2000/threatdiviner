@@ -1,8 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from '@nestjs/common';
 import { OpenSearchProvider, SecurityEvent, SearchQuery, SearchResult } from './opensearch.provider';
 import { AlertRulesService } from './alert-rules.service';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 export type EventSource = 'scan' | 'cspm' | 'auth' | 'api' | 'webhook' | 'system';
 export type EventType =
@@ -26,10 +25,7 @@ export type EventType =
 
 @Injectable()
 export class SiemService {
-  private readonly logger = new Logger(SiemService.name);
-
   constructor(
-    private readonly prisma: PrismaService,
     private readonly opensearch: OpenSearchProvider,
     private readonly alertRules: AlertRulesService,
   ) {}
@@ -50,7 +46,7 @@ export class SiemService {
     },
   ): Promise<SecurityEvent> {
     const event: SecurityEvent = {
-      id: uuidv4(),
+      id: randomUUID(),
       timestamp: new Date(),
       tenantId,
       eventType,
@@ -341,7 +337,7 @@ export class SiemService {
       criticalThreats: critical,
       highThreats: high,
       topVulnerabilities: [], // Would need additional aggregation
-      attackTrends: aggregations.timeline,
+      attackTrends: aggregations.timeline.map((t) => ({ date: t.date, attacks: t.count })),
       riskScore,
     };
   }

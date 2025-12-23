@@ -164,7 +164,7 @@ export class ZapScanner implements IScanner {
   private async runDockerScan(
     config: ZapScanConfig,
     outputDir: string,
-    outputFile: string,
+    _outputFile: string,
     timeout: number,
   ): Promise<ScanOutput> {
     const reportName = 'report.json';

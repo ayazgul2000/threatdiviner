@@ -4,7 +4,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { spawn } from 'child_process';
-import { CloudAccount, CloudProvider, CspmFinding } from '../cspm.service';
+import { CloudAccount, CspmFinding } from '../cspm.service';
 
 interface ProwlerFinding {
   CheckID: string;
@@ -97,8 +97,6 @@ export class ProwlerScanner {
     account: CloudAccount,
     outputFile: string,
   ): Promise<CspmFinding[]> {
-    const provider = account.provider;
-
     if (this.useDocker) {
       return this.runDockerProwler(account, outputFile);
     }

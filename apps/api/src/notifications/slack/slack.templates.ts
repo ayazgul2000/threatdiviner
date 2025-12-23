@@ -1,8 +1,12 @@
 // Slack Block Kit templates for notifications
 
 export interface SlackMessage {
-  text: string;
-  blocks: SlackBlock[];
+  text?: string;
+  blocks?: SlackBlock[];
+  attachments?: Array<{
+    color?: string;
+    blocks?: SlackBlock[];
+  }>;
 }
 
 export interface SlackBlock {

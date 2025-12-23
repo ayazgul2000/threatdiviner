@@ -331,4 +331,43 @@ export class NotificationsService {
       return '***configured***';
     }
   }
+
+  /**
+   * Send a generic Slack notification (used by SIEM alerts)
+   */
+  async sendSlackNotification(
+    tenantId: string,
+    data: { type: string; title: string; message: string; severity?: string },
+  ): Promise<void> {
+    try {
+      const config = await this.getConfigInternal(tenantId);
+      if (!config?.slackEnabled || !config.slackWebhookUrl) {
+        return;
+      }
+
+      const webhookUrl = this.cryptoService.decrypt(config.slackWebhookUrl);
+      await this.slackService.sendGenericMessage(webhookUrl, data.title, data.message, data.severity);
+    } catch (error) {
+      this.logger.error(`Failed to send Slack notification: ${error}`);
+    }
+  }
+
+  /**
+   * Send a generic Email notification (used by SIEM alerts)
+   */
+  async sendEmailNotification(
+    tenantId: string,
+    data: { subject: string; body: string; type: string },
+  ): Promise<void> {
+    try {
+      const config = await this.getConfigInternal(tenantId);
+      if (!config?.emailEnabled || !config.emailRecipients?.length) {
+        return;
+      }
+
+      await this.emailService.sendGenericEmail(config.emailRecipients, data.subject, data.body);
+    } catch (error) {
+      this.logger.error(`Failed to send email notification: ${error}`);
+    }
+  }
 }
