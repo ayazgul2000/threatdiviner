@@ -2,7 +2,116 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - 2024-12-22 (Overnight Session)
+## [Unreleased] - 2024-12-24 (Phase 5 - Overnight Autonomous Session)
+
+### Session 5: Complete Dashboard Rebuild + CLI Tool
+
+#### Added - Scan Detail Page
+- `apps/dashboard/src/app/dashboard/scans/[id]/page.tsx`
+- Metadata header with commit, branch, status
+- Severity pie chart (recharts)
+- Scanner bar chart breakdown
+- Scanner tabs: SAST, SCA, Secrets, IaC, DAST
+- Findings table with file/line navigation
+- Re-run scan button
+
+#### Added - Single Finding Page
+- `apps/dashboard/src/app/dashboard/findings/[id]/page.tsx`
+- CVE details with NVD links
+- CVSS gauge visualization
+- CWE links and details
+- OWASP Top 10 mapping
+- Compliance tags (PCI-DSS, SOC2, HIPAA)
+- AI Triage section with mocked response
+- Status management buttons
+- Jira integration button
+
+#### Added - Pipeline Security View
+- `apps/dashboard/src/app/dashboard/pipeline/page.tsx`
+- Horizontal stage visualization: Code → Build → Test → Deploy → Prod
+- Overall security score gauge
+- Stage-specific finding counts
+- Gate status indicators (pass/warning/fail)
+
+#### Added - Analytics Dashboard
+- `apps/dashboard/src/app/dashboard/analytics/page.tsx`
+- Date range picker (7d, 30d, 90d)
+- Scans over time line chart
+- Findings trend chart
+- Severity pie chart
+- Scanner bar chart
+- Top vulnerable repositories
+- Top recurring rules
+- Compliance score cards
+- CSV export button
+
+#### Added - CSPM Dashboard (3 pages)
+- `apps/dashboard/src/app/dashboard/cloud/page.tsx` - Cloud accounts management
+- `apps/dashboard/src/app/dashboard/cloud/findings/page.tsx` - Cloud findings with filters
+- `apps/dashboard/src/app/dashboard/cloud/compliance/page.tsx` - Compliance dashboard
+- Multi-cloud support: AWS, Azure, GCP
+- Add account modal with provider-specific credentials
+- Compliance framework selector (CIS, SOC2, PCI-DSS, HIPAA, NIST, ISO27001)
+- Score gauges and control breakdown
+
+#### Added - SIEM Dashboard (3 pages)
+- `apps/dashboard/src/app/dashboard/siem/page.tsx` - Security events timeline
+- `apps/dashboard/src/app/dashboard/siem/alerts/page.tsx` - Alerts with status management
+- `apps/dashboard/src/app/dashboard/siem/rules/page.tsx` - Alert rule configuration
+- Event severity/source filtering
+- Events by severity/source charts
+- Acknowledge/Resolve alert buttons
+- Create/edit rule modal with threshold configuration
+
+#### Added - Repository Scanner Configuration
+- `apps/dashboard/src/app/dashboard/repositories/[id]/settings/page.tsx`
+- Scanner toggles: SAST, SCA, Secrets, IaC, DAST
+- DAST configuration: target URL, scan type, auth settings
+- Schedule configuration: frequency, timezone, cron
+- Branch configuration for auto-scan
+- AI Triage toggle
+- PR settings: inline comments, diff-only, block severity
+
+#### Added - Repository Detail Page with Branch Selector
+- `apps/dashboard/src/app/dashboard/repositories/[id]/page.tsx`
+- Branch dropdown selector from SCM API
+- Language detection with color-coded progress bar
+- Language percentage badges
+- Scan button with selected branch
+- Recent scans table
+
+#### Added - API Endpoints for Branch/Language
+- `GET /scm/repositories/:id/branches` - List branches
+- `GET /scm/repositories/:id/languages` - Language breakdown
+- Updated `github.provider.ts` and `gitlab.provider.ts` with getBranches/getLanguages
+- Added `ScmBranch` and `ScmLanguages` interfaces
+
+#### Added - UI Polish Components
+- `apps/dashboard/src/components/ui/scan-progress.tsx` - Animated scan stages
+- `apps/dashboard/src/components/ui/skeleton.tsx` - Loading skeletons
+- `apps/dashboard/src/components/ui/empty-state.tsx` - Empty state illustrations
+- `apps/dashboard/src/components/ui/toast.tsx` - Toast notification system
+- `apps/dashboard/src/lib/utils.ts` - Utility functions (cn, formatDate, etc.)
+
+#### Added - CLI Tool for CI/CD
+- `packages/cli/` - Standalone CLI package
+- `tdiv scan` command with SAST/SCA/Secrets/IaC scanners
+- JSON, SARIF, and text output formats
+- Exit codes: 0=clean, 1=findings, 2=error
+- Configuration file support: `.threatdiviner.json`
+- `tdiv config init/show/validate` commands
+- CI examples: GitHub Actions, GitLab CI, Azure DevOps, Jenkins, CircleCI
+
+#### Dependencies Added
+- `clsx` - Classname utility
+- `tailwind-merge` - Tailwind class merging
+- `commander` - CLI framework
+- `ora` - CLI spinners
+- `chalk` - CLI colors
+
+---
+
+## [Previous] - 2024-12-22 (Overnight Session)
 
 ### Session 4: Phase 2 Features - Scanners, Notifications, Audit, Rate Limiting
 
