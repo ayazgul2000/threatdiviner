@@ -112,7 +112,7 @@ export default function ScansPage() {
                   <TableRow key={scan.id}>
                     <TableCell>
                       <Link
-                        href={`/dashboard/repositories/${scan.repositoryId}`}
+                        href={`/dashboard/scans/${scan.id}`}
                         className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
                       >
                         {scan.repository?.fullName || 'Unknown'}
