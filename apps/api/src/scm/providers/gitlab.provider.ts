@@ -6,6 +6,8 @@ import {
   ScmRepository,
   ScmUser,
   ScmCommit,
+  ScmBranch,
+  ScmLanguages,
   OAuthTokenResponse,
 } from './scm-provider.interface';
 
@@ -126,6 +128,35 @@ export class GitLabProvider implements ScmProvider {
     const projectPath = encodeURIComponent(`${owner}/${repo}`);
     const response = await this.apiRequest(accessToken, `/projects/${projectPath}`);
     return this.mapRepository(response);
+  }
+
+  async getBranches(accessToken: string, owner: string, repo: string): Promise<ScmBranch[]> {
+    const projectPath = encodeURIComponent(`${owner}/${repo}`);
+    const [branches, project] = await Promise.all([
+      this.apiRequest(accessToken, `/projects/${projectPath}/repository/branches?per_page=100`),
+      this.apiRequest(accessToken, `/projects/${projectPath}`),
+    ]);
+
+    const defaultBranch = project.default_branch;
+
+    return branches.map((branch: any) => ({
+      name: branch.name,
+      sha: branch.commit.id,
+      isDefault: branch.name === defaultBranch,
+      isProtected: branch.protected || false,
+    }));
+  }
+
+  async getLanguages(accessToken: string, owner: string, repo: string): Promise<ScmLanguages> {
+    const projectPath = encodeURIComponent(`${owner}/${repo}`);
+    const response = await this.apiRequest(accessToken, `/projects/${projectPath}/languages`);
+    // GitLab returns percentages, convert to bytes (estimate based on 1000000 total)
+    const totalBytes = 1000000;
+    const languages: ScmLanguages = {};
+    for (const [lang, percentage] of Object.entries(response)) {
+      languages[lang] = Math.round((percentage as number) / 100 * totalBytes);
+    }
+    return languages;
   }
 
   async getLatestCommit(accessToken: string, owner: string, repo: string, branch: string): Promise<ScmCommit> {

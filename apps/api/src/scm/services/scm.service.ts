@@ -283,6 +283,40 @@ export class ScmService {
     return repository;
   }
 
+  async getBranches(tenantId: string, repositoryId: string) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { connection: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    const provider = this.getProvider(repository.connection.provider);
+    const token = this.cryptoService.decrypt(repository.connection.accessToken);
+    const [owner, repoName] = repository.fullName.split('/');
+
+    return provider.getBranches(token, owner, repoName);
+  }
+
+  async getLanguages(tenantId: string, repositoryId: string) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { connection: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    const provider = this.getProvider(repository.connection.provider);
+    const token = this.cryptoService.decrypt(repository.connection.accessToken);
+    const [owner, repoName] = repository.fullName.split('/');
+
+    return provider.getLanguages(token, owner, repoName);
+  }
+
   async updateScanConfig(tenantId: string, repositoryId: string, config: Partial<{
     enableSast: boolean;
     enableSca: boolean;

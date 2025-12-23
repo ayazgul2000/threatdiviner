@@ -6,6 +6,8 @@ import {
   ScmRepository,
   ScmUser,
   ScmCommit,
+  ScmBranch,
+  ScmLanguages,
   OAuthTokenResponse,
 } from './scm-provider.interface';
 
@@ -121,6 +123,27 @@ export class GitHubProvider implements ScmProvider {
   async getRepository(accessToken: string, owner: string, repo: string): Promise<ScmRepository> {
     const response = await this.apiRequest(accessToken, `/repos/${owner}/${repo}`);
     return this.mapRepository(response);
+  }
+
+  async getBranches(accessToken: string, owner: string, repo: string): Promise<ScmBranch[]> {
+    const [branches, repoInfo] = await Promise.all([
+      this.apiRequest(accessToken, `/repos/${owner}/${repo}/branches?per_page=100`),
+      this.apiRequest(accessToken, `/repos/${owner}/${repo}`),
+    ]);
+
+    const defaultBranch = repoInfo.default_branch;
+
+    return branches.map((branch: any) => ({
+      name: branch.name,
+      sha: branch.commit.sha,
+      isDefault: branch.name === defaultBranch,
+      isProtected: branch.protected || false,
+    }));
+  }
+
+  async getLanguages(accessToken: string, owner: string, repo: string): Promise<ScmLanguages> {
+    const response = await this.apiRequest(accessToken, `/repos/${owner}/${repo}/languages`);
+    return response as ScmLanguages;
   }
 
   async getLatestCommit(accessToken: string, owner: string, repo: string, branch: string): Promise<ScmCommit> {

@@ -133,6 +133,26 @@ export class ScmController {
     return { repository };
   }
 
+  @Get('repositories/:repositoryId/branches')
+  @UseGuards(JwtAuthGuard)
+  async getBranches(
+    @CurrentUser() user: { tenantId: string },
+    @Param('repositoryId') repositoryId: string,
+  ) {
+    const branches = await this.scmService.getBranches(user.tenantId, repositoryId);
+    return { branches };
+  }
+
+  @Get('repositories/:repositoryId/languages')
+  @UseGuards(JwtAuthGuard)
+  async getLanguages(
+    @CurrentUser() user: { tenantId: string },
+    @Param('repositoryId') repositoryId: string,
+  ) {
+    const languages = await this.scmService.getLanguages(user.tenantId, repositoryId);
+    return { languages };
+  }
+
   @Put('repositories/:repositoryId/config')
   @UseGuards(JwtAuthGuard)
   async updateScanConfig(

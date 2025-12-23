@@ -37,6 +37,17 @@ export interface ScmPullRequest {
   headBranch: string;
 }
 
+export interface ScmBranch {
+  name: string;
+  sha: string;
+  isDefault: boolean;
+  isProtected: boolean;
+}
+
+export interface ScmLanguages {
+  [language: string]: number; // language -> bytes of code
+}
+
 export interface OAuthTokenResponse {
   accessToken: string;
   refreshToken?: string;
@@ -60,7 +71,9 @@ export interface ScmProvider {
   getRepository(accessToken: string, owner: string, repo: string): Promise<ScmRepository>;
 
   // Branch/commit operations
+  getBranches(accessToken: string, owner: string, repo: string): Promise<ScmBranch[]>;
   getLatestCommit(accessToken: string, owner: string, repo: string, branch: string): Promise<ScmCommit>;
+  getLanguages(accessToken: string, owner: string, repo: string): Promise<ScmLanguages>;
 
   // Webhook operations
   createWebhook(
