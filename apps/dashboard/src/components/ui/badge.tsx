@@ -2,7 +2,7 @@
 
 import { HTMLAttributes, forwardRef } from 'react';
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'critical' | 'high' | 'medium' | 'low';
+type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'critical' | 'high' | 'medium' | 'low' | 'outline';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -15,6 +15,7 @@ const variants: Record<BadgeVariant, string> = {
   warning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
   danger: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
   info: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  outline: 'bg-transparent border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300',
   // Severity-specific variants
   critical: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
   high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
@@ -67,7 +68,7 @@ SeverityBadge.displayName = 'SeverityBadge';
 
 // Convenience component for status badges
 interface StatusBadgeProps extends Omit<BadgeProps, 'variant'> {
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'open' | 'fixed' | 'ignored' | 'false_positive';
 }
 
 const statusVariants: Record<StatusBadgeProps['status'], BadgeVariant> = {
@@ -76,13 +77,30 @@ const statusVariants: Record<StatusBadgeProps['status'], BadgeVariant> = {
   completed: 'success',
   failed: 'danger',
   cancelled: 'warning',
+  // Finding statuses
+  open: 'danger',
+  fixed: 'success',
+  ignored: 'default',
+  false_positive: 'warning',
+};
+
+const statusLabels: Record<StatusBadgeProps['status'], string> = {
+  pending: 'Pending',
+  running: 'Running',
+  completed: 'Completed',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  open: 'Open',
+  fixed: 'Fixed',
+  ignored: 'Ignored',
+  false_positive: 'False Positive',
 };
 
 export const StatusBadge = forwardRef<HTMLSpanElement, StatusBadgeProps>(
   ({ status, children, ...props }, ref) => {
     return (
       <Badge ref={ref} variant={statusVariants[status]} {...props}>
-        {children || status.charAt(0).toUpperCase() + status.slice(1)}
+        {children || statusLabels[status] || status}
       </Badge>
     );
   }

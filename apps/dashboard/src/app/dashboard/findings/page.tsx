@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Button, Card, CardContent, Badge, SeverityBadge, Modal, ModalHeader, ModalBody, ModalFooter, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui';
 import { findingsApi, aiApi, type Finding, type AiTriageResult } from '@/lib/api';
 
@@ -237,9 +238,12 @@ export default function FindingsPage() {
                       <SeverityBadge severity={finding.severity} />
                     </TableCell>
                     <TableCell>
-                      <p className="font-medium text-gray-900 dark:text-white truncate max-w-md">
+                      <Link
+                        href={`/dashboard/findings/${finding.id}`}
+                        className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 truncate max-w-md block"
+                      >
                         {finding.title}
-                      </p>
+                      </Link>
                       <p className="text-xs text-gray-500 truncate max-w-md" title={finding.ruleId}>
                         {getShortRuleId(finding.ruleId)}
                       </p>
