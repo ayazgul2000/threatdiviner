@@ -107,6 +107,49 @@ export class SiemController {
     return this.siemService.getThreatSummary(user.tenantId);
   }
 
+  @Get('stats')
+  @ApiOperation({ summary: 'Get SIEM statistics' })
+  async getStats(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('timeRange') timeRange?: string,
+  ) {
+    const end = new Date();
+    let start: Date;
+
+    switch (timeRange) {
+      case '1h':
+        start = new Date(end.getTime() - 60 * 60 * 1000);
+        break;
+      case '7d':
+        start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '24h':
+      default:
+        start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    }
+
+    const data = await this.siemService.getEventDashboard(user.tenantId, { start, end });
+    const alertHistory = await this.alertRulesService.getAlertHistory(user.tenantId, 100);
+    // Count recent alerts (last 24 hours) as active
+    const activeAlerts = alertHistory.filter(a => {
+      const triggeredAt = new Date(a.triggeredAt);
+      return triggeredAt >= start;
+    }).length;
+
+    // Map to expected dashboard format
+    return {
+      totalEvents: data.totalEvents,
+      criticalEvents: data.bySeverity?.critical || 0,
+      activeAlerts,
+      eventsBySource: data.bySource || {},
+      eventsBySeverity: data.bySeverity || {},
+      eventsTimeline: data.timeline || [],
+    };
+  }
+
   // =====================
   // Alert Rules
   // =====================

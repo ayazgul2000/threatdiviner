@@ -364,3 +364,53 @@ export const aiApi = {
   getTriageResult: (findingId: string) =>
     fetchApi<AiTriageResult>(`/ai/triage/${findingId}`),
 };
+
+// Analytics API
+export interface AnalyticsData {
+  totalScans: number;
+  totalFindings: number;
+  openFindings: number;
+  fixedFindings: number;
+  mttr: number;
+  fixRate: number;
+  findingsBySeverity: Record<string, number>;
+  findingsByScanner: Record<string, number>;
+  scansOverTime: Array<{ date: string; count: number }>;
+  findingsTrend: Array<{ date: string; introduced: number; fixed: number }>;
+  topVulnerableRepos: Array<{ name: string; count: number }>;
+  topRecurringRules: Array<{ ruleId: string; count: number }>;
+  complianceScores: Record<string, number>;
+}
+
+export const analyticsApi = {
+  get: (range: '7d' | '30d' | '90d' = '30d') =>
+    fetchApi<AnalyticsData>(`/analytics?range=${range}`),
+
+  getScannerStats: (range: '7d' | '30d' | '90d' = '30d') =>
+    fetchApi<Record<string, {
+      total: number;
+      bySeverity: Record<string, number>;
+      openCount: number;
+      fixedCount: number;
+    }>>(`/analytics/scanners?range=${range}`),
+};
+
+// Branch and Language API (for repositories)
+export interface ScmBranch {
+  name: string;
+  sha: string;
+  isDefault: boolean;
+  isProtected: boolean;
+}
+
+export interface ScmLanguages {
+  [language: string]: number;
+}
+
+export const branchesApi = {
+  list: (repositoryId: string) =>
+    fetchApi<ScmBranch[]>(`/scm/repositories/${repositoryId}/branches`),
+
+  getLanguages: (repositoryId: string) =>
+    fetchApi<ScmLanguages>(`/scm/repositories/${repositoryId}/languages`),
+};

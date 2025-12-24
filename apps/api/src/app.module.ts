@@ -23,6 +23,8 @@ import { ApiKeysModule } from './apikeys/apikeys.module';
 import { RetentionModule } from './retention/retention.module';
 import { CspmModule } from './cspm/cspm.module';
 import { SiemModule } from './siem/siem.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -74,6 +76,8 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     RetentionModule,
     CspmModule,
     SiemModule,
+    DashboardModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [

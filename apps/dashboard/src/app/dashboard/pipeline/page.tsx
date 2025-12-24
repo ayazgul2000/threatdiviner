@@ -406,9 +406,12 @@ export default function PipelinePage() {
                     )}
 
                     {/* Configure Gate Button */}
-                    <button className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                    <Link
+                      href={selectedRepo ? `/dashboard/repositories/${selectedRepo}/settings` : '#'}
+                      className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline block"
+                    >
                       Configure Gate
-                    </button>
+                    </Link>
                   </div>
 
                   {/* Connector Arrow */}
