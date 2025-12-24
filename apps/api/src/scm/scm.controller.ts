@@ -13,6 +13,7 @@ import {
 import { Response } from 'express';
 import { JwtAuthGuard, CurrentUser, Roles, RolesGuard } from '../libs/auth';
 import { ScmService } from './services/scm.service';
+import { SarifUploadService } from './services/sarif-upload.service';
 import {
   InitiateOAuthDto,
   OAuthCallbackDto,
@@ -27,6 +28,7 @@ import { ConfigService } from '@nestjs/config';
 export class ScmController {
   constructor(
     private readonly scmService: ScmService,
+    private readonly sarifUploadService: SarifUploadService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -259,5 +261,42 @@ export class ScmController {
     @Body('status') status: string,
   ) {
     return this.scmService.updateFindingStatus(user.tenantId, findingId, status);
+  }
+
+  // SARIF Upload
+  @Post('scans/:scanId/sarif-upload')
+  @UseGuards(JwtAuthGuard)
+  async uploadSarif(
+    @CurrentUser() user: { tenantId: string },
+    @Param('scanId') scanId: string,
+  ) {
+    // First verify user has access to this scan
+    const scan = await this.scmService.getScan(user.tenantId, scanId);
+    if (!scan) {
+      throw new Error('Scan not found');
+    }
+
+    // Generate SARIF from findings and upload
+    const sarifContent = await this.sarifUploadService.generateSarifFromScan(scanId);
+    const result = await this.sarifUploadService.uploadSarif(scanId, sarifContent);
+
+    return result;
+  }
+
+  @Get('scans/:scanId/sarif')
+  @UseGuards(JwtAuthGuard)
+  async getSarif(
+    @CurrentUser() user: { tenantId: string },
+    @Param('scanId') scanId: string,
+  ) {
+    // First verify user has access to this scan
+    const scan = await this.scmService.getScan(user.tenantId, scanId);
+    if (!scan) {
+      throw new Error('Scan not found');
+    }
+
+    // Generate and return SARIF
+    const sarifContent = await this.sarifUploadService.generateSarifFromScan(scanId);
+    return JSON.parse(sarifContent);
   }
 }

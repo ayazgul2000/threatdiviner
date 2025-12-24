@@ -141,6 +141,7 @@ model ScanConfig {
   prCommentsEnabled   Boolean  @default(true) @map("pr_comments_enabled")
   prCommentMaxFindings Int     @default(20) @map("pr_comment_max_findings")
   prCommentSeverities String[] @default(["critical", "high", "medium"]) @map("pr_comment_severities")
+  prDiffOnly          Boolean  @default(true) @map("pr_diff_only") // Only post findings on changed lines
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -164,6 +165,8 @@ model Scan {
   pullRequestId  String?   @map("pull_request_id") // PR number if triggered by PR
   pullRequestUrl String?   @map("pull_request_url")
   checkRunId     String?   @map("check_run_id") // GitHub check run ID for status updates
+  sarifUploadId  String?   @map("sarif_upload_id") // SARIF upload ID for native security integration
+  sarifUploadUrl String?   @map("sarif_upload_url") // URL to view in native security tab
   startedAt      DateTime? @map("started_at")
   completedAt    DateTime? @map("completed_at")
   duration       Int? // seconds
@@ -199,7 +202,12 @@ model Finding {
   cveId         String?   @map("cve_id") // CVE-2024-xxxx
   owasp         String? // A01:2021, etc
   confidence    String? // high, medium, low
+  autoFix       String?   @map("auto_fix") // Suggested auto-fix code
+  remediation   String?   // Remediation guidance
   status        String    @default("open") // open, triaged, fixed, false_positive, accepted, baselined
+  dismissReason String?   @map("dismiss_reason") // Reason for dismissal
+  dismissedAt   DateTime? @map("dismissed_at")
+  prCommentId   String?   @map("pr_comment_id") // PR comment ID for resolving
   triagedBy     String?   @map("triaged_by") // user ID who triaged
   triagedAt     DateTime? @map("triaged_at")
   fixedInCommit String?   @map("fixed_in_commit")

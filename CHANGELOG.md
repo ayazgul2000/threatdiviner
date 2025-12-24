@@ -2,7 +2,58 @@
 
 All notable changes to ThreatDiviner will be documented in this file.
 
-## [Unreleased] - Phase 4 (2024-12-23)
+## [Unreleased] - Phase 6 (2024-12-25)
+
+### Added
+
+#### Bitbucket Integration
+- BitbucketProvider with full OAuth 2.0 support
+- Repository listing and branch management
+- Build status updates via commit statuses
+- PR comments (general and inline)
+- Code Insights API for security annotations
+- Webhook support for push and PR events
+
+#### Azure DevOps Integration
+- AzureDevOpsProvider with OAuth/PAT authentication
+- Multi-project repository listing
+- Git status updates for commits
+- PR thread comments with inline support
+- Service hooks integration for webhooks
+
+#### Fix Module for PR Actions
+- New `/fix` module for PR-based security actions
+- Apply Fix endpoint - commits auto-fix patches
+- Apply All Fixes - batch fix application
+- Dismiss endpoint - dismiss findings from PR
+- AI Triage endpoint - Claude-powered analysis with PR reply
+- Triage All - batch AI triage with summary
+
+#### Schema Enhancements
+- Added `prDiffOnly` to ScanConfig for diff-only scanning
+- Added `autoFix`, `remediation` fields to Finding model
+- Added `dismissReason`, `dismissedAt` for dismissal tracking
+- Added `prCommentId` for PR comment linking
+
+### Changed
+- Updated SCM module to include Bitbucket and Azure DevOps providers
+- Updated app.module.ts to include FixModule
+
+---
+
+## [Phase 5] - 2024-12-24
+
+### Added
+- Dashboard API modules for overview stats
+- Analytics module with scan/finding trends
+- Dashboard module for overview metrics
+
+### Fixed
+- Dashboard hydration issues with Next.js 14.1.0
+
+---
+
+## [Phase 4] - 2024-12-23
 
 ### Added
 

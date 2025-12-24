@@ -411,6 +411,145 @@ export class GitLabProvider implements ScmProvider {
     );
   }
 
+  /**
+   * Upload SARIF file as a SAST report to GitLab
+   * GitLab doesn't have a direct SARIF upload API like GitHub.
+   * Instead, we convert SARIF to GitLab SAST format and upload as a report.
+   * For proper integration, this should be done via GitLab CI artifacts.
+   */
+  async uploadSarif(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    commitSha: string,
+    _ref: string,
+    sarifContent: string,
+  ): Promise<{ id: string; url: string }> {
+    // Convert SARIF to GitLab SAST format
+    const sarif = JSON.parse(sarifContent);
+    const gitlabReport = this.convertSarifToGitLabSast(sarif, commitSha);
+
+    // GitLab doesn't have a direct API for uploading security reports outside CI
+    // The best approach is to create a vulnerability finding for each issue
+    // Using the Vulnerability Export/Import API (requires Ultimate)
+
+    // For now, we'll create an issue/note with the findings summary
+    // In production, this should integrate with GitLab CI artifacts
+    const summary = this.generateSarifSummary(sarif);
+
+    // Create a commit status with a link
+    await this.createCommitStatus(
+      accessToken,
+      owner,
+      repo,
+      commitSha,
+      gitlabReport.vulnerabilities.length > 0 ? 'failed' : 'success',
+      'ThreatDiviner Security Scan',
+      `https://gitlab.com/${owner}/${repo}/-/security/vulnerability_report`,
+      summary,
+    );
+
+    return {
+      id: `gitlab-sarif-${commitSha}`,
+      url: `https://gitlab.com/${owner}/${repo}/-/security/vulnerability_report`,
+    };
+  }
+
+  /**
+   * Convert SARIF format to GitLab SAST report format
+   */
+  private convertSarifToGitLabSast(sarif: any, _commitSha: string): {
+    version: string;
+    vulnerabilities: Array<{
+      id: string;
+      category: string;
+      name: string;
+      message: string;
+      description: string;
+      severity: string;
+      confidence: string;
+      location: { file: string; start_line: number; end_line: number };
+      identifiers: Array<{ type: string; name: string; value: string }>;
+    }>;
+    scan: { scanner: { id: string; name: string; vendor: { name: string } }; start_time: string; end_time: string; status: string };
+  } {
+    const vulnerabilities: any[] = [];
+
+    for (const run of sarif.runs || []) {
+      for (const result of run.results || []) {
+        const location = result.locations?.[0]?.physicalLocation;
+        const severity = this.mapSarifLevelToGitLabSeverity(result.level);
+
+        vulnerabilities.push({
+          id: result.fingerprints?.['finding-id'] || `vuln-${vulnerabilities.length}`,
+          category: 'sast',
+          name: result.ruleId || 'Unknown',
+          message: result.message?.text || 'Security issue detected',
+          description: result.message?.text || '',
+          severity,
+          confidence: 'High',
+          location: {
+            file: location?.artifactLocation?.uri || '',
+            start_line: location?.region?.startLine || 1,
+            end_line: location?.region?.endLine || location?.region?.startLine || 1,
+          },
+          identifiers: [
+            {
+              type: 'threatdiviner_rule_id',
+              name: result.ruleId || 'unknown',
+              value: result.ruleId || 'unknown',
+            },
+          ],
+        });
+      }
+    }
+
+    return {
+      version: '14.0.0',
+      vulnerabilities,
+      scan: {
+        scanner: {
+          id: 'threatdiviner',
+          name: 'ThreatDiviner',
+          vendor: { name: 'ThreatDiviner' },
+        },
+        start_time: new Date().toISOString(),
+        end_time: new Date().toISOString(),
+        status: 'success',
+      },
+    };
+  }
+
+  private mapSarifLevelToGitLabSeverity(level: string): string {
+    switch (level) {
+      case 'error': return 'Critical';
+      case 'warning': return 'Medium';
+      case 'note': return 'Low';
+      default: return 'Info';
+    }
+  }
+
+  private generateSarifSummary(sarif: any): string {
+    let critical = 0, high = 0, medium = 0, low = 0;
+
+    for (const run of sarif.runs || []) {
+      for (const result of run.results || []) {
+        const level = result.level || 'warning';
+        if (level === 'error') critical++;
+        else if (level === 'warning') high++;
+        else if (level === 'note') medium++;
+        else low++;
+      }
+    }
+
+    const total = critical + high + medium + low;
+    if (total === 0) {
+      return 'No security issues found';
+    }
+
+    return `Found ${total} issues: ${critical} critical, ${high} high, ${medium} medium, ${low} low`;
+  }
+
   private mapRepository(repo: any): ScmRepository {
     return {
       id: String(repo.id),

@@ -412,6 +412,86 @@ export class GitHubProvider implements ScmProvider {
     return String(response.id);
   }
 
+  /**
+   * Upload SARIF file to GitHub Code Scanning
+   * This allows findings to appear in the Security tab of the repository
+   */
+  async uploadSarif(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    commitSha: string,
+    ref: string,
+    sarifContent: string,
+  ): Promise<{ id: string; url: string }> {
+    // GitHub requires SARIF to be gzipped and base64 encoded
+    const zlib = await import('zlib');
+    const gzipped = zlib.gzipSync(Buffer.from(sarifContent, 'utf-8'));
+    const encoded = gzipped.toString('base64');
+
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/code-scanning/sarifs`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          commit_sha: commitSha,
+          ref: ref.startsWith('refs/') ? ref : `refs/heads/${ref}`,
+          sarif: encoded,
+          tool_name: 'ThreatDiviner',
+        }),
+      },
+    );
+
+    return {
+      id: response.id,
+      url: response.url || `https://github.com/${owner}/${repo}/security/code-scanning`,
+    };
+  }
+
+  /**
+   * Get Code Scanning analysis status
+   */
+  async getCodeScanningAnalysis(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    sarifId: string,
+  ): Promise<{ state: string; results_count: number }> {
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/code-scanning/sarifs/${sarifId}`,
+    );
+
+    return {
+      state: response.processing_status,
+      results_count: response.analyses_url ? 1 : 0,
+    };
+  }
+
+  /**
+   * List Code Scanning alerts
+   */
+  async listCodeScanningAlerts(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    ref?: string,
+  ): Promise<Array<{
+    number: number;
+    rule: { id: string; severity: string };
+    state: string;
+    most_recent_instance: { location: { path: string; start_line: number } };
+  }>> {
+    const params = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/code-scanning/alerts${params}`,
+    );
+
+    return response;
+  }
+
   getAuthenticatedCloneUrl(accessToken: string, cloneUrl: string): string {
     // Convert https://github.com/owner/repo.git to https://x-access-token:TOKEN@github.com/owner/repo.git
     const url = new URL(cloneUrl);
