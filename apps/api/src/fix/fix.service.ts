@@ -52,12 +52,17 @@ export class FixService {
       throw new NotFoundException('Finding not found');
     }
 
-    if (!finding.autoFix) {
-      return {
-        success: false,
-        message: 'No auto-fix available for this finding',
-        redirectUrl: finding.scan.pullRequestUrl || undefined,
-      };
+    // If no auto-fix is stored, try to generate one using AI
+    let autoFix = finding.autoFix;
+    if (!autoFix) {
+      autoFix = await this.generateAutoFix(finding);
+      if (!autoFix) {
+        return {
+          success: false,
+          message: 'No auto-fix available for this finding',
+          redirectUrl: finding.scan.pullRequestUrl || undefined,
+        };
+      }
     }
 
     const { repository } = finding.scan;
@@ -103,7 +108,7 @@ export class FixService {
       const endLine = finding.endLine || startLine;
 
       // Replace the vulnerable lines with the fix
-      const fixLines = finding.autoFix.split('\n');
+      const fixLines = autoFix.split('\n');
       lines.splice(startLine - 1, endLine - startLine + 1, ...fixLines);
       const fixedContent = lines.join('\n');
 
@@ -366,6 +371,166 @@ ${triage.remediation}`;
         success: false,
         redirectUrl: finding.scan.pullRequestUrl || undefined,
       };
+    }
+  }
+
+  /**
+   * Get fix status for a finding
+   */
+  async getFixStatus(findingId: string) {
+    const finding = await this.prisma.finding.findUnique({
+      where: { id: findingId },
+      select: {
+        id: true,
+        autoFix: true,
+        aiTriagedAt: true,
+        aiAnalysis: true,
+        aiConfidence: true,
+        aiFalsePositive: true,
+        status: true,
+      },
+    });
+
+    if (!finding) {
+      throw new NotFoundException('Finding not found');
+    }
+
+    return {
+      findingId: finding.id,
+      autoFixAvailable: !!finding.autoFix,
+      aiTriaged: !!finding.aiTriagedAt,
+      aiAnalysis: finding.aiAnalysis || null,
+      aiConfidence: finding.aiConfidence || null,
+      aiFalsePositive: finding.aiFalsePositive || null,
+      status: finding.status,
+    };
+  }
+
+  /**
+   * Generate auto-fix without applying (preview mode)
+   */
+  async generateFix(findingId: string) {
+    const finding = await this.prisma.finding.findUnique({
+      where: { id: findingId },
+      include: {
+        scan: {
+          include: {
+            repository: {
+              include: {
+                connection: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!finding) {
+      throw new NotFoundException('Finding not found');
+    }
+
+    // If already has auto-fix, return it
+    if (finding.autoFix) {
+      return {
+        success: true,
+        autoFix: finding.autoFix,
+        explanation: finding.aiRemediation || 'Previously generated fix',
+        cached: true,
+      };
+    }
+
+    // Generate new fix
+    const autoFix = await this.generateAutoFix(finding);
+
+    if (!autoFix) {
+      return {
+        success: false,
+        message: 'Unable to generate auto-fix for this finding',
+      };
+    }
+
+    return {
+      success: true,
+      autoFix,
+      explanation: finding.aiRemediation || 'AI-generated fix',
+      cached: false,
+    };
+  }
+
+  /**
+   * Generate an auto-fix using AI
+   */
+  private async generateAutoFix(finding: any): Promise<string | null> {
+    try {
+      const { repository } = finding.scan;
+      const { connection } = repository;
+
+      if (!connection) {
+        return null;
+      }
+
+      // Fetch the file content to provide context
+      let fileContent: string;
+      const [owner, repo] = repository.fullName.split('/');
+      const accessToken = connection.accessToken;
+
+      if (connection.provider === 'github') {
+        const response = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/contents/${finding.filePath}?ref=${finding.scan.branch}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              Accept: 'application/vnd.github.v3+json',
+            },
+          },
+        );
+
+        if (!response.ok) {
+          this.logger.warn(`Failed to fetch file for auto-fix: ${response.statusText}`);
+          return null;
+        }
+
+        const data = await response.json();
+        fileContent = Buffer.from(data.content, 'base64').toString('utf-8');
+      } else {
+        // Other providers not yet supported for auto-fix generation
+        return null;
+      }
+
+      // Call AI to generate fix
+      const result = await this.aiService.generateAutoFix({
+        finding: {
+          ruleId: finding.ruleId,
+          title: finding.title,
+          description: finding.description || '',
+          severity: finding.severity,
+          filePath: finding.filePath,
+          startLine: finding.startLine || 1,
+          endLine: finding.endLine || undefined,
+          snippet: finding.snippet || undefined,
+          cweId: finding.cweId || undefined,
+        },
+        fileContent,
+      });
+
+      if (!result || !result.fixedCode) {
+        return null;
+      }
+
+      // Store the generated fix for future use
+      await this.prisma.finding.update({
+        where: { id: finding.id },
+        data: {
+          autoFix: result.fixedCode,
+          aiRemediation: result.explanation,
+        },
+      });
+
+      this.logger.log(`Generated auto-fix for finding ${finding.id} with confidence ${result.confidence}`);
+      return result.fixedCode;
+    } catch (error) {
+      this.logger.error(`Failed to generate auto-fix for finding ${finding.id}:`, error);
+      return null;
     }
   }
 

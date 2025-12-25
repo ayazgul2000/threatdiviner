@@ -15,6 +15,7 @@ import { TruffleHogScanner } from '../../scanners/secrets/trufflehog';
 import { CheckovScanner } from '../../scanners/iac/checkov';
 import { NucleiScanner } from '../../scanners/dast/nuclei';
 import { FindingProcessorService } from '../../scanners/services/finding-processor.service';
+import { DiffFilterService } from '../../scanners/services/diff-filter.service';
 import { QueueService } from '../services/queue.service';
 import { QUEUE_NAMES } from '../queue.constants';
 import { ScanJobData, NotifyJobData, FindingsCount } from '../jobs';
@@ -47,6 +48,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly checkovScanner: CheckovScanner,
     private readonly nucleiScanner: NucleiScanner,
     private readonly findingProcessor: FindingProcessorService,
+    private readonly diffFilterService: DiffFilterService,
     private readonly queueService: QueueService,
     private readonly githubProvider: GitHubProvider,
     private readonly aiService: AiService,
@@ -128,7 +130,13 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
 
       // 4. Process and store findings
       await this.updateScanStatus(scanId, 'analyzing');
-      const dedupedFindings = this.findingProcessor.deduplicateFindings(allFindings);
+      let dedupedFindings = this.findingProcessor.deduplicateFindings(allFindings);
+      await job.updateProgress(75);
+
+      // 4b. Apply diff filter for PR scans (diff-only mode)
+      if (job.data.pullRequestId && job.data.config.prDiffOnly) {
+        dedupedFindings = await this.applyDiffFilter(job.data, dedupedFindings);
+      }
       await job.updateProgress(80);
 
       await this.updateScanStatus(scanId, 'storing');
@@ -573,6 +581,67 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       // Log but don't fail the scan if PR comments fail
       this.logger.error(`PR comments failed: ${error}`);
+    }
+  }
+
+  /**
+   * Apply diff filter to only include findings in changed lines
+   */
+  private async applyDiffFilter(
+    data: ScanJobData,
+    findings: NormalizedFinding[],
+  ): Promise<NormalizedFinding[]> {
+    try {
+      this.logger.log(`Applying diff filter for PR #${data.pullRequestId}`);
+
+      // Get the PR diff from GitHub
+      const connection = await this.prisma.scmConnection.findUnique({
+        where: { id: data.connectionId },
+      });
+
+      if (!connection) {
+        this.logger.warn('Connection not found for diff filter, skipping');
+        return findings;
+      }
+
+      const accessToken = this.cryptoService.decrypt(connection.accessToken);
+      const [owner, repo] = data.fullName.split('/');
+
+      // Get PR diff
+      const diffText = await this.githubProvider.getPullRequestDiff(
+        accessToken,
+        owner,
+        repo,
+        data.pullRequestId!,
+      );
+
+      if (!diffText) {
+        this.logger.warn('No diff found, skipping filter');
+        return findings;
+      }
+
+      // Parse the diff
+      const diffData = this.diffFilterService.parseDiff(diffText);
+
+      // Cache the diff for later use (e.g., for PR comments)
+      await this.diffFilterService.cacheDiff(
+        data.scanId,
+        data.pullRequestId!,
+        diffData,
+      );
+
+      // Filter findings
+      const filtered = this.diffFilterService.filterFindingsByDiff(findings, diffData);
+
+      this.logger.log(
+        `Diff filter: ${findings.length} → ${filtered.length} findings (${findings.length - filtered.length} filtered out)`,
+      );
+
+      return filtered;
+    } catch (error) {
+      this.logger.error(`Diff filter failed: ${error}`);
+      // On error, return all findings rather than failing
+      return findings;
     }
   }
 }

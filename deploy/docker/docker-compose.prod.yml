@@ -36,6 +36,23 @@ services:
     networks:
       - threatdiviner-network
 
+  # Qdrant for RAG vector search
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: threatdiviner-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - threatdiviner-network
+
   # OpenSearch for SIEM
   opensearch:
     image: opensearchproject/opensearch:2.11.0
@@ -79,10 +96,32 @@ services:
       REDIS_URL: redis://redis:6379
       OPENSEARCH_URL: http://opensearch:9200
       OPENSEARCH_ENABLED: "true"
+      QDRANT_URL: http://qdrant:6333
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:?error}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      # Cache Configuration
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-300}
+      CACHE_KEY_PREFIX: ${CACHE_KEY_PREFIX:-td:}
+      # OAuth Providers
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITLAB_CLIENT_ID: ${GITLAB_CLIENT_ID:-}
+      GITLAB_CLIENT_SECRET: ${GITLAB_CLIENT_SECRET:-}
+      GITLAB_URL: ${GITLAB_URL:-https://gitlab.com}
+      BITBUCKET_CLIENT_ID: ${BITBUCKET_CLIENT_ID:-}
+      BITBUCKET_CLIENT_SECRET: ${BITBUCKET_CLIENT_SECRET:-}
+      AZURE_DEVOPS_CLIENT_ID: ${AZURE_DEVOPS_CLIENT_ID:-}
+      AZURE_DEVOPS_CLIENT_SECRET: ${AZURE_DEVOPS_CLIENT_SECRET:-}
+      # Notifications
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL:-}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      PAGERDUTY_ROUTING_KEY: ${PAGERDUTY_ROUTING_KEY:-}
+      OPSGENIE_API_KEY: ${OPSGENIE_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -152,6 +191,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  qdrant_data:
   opensearch_data:
 
 networks:

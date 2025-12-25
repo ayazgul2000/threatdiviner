@@ -24,6 +24,7 @@ export interface ScanConfig {
   containerImages?: string[];
   skipPaths: string[];
   branches: string[];
+  prDiffOnly?: boolean; // Only report findings on changed lines in PRs
 }
 
 export interface CloneJobData {

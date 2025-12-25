@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as crypto from 'crypto';
 
 export type ExportFormat = 'csv' | 'json';
 
@@ -424,5 +425,156 @@ export class ExportService {
       default:
         return 'note';
     }
+  }
+
+  /**
+   * Export SBOM (Software Bill of Materials) in CycloneDX format
+   */
+  async exportSbom(tenantId: string, repositoryId: string): Promise<ExportResult> {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    // Get latest scan with vulnerability findings (usually from Trivy)
+    const latestScan = await this.prisma.scan.findFirst({
+      where: { repositoryId, tenantId, status: 'completed' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        findings: {
+          where: { scanner: { in: ['trivy', 'snyk', 'dependabot'] } },
+        },
+      },
+    });
+
+    // Extract unique components from findings
+    const componentsMap = new Map<string, {
+      name: string;
+      version: string;
+      type: string;
+      vulnerabilities: {
+        id: string;
+        severity: string;
+        description: string;
+      }[];
+    }>();
+
+    if (latestScan?.findings) {
+      for (const finding of latestScan.findings) {
+        // Parse component info from finding (format varies by scanner)
+        const componentInfo = this.parseComponentFromFinding(finding);
+        if (componentInfo) {
+          const key = `${componentInfo.name}@${componentInfo.version}`;
+          const existing = componentsMap.get(key);
+          if (existing) {
+            existing.vulnerabilities.push({
+              id: finding.cveId || finding.ruleId,
+              severity: finding.severity,
+              description: finding.description || finding.title,
+            });
+          } else {
+            componentsMap.set(key, {
+              ...componentInfo,
+              vulnerabilities: [{
+                id: finding.cveId || finding.ruleId,
+                severity: finding.severity,
+                description: finding.description || finding.title,
+              }],
+            });
+          }
+        }
+      }
+    }
+
+    // Build CycloneDX SBOM
+    const sbom = {
+      bomFormat: 'CycloneDX',
+      specVersion: '1.4',
+      serialNumber: `urn:uuid:${crypto.randomUUID()}`,
+      version: 1,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        tools: [{
+          vendor: 'ThreatDiviner',
+          name: 'ThreatDiviner Security Platform',
+          version: '1.0.0',
+        }],
+        component: {
+          type: 'application',
+          name: repository.name,
+          version: latestScan?.commitSha?.substring(0, 7) || '0.0.0',
+        },
+      },
+      components: Array.from(componentsMap.values()).map((comp) => ({
+        type: comp.type,
+        name: comp.name,
+        version: comp.version,
+        'bom-ref': `pkg:${comp.type}/${comp.name}@${comp.version}`,
+        purl: `pkg:${comp.type}/${comp.name}@${comp.version}`,
+      })),
+      vulnerabilities: Array.from(componentsMap.values()).flatMap((comp) =>
+        comp.vulnerabilities.map((vuln) => ({
+          id: vuln.id,
+          source: { name: 'ThreatDiviner' },
+          ratings: [{
+            severity: vuln.severity,
+            method: 'other',
+          }],
+          description: vuln.description,
+          affects: [{
+            ref: `pkg:${comp.type}/${comp.name}@${comp.version}`,
+          }],
+        }))
+      ),
+    };
+
+    return {
+      filename: `sbom-${repository.name}-${Date.now()}.json`,
+      contentType: 'application/vnd.cyclonedx+json',
+      data: JSON.stringify(sbom, null, 2),
+    };
+  }
+
+  private parseComponentFromFinding(finding: any): { name: string; version: string; type: string } | null {
+    // Try to extract package info from finding title or file path
+    const title = finding.title || '';
+    const filePath = finding.filePath || '';
+
+    // Common patterns
+    // "CVE-XXXX in package@version"
+    const packageMatch = title.match(/in\s+(\S+)@(\S+)/);
+    if (packageMatch) {
+      return {
+        name: packageMatch[1],
+        version: packageMatch[2],
+        type: this.detectPackageType(filePath),
+      };
+    }
+
+    // "package (version)"
+    const altMatch = title.match(/(\S+)\s+\(([^)]+)\)/);
+    if (altMatch) {
+      return {
+        name: altMatch[1],
+        version: altMatch[2],
+        type: this.detectPackageType(filePath),
+      };
+    }
+
+    return null;
+  }
+
+  private detectPackageType(filePath: string): string {
+    if (filePath.includes('package.json') || filePath.includes('node_modules')) return 'npm';
+    if (filePath.includes('requirements.txt') || filePath.includes('.py')) return 'pypi';
+    if (filePath.includes('Gemfile') || filePath.includes('.rb')) return 'gem';
+    if (filePath.includes('go.mod') || filePath.includes('.go')) return 'golang';
+    if (filePath.includes('pom.xml') || filePath.includes('.jar')) return 'maven';
+    if (filePath.includes('Cargo.toml') || filePath.includes('.rs')) return 'cargo';
+    if (filePath.includes('composer.json') || filePath.includes('.php')) return 'composer';
+    return 'generic';
   }
 }

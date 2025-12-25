@@ -9,3 +9,10 @@ data:
   JWT_EXPIRES_IN: "1d"
   OPENSEARCH_ENABLED: "true"
   CORS_ORIGIN: "https://app.threatdiviner.com"
+  # Cache Configuration
+  CACHE_TTL_SECONDS: "300"
+  CACHE_KEY_PREFIX: "td:"
+  # AI Configuration
+  ANTHROPIC_MODEL: "claude-sonnet-4-20250514"
+  # GitLab default URL
+  GITLAB_URL: "https://gitlab.com"

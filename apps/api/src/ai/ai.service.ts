@@ -32,6 +32,28 @@ export interface TriageResult {
   references: string[];
 }
 
+export interface AutoFixRequest {
+  finding: {
+    ruleId: string;
+    title: string;
+    description: string;
+    severity: string;
+    filePath: string;
+    startLine: number;
+    endLine?: number;
+    snippet?: string;
+    cweId?: string;
+  };
+  fileContent: string;
+  language?: string;
+}
+
+export interface AutoFixResult {
+  fixedCode: string;
+  explanation: string;
+  confidence: number;
+}
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -105,6 +127,138 @@ export class AiService {
     }
 
     return results;
+  }
+
+  async generateAutoFix(request: AutoFixRequest): Promise<AutoFixResult | null> {
+    if (!this.client) {
+      this.logger.warn('AI auto-fix not available - API key not configured');
+      return null;
+    }
+
+    try {
+      const prompt = this.buildAutoFixPrompt(request);
+
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 4096,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      });
+
+      const content = response.content[0];
+      if (content.type !== 'text') {
+        throw new Error('Unexpected response type');
+      }
+
+      return this.parseAutoFixResponse(content.text);
+    } catch (error) {
+      this.logger.error(`AI auto-fix generation failed: ${error}`);
+      return null;
+    }
+  }
+
+  private buildAutoFixPrompt(request: AutoFixRequest): string {
+    const { finding, fileContent, language } = request;
+    const extension = finding.filePath.split('.').pop() || '';
+    const detectedLanguage = language || this.detectLanguage(extension);
+
+    let prompt = `You are a security expert tasked with fixing a vulnerability in code.
+
+## Vulnerability Details
+- **Rule**: ${finding.ruleId}
+- **Title**: ${finding.title}
+- **Description**: ${finding.description}
+- **Severity**: ${finding.severity}
+- **File**: ${finding.filePath}
+- **Location**: Lines ${finding.startLine}${finding.endLine ? `-${finding.endLine}` : ''}
+${finding.cweId ? `- **CWE**: ${finding.cweId}` : ''}
+`;
+
+    if (finding.snippet) {
+      prompt += `
+## Vulnerable Code Snippet
+\`\`\`${detectedLanguage}
+${finding.snippet}
+\`\`\`
+`;
+    }
+
+    // Include surrounding context (limited lines around the vulnerability)
+    const lines = fileContent.split('\n');
+    const startLine = Math.max(0, (finding.startLine || 1) - 10);
+    const endLine = Math.min(lines.length, (finding.endLine || finding.startLine || 1) + 10);
+    const contextLines = lines.slice(startLine, endLine);
+    const contextWithLineNums = contextLines
+      .map((line, idx) => `${startLine + idx + 1}: ${line}`)
+      .join('\n');
+
+    prompt += `
+## File Context (with line numbers)
+\`\`\`${detectedLanguage}
+${contextWithLineNums}
+\`\`\`
+
+## Your Task
+Generate a secure fix for the vulnerable lines (${finding.startLine}${finding.endLine ? `-${finding.endLine}` : ''}).
+
+Requirements:
+1. Fix ONLY the vulnerable code - preserve all other functionality
+2. The fix should be minimal and targeted
+3. Follow security best practices for ${detectedLanguage}
+4. Maintain code style consistency
+5. Do not add comments explaining the fix in the code itself
+
+Respond in this exact JSON format:
+{
+  "fixedCode": "The replacement code for the vulnerable lines ONLY (no line numbers)",
+  "explanation": "Brief explanation of what was changed and why",
+  "confidence": 0.85
+}
+
+IMPORTANT: The "fixedCode" should contain ONLY the replacement lines, not the entire file.`;
+
+    return prompt;
+  }
+
+  private parseAutoFixResponse(text: string): AutoFixResult {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response');
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    return {
+      fixedCode: String(parsed.fixedCode || ''),
+      explanation: String(parsed.explanation || 'No explanation provided'),
+      confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0.5)),
+    };
+  }
+
+  private detectLanguage(extension: string): string {
+    const languageMap: Record<string, string> = {
+      ts: 'typescript',
+      tsx: 'typescript',
+      js: 'javascript',
+      jsx: 'javascript',
+      py: 'python',
+      rb: 'ruby',
+      java: 'java',
+      go: 'go',
+      rs: 'rust',
+      cs: 'csharp',
+      cpp: 'cpp',
+      c: 'c',
+      php: 'php',
+      swift: 'swift',
+      kt: 'kotlin',
+      scala: 'scala',
+    };
+    return languageMap[extension] || extension;
   }
 
   private buildTriagePrompt(request: TriageRequest): string {

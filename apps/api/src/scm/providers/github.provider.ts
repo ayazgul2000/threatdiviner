@@ -368,6 +368,34 @@ export class GitHubProvider implements ScmProvider {
   }
 
   /**
+   * Get the raw diff for a pull request
+   * Returns unified diff format
+   */
+  async getPullRequestDiff(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    prNumber: number | string,
+  ): Promise<string> {
+    const url = `${this.apiBaseUrl}/repos/${owner}/${repo}/pulls/${prNumber}`;
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/vnd.github.v3.diff',
+        'Authorization': `Bearer ${accessToken}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      this.logger.error(`GitHub API error getting PR diff: ${response.status} ${error}`);
+      throw new Error(`Failed to get PR diff: ${response.status}`);
+    }
+
+    return response.text();
+  }
+
+  /**
    * Create a PR review with multiple comments
    */
   async createPRReview(

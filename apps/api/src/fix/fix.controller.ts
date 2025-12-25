@@ -139,11 +139,15 @@ export class FixController {
   @Get('status/:findingId')
   @ApiOperation({ summary: 'Get fix status for a finding' })
   async getFixStatus(@Param('findingId') findingId: string) {
-    // This could be used by the dashboard to check fix availability
-    return {
-      findingId,
-      autoFixAvailable: false, // Would query from DB
-      aiTriaged: false,
-    };
+    return this.fixService.getFixStatus(findingId);
+  }
+
+  /**
+   * Generate auto-fix without applying (preview mode)
+   */
+  @Post('generate/:findingId')
+  @ApiOperation({ summary: 'Generate auto-fix for a finding (preview)' })
+  async generateFix(@Param('findingId') findingId: string) {
+    return this.fixService.generateFix(findingId);
   }
 }

@@ -4,6 +4,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { scanCommand } from './commands/scan';
 import { configCommand } from './commands/config';
+import { uploadCommand } from './commands/upload';
+import { baselineCommand } from './commands/baseline';
 
 const program = new Command();
 
@@ -37,6 +39,8 @@ program
 // Register commands
 program.addCommand(scanCommand);
 program.addCommand(configCommand);
+program.addCommand(uploadCommand);
+program.addCommand(baselineCommand);
 
 // Parse arguments
 program.parse();

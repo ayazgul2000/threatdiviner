@@ -36,6 +36,7 @@ import { ZapScanner } from './dast/zap/zap.scanner';
 
 // Services
 import { FindingProcessorService } from './services/finding-processor.service';
+import { DiffFilterService } from './services/diff-filter.service';
 
 // Processors
 import { ScanProcessor, NotifyProcessor } from '../queue/processors';
@@ -73,6 +74,7 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 
     // Services
     FindingProcessorService,
+    DiffFilterService,
 
     // Queue Processors
     ScanProcessor,
@@ -92,6 +94,7 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     NucleiScanner,
     ZapScanner,
     FindingProcessorService,
+    DiffFilterService,
   ],
 })
 export class ScannersModule {}

@@ -225,6 +225,17 @@ model Finding {
   aiRemediation    String?   @map("ai_remediation") // AI-suggested fix
   aiTriagedAt      DateTime? @map("ai_triaged_at") // When AI triaged
   firstSeenAt      DateTime  @default(now()) @map("first_seen_at") // First occurrence
+  // VulnDB enrichment fields
+  cveData          Json?     @map("cve_data") // Cached CVE details
+  cweData          Json?     @map("cwe_data") // Cached CWE details
+  owaspCategory    String?   @map("owasp_category") // A01:2021
+  complianceControls Json?   @map("compliance_controls") // Mapped compliance controls
+  attackTechniques Json?     @map("attack_techniques") // MITRE ATT&CK techniques
+  capecPatterns    Json?     @map("capec_patterns") // CAPEC attack patterns
+  riskScore        Float?    @map("risk_score") // Calculated risk score
+  isKev            Boolean   @default(false) @map("is_kev") // Known Exploited Vulnerability
+  epssScore        Float?    @map("epss_score") // EPSS score from CVE
+  enrichedAt       DateTime? @map("enriched_at")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -496,4 +507,269 @@ model AlertHistory {
   @@index([ruleId])
   @@index([triggeredAt])
   @@map("alert_history")
+}
+
+// Pipeline security gates configuration
+model PipelineGate {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  repositoryId    String?   @map("repository_id") // null = default for tenant
+  stage           String    // code, build, test, deploy, prod
+  enabled         Boolean   @default(true)
+  blockSeverity   String    @default("critical") @map("block_severity") // critical, high, medium, low, none
+  notifyOnFailure Boolean   @default(true) @map("notify_on_failure")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, repositoryId, stage])
+  @@index([tenantId])
+  @@index([repositoryId])
+  @@map("pipeline_gates")
+}
+
+// Diff filter cache for PR scanning
+model DiffCache {
+  id            String   @id @default(uuid())
+  scanId        String   @unique @map("scan_id")
+  pullRequestId String   @map("pull_request_id")
+  diffData      Json     @map("diff_data") // Cached PR diff hunks
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([scanId])
+  @@map("diff_cache")
+}
+
+// ============================================
+// VULNERABILITY DATABASE (VulnDB)
+// ============================================
+
+// CVE Database - synced from NVD
+model Cve {
+  id                String   @id // CVE-2024-12345
+  description       String
+  publishedDate     DateTime @map("published_date")
+  lastModifiedDate  DateTime @map("last_modified_date")
+  cvssV3Score       Float?   @map("cvss_v3_score")
+  cvssV3Vector      String?  @map("cvss_v3_vector")
+  cvssV3Severity    String?  @map("cvss_v3_severity") // CRITICAL, HIGH, MEDIUM, LOW
+  cvssV2Score       Float?   @map("cvss_v2_score")
+  cweIds            String[] @map("cwe_ids") // CWE-79, CWE-89
+  references        Json     @default("[]") // Array of URLs
+  affectedProducts  Json     @default("[]") @map("affected_products") // CPE data
+  epssScore         Float?   @map("epss_score") // Exploit Prediction Scoring
+  epssPercentile    Float?   @map("epss_percentile")
+  isKev             Boolean  @default(false) @map("is_kev") // Known Exploited Vulnerability
+  kevDateAdded      DateTime? @map("kev_date_added")
+  kevDueDate        DateTime? @map("kev_due_date")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([cvssV3Severity])
+  @@index([publishedDate])
+  @@index([isKev])
+  @@index([epssScore])
+  @@map("cves")
+}
+
+// CWE Database - synced from MITRE
+model Cwe {
+  id                  String   @id // CWE-79
+  name                String   // Cross-site Scripting
+  description         String
+  extendedDescription String?  @map("extended_description")
+  relatedWeaknesses   String[] @map("related_weaknesses") // Parent/child CWEs
+  commonConsequences  Json     @default("[]") @map("common_consequences")
+  potentialMitigations Json    @default("[]") @map("potential_mitigations")
+  detectionMethods    Json     @default("[]") @map("detection_methods")
+  applicablePlatforms Json     @default("[]") @map("applicable_platforms")
+  likelihoodOfExploit String?  @map("likelihood_of_exploit") // High, Medium, Low
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Compliance mappings
+  complianceMappings CweComplianceMapping[]
+
+  @@map("cwes")
+}
+
+// CWE to Compliance Control mapping
+model CweComplianceMapping {
+  id                 String  @id @default(uuid())
+  cweId              String  @map("cwe_id")
+  cwe                Cwe     @relation(fields: [cweId], references: [id], onDelete: Cascade)
+  frameworkId        String  @map("framework_id") // soc2, pci-dss, hipaa, gdpr, iso27001, nist, cis, owasp
+  controlId          String  @map("control_id") // CC6.1, 6.5.1, etc.
+  controlName        String  @map("control_name")
+  controlDescription String? @map("control_description")
+
+  @@unique([cweId, frameworkId, controlId])
+  @@index([frameworkId])
+  @@index([cweId])
+  @@map("cwe_compliance_mappings")
+}
+
+// Compliance Framework definitions
+model ComplianceFramework {
+  id          String   @id // soc2, pci-dss, hipaa, etc.
+  name        String   // SOC 2 Type II
+  version     String   // 2017, 4.0, etc.
+  description String
+  sourceUrl   String   @map("source_url") // Official documentation URL
+  lastUpdated DateTime @map("last_updated")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  controls    ComplianceControl[]
+
+  @@map("compliance_frameworks")
+}
+
+model ComplianceControl {
+  id             String   @id @default(uuid())
+  frameworkId    String   @map("framework_id")
+  framework      ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  controlId      String   @map("control_id") // CC6.1, 6.5.1
+  category       String   // Access Control, Encryption
+  name           String
+  description    String
+  guidance       String?
+  testProcedures Json?    @map("test_procedures")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([frameworkId, controlId])
+  @@index([frameworkId])
+  @@map("compliance_controls")
+}
+
+// OWASP Top 10
+model OwaspTop10 {
+  id               String   @id // A01:2021
+  year             Int      // 2021
+  rank             Int      // 1-10
+  name             String   // Broken Access Control
+  description      String
+  cweIds           String[] @map("cwe_ids") // Mapped CWEs
+  preventionTips   Json     @default("[]") @map("prevention_tips")
+  exampleScenarios Json     @default("[]") @map("example_scenarios")
+  references       Json     @default("[]")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([year])
+  @@map("owasp_top10")
+}
+
+// CIS Benchmarks
+model CisBenchmark {
+  id          String   @id @default(uuid())
+  platform    String   // aws, azure, gcp, kubernetes, docker
+  version     String   // 1.5.0
+  controlId   String   @map("control_id") // 1.1.1
+  level       Int      // 1 or 2
+  title       String
+  description String
+  rationale   String?
+  audit       String?
+  remediation String?
+  impact      String?
+  references  Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([platform, version, controlId])
+  @@index([platform])
+  @@index([level])
+  @@map("cis_benchmarks")
+}
+
+// NIST 800-53 Controls
+model NistControl {
+  id                    String   @id // AC-1, AU-2
+  family                String   // Access Control, Audit
+  name                  String
+  description           String
+  supplementalGuidance  String?  @map("supplemental_guidance")
+  relatedControls       String[] @map("related_controls")
+  baselineImpact        Json     @default("{}") @map("baseline_impact") // low, moderate, high mappings
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@index([family])
+  @@map("nist_controls")
+}
+
+// MITRE ATT&CK Tactics
+model AttackTactic {
+  id           String   @id // TA0001
+  name         String   // Initial Access
+  description  String
+  shortName    String   @map("short_name") // initial-access
+  url          String   // MITRE URL
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  techniques   AttackTechnique[]
+
+  @@map("attack_tactics")
+}
+
+// MITRE ATT&CK Techniques
+model AttackTechnique {
+  id              String   @id // T1566
+  name            String   // Phishing
+  description     String
+  tacticId        String   @map("tactic_id")
+  tactic          AttackTactic @relation(fields: [tacticId], references: [id], onDelete: Cascade)
+  isSubTechnique  Boolean  @default(false) @map("is_sub_technique")
+  parentId        String?  @map("parent_id") // For sub-techniques like T1566.001
+  platforms       String[] // Windows, Linux, macOS, etc.
+  dataSources     String[] @map("data_sources")
+  detection       String?
+  mitigations     Json     @default("[]")
+  capecIds        String[] @map("capec_ids") // Mapped CAPEC patterns
+  cweIds          String[] @map("cwe_ids") // Mapped CWEs
+  url             String   // MITRE URL
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([tacticId])
+  @@index([parentId])
+  @@map("attack_techniques")
+}
+
+// MITRE CAPEC Attack Patterns
+model CapecPattern {
+  id              String   @id // CAPEC-66
+  name            String   // SQL Injection
+  description     String
+  likelihood      String?  // High, Medium, Low
+  severity        String?  // High, Medium, Low
+  prerequisites   Json     @default("[]")
+  skillsRequired  Json     @default("[]") @map("skills_required")
+  resourcesRequired Json   @default("[]") @map("resources_required")
+  consequences    Json     @default("[]")
+  mitigations     Json     @default("[]")
+  relatedCwes     String[] @map("related_cwes") // CWE-89, etc.
+  relatedAttackPatterns String[] @map("related_attack_patterns")
+  url             String
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("capec_patterns")
+}
+
+// Sync status tracking
+model DataSyncStatus {
+  id            String    @id // nvd, cwe, epss, kev, etc.
+  lastSyncAt    DateTime? @map("last_sync_at")
+  lastSuccessAt DateTime? @map("last_success_at")
+  recordCount   Int       @default(0) @map("record_count")
+  status        String    @default("pending") // pending, syncing, success, failed
+  errorMessage  String?   @map("error_message")
+  nextSyncAt    DateTime? @map("next_sync_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("data_sync_status")
 }

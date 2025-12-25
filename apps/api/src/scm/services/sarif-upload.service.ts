@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CryptoService } from './crypto.service';
 import { GitHubProvider } from '../providers/github.provider';
 import { GitLabProvider } from '../providers/gitlab.provider';
+import { BitbucketProvider } from '../providers/bitbucket.provider';
+import { AzureDevOpsProvider } from '../providers/azure-devops.provider';
 
 export interface SarifUploadResult {
   success: boolean;
@@ -16,8 +19,11 @@ export class SarifUploadService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cryptoService: CryptoService,
     private readonly githubProvider: GitHubProvider,
     private readonly gitlabProvider: GitLabProvider,
+    private readonly bitbucketProvider: BitbucketProvider,
+    private readonly azureDevOpsProvider: AzureDevOpsProvider,
   ) {}
 
   /**
@@ -56,68 +62,82 @@ export class SarifUploadService {
         return { success: false, error: 'Invalid repository name' };
       }
 
-      const accessToken = connection.accessToken;
+      const accessToken = this.cryptoService.decrypt(connection.accessToken);
       const commitSha = scan.commitSha;
       const branch = scan.branch;
 
-      if (connection.provider === 'github') {
-        const result = await this.githubProvider.uploadSarif(
-          accessToken,
-          owner,
-          repo,
-          commitSha,
-          branch,
-          sarifContent,
-        );
+      let result: { id: string; url: string };
 
-        // Store the SARIF upload ID in the scan
-        await this.prisma.scan.update({
-          where: { id: scanId },
-          data: {
-            sarifUploadId: result.id,
-            sarifUploadUrl: result.url,
-          },
-        });
+      switch (connection.provider) {
+        case 'github':
+          result = await this.githubProvider.uploadSarif(
+            accessToken,
+            owner,
+            repo,
+            commitSha,
+            branch,
+            sarifContent,
+          );
+          this.logger.log(`SARIF uploaded to GitHub for scan ${scanId}: ${result.id}`);
+          break;
 
-        this.logger.log(`SARIF uploaded to GitHub for scan ${scanId}: ${result.id}`);
+        case 'gitlab':
+          result = await this.gitlabProvider.uploadSarif(
+            accessToken,
+            owner,
+            repo,
+            commitSha,
+            branch,
+            sarifContent,
+          );
+          this.logger.log(`SARIF uploaded to GitLab for scan ${scanId}: ${result.id}`);
+          break;
 
-        return {
-          success: true,
-          id: result.id,
-          url: result.url,
-        };
-      } else if (connection.provider === 'gitlab') {
-        const result = await this.gitlabProvider.uploadSarif(
-          accessToken,
-          owner,
-          repo,
-          commitSha,
-          branch,
-          sarifContent,
-        );
+        case 'bitbucket':
+          result = await this.bitbucketProvider.uploadSarif(
+            accessToken,
+            owner,
+            repo,
+            commitSha,
+            branch,
+            sarifContent,
+          );
+          this.logger.log(`SARIF uploaded to Bitbucket for scan ${scanId}: ${result.id}`);
+          break;
 
-        // Store the SARIF upload ID in the scan
-        await this.prisma.scan.update({
-          where: { id: scanId },
-          data: {
-            sarifUploadId: result.id,
-            sarifUploadUrl: result.url,
-          },
-        });
+        case 'azure-devops':
+          result = await this.azureDevOpsProvider.uploadSarif(
+            accessToken,
+            owner,
+            repo,
+            commitSha,
+            branch,
+            sarifContent,
+          );
+          this.logger.log(`SARIF uploaded to Azure DevOps for scan ${scanId}: ${result.id}`);
+          break;
 
-        this.logger.log(`SARIF uploaded to GitLab for scan ${scanId}: ${result.id}`);
-
-        return {
-          success: true,
-          id: result.id,
-          url: result.url,
-        };
-      } else {
-        return {
-          success: false,
-          error: `SARIF upload not supported for provider: ${connection.provider}`,
-        };
+        default:
+          return {
+            success: false,
+            error: `SARIF upload not supported for provider: ${connection.provider}`,
+          };
       }
+
+      // Store the SARIF upload ID in the scan
+      await this.prisma.scan.update({
+        where: { id: scanId },
+        data: {
+          sarifUploadId: result.id,
+          sarifUploadUrl: result.url,
+        },
+      });
+
+      return {
+        success: true,
+        id: result.id,
+        url: result.url,
+      };
     } catch (error) {
       this.logger.error(`Failed to upload SARIF for scan ${scanId}:`, error);
       return {

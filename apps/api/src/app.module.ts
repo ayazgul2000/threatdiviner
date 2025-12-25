@@ -26,6 +26,13 @@ import { SiemModule } from './siem/siem.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { FixModule } from './fix/fix.module';
+import { PipelineModule } from './pipeline/pipeline.module';
+import { CliModule } from './cli/cli.module';
+import { ComplianceModule } from './compliance/compliance.module';
+import { CacheModule } from './cache/cache.module';
+import { SecurityModule } from './common/security/security.module';
+import { VulnDbModule } from './vulndb/vulndb.module';
+import { RagModule } from './rag/rag.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -80,6 +87,13 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     DashboardModule,
     AnalyticsModule,
     FixModule,
+    PipelineModule,
+    CliModule,
+    ComplianceModule,
+    CacheModule,
+    SecurityModule,
+    VulnDbModule,
+    RagModule,
   ],
   controllers: [HealthController],
   providers: [
