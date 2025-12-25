@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { VectorDbService, VectorDocument, SearchResult } from './vector-db.service';
 import { EmbeddingService } from './embedding.service';
@@ -44,7 +43,6 @@ export class RagService implements OnModuleInit {
   private isInitialized = false;
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly vectorDb: VectorDbService,
     private readonly embedding: EmbeddingService,
@@ -81,7 +79,6 @@ export class RagService implements OnModuleInit {
           name: true,
           description: true,
           extendedDescription: true,
-          mitigations: true,
           potentialMitigations: true,
         },
       });
@@ -90,10 +87,14 @@ export class RagService implements OnModuleInit {
 
       for (const cwe of cwes) {
         try {
-          // Combine all remediation-related text
+          // Combine all remediation-related text - potentialMitigations is JSON
+          const mitigationsText = cwe.potentialMitigations
+            ? (typeof cwe.potentialMitigations === 'string'
+                ? cwe.potentialMitigations
+                : JSON.stringify(cwe.potentialMitigations))
+            : '';
           const remediationText = [
-            cwe.mitigations,
-            cwe.potentialMitigations,
+            mitigationsText,
             cwe.extendedDescription,
           ].filter(Boolean).join('\n\n');
 
@@ -148,18 +149,8 @@ export class RagService implements OnModuleInit {
     try {
       // Get all ATT&CK techniques from database
       const techniques = await this.prisma.attackTechnique.findMany({
-        select: {
-          id: true,
-          techniqueId: true,
-          name: true,
-          description: true,
-          detection: true,
-          tactic: {
-            select: {
-              name: true,
-            },
-          },
-          mitigations: true,
+        include: {
+          tactic: true,
         },
       });
 
@@ -185,11 +176,11 @@ export class RagService implements OnModuleInit {
 
           if (embedding) {
             documents.push({
-              id: `attack-${technique.techniqueId}`,
+              id: `attack-${technique.id}`,
               collection: 'attack_techniques',
               embedding,
               metadata: {
-                techniqueId: technique.techniqueId,
+                techniqueId: technique.id,
                 techniqueName: technique.name,
                 tacticName: technique.tactic?.name || 'Unknown',
                 description: technique.description?.substring(0, 500) || '',
@@ -200,7 +191,7 @@ export class RagService implements OnModuleInit {
             indexed++;
           }
         } catch (e) {
-          this.logger.error(`Failed to index technique ${technique.techniqueId}: ${e}`);
+          this.logger.error(`Failed to index technique ${technique.id}: ${e}`);
           errors++;
         }
       }
@@ -229,10 +220,9 @@ export class RagService implements OnModuleInit {
         select: {
           id: true,
           controlId: true,
-          title: true,
+          name: true,
           description: true,
           frameworkId: true,
-          cwes: true,
         },
       });
 
@@ -240,7 +230,7 @@ export class RagService implements OnModuleInit {
 
       for (const control of controls) {
         try {
-          const combinedText = `${control.title}: ${control.description || ''}`;
+          const combinedText = `${control.name}: ${control.description || ''}`;
 
           if (combinedText.length < 30) {
             continue;
@@ -255,10 +245,9 @@ export class RagService implements OnModuleInit {
               embedding,
               metadata: {
                 controlId: control.controlId,
-                title: control.title,
+                name: control.name,
                 description: control.description?.substring(0, 500) || '',
                 frameworkId: control.frameworkId,
-                cwes: JSON.stringify(control.cwes || []),
               },
             });
             indexed++;
@@ -368,11 +357,10 @@ export class RagService implements OnModuleInit {
     attackTechniques: string[];
   } | null> {
     try {
-      // Get the finding with enriched data
+      // Get the finding with enriched data (enrichment fields are directly on Finding)
       const finding = await this.prisma.finding.findUnique({
         where: { id: findingId },
         include: {
-          enrichment: true,
           scan: {
             include: {
               repository: true,
@@ -385,12 +373,16 @@ export class RagService implements OnModuleInit {
         return null;
       }
 
+      // Extract CWE name from cached cweData JSON if available
+      const cweData = finding.cweData as Record<string, any> | null;
+      const cweName = cweData?.name || null;
+
       // Build search query from finding context
       const searchQuery = [
         finding.title,
         finding.description,
-        finding.enrichment?.cweId,
-        finding.enrichment?.cweName,
+        finding.cweId,
+        cweName,
       ].filter(Boolean).join(' ');
 
       // Search for relevant remediations

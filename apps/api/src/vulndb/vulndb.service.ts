@@ -333,16 +333,13 @@ export class VulnDbService {
 
     const findings = await this.prisma.finding.findMany({
       where: findingWhere,
-      include: {
-        enrichment: true,
-      },
     });
 
-    // Collect all attack technique IDs from findings
+    // Collect all attack technique IDs from findings (attackTechniques is directly on Finding as Json)
     const techniqueIds = new Set<string>();
     for (const finding of findings) {
-      if (finding.enrichment?.attackTechniques) {
-        const techniques = finding.enrichment.attackTechniques as string[];
+      if (finding.attackTechniques) {
+        const techniques = finding.attackTechniques as string[];
         techniques.forEach(t => techniqueIds.add(t));
       }
     }
@@ -352,9 +349,9 @@ export class VulnDbService {
       include: { techniques: true },
     });
 
-    // Calculate tactic coverage
+    // Calculate tactic coverage (technique.id is the technique ID like T1566)
     const tacticCoverage = tactics.map(tactic => {
-      const matchingTechniques = tactic.techniques.filter(t => techniqueIds.has(t.techniqueId));
+      const matchingTechniques = tactic.techniques.filter(t => techniqueIds.has(t.id));
       return {
         tactic: tactic.name,
         count: matchingTechniques.length,
@@ -364,15 +361,15 @@ export class VulnDbService {
       };
     });
 
-    // Calculate top techniques
+    // Calculate top techniques (technique id field IS the technique ID like T1566)
     const techniqueCounts = new Map<string, { id: string; name: string; count: number }>();
     for (const finding of findings) {
-      if (finding.enrichment?.attackTechniques) {
-        const techniques = finding.enrichment.attackTechniques as string[];
+      if (finding.attackTechniques) {
+        const techniques = finding.attackTechniques as string[];
         for (const techId of techniques) {
           if (!techniqueCounts.has(techId)) {
-            const tech = await this.prisma.attackTechnique.findFirst({
-              where: { techniqueId: techId },
+            const tech = await this.prisma.attackTechnique.findUnique({
+              where: { id: techId },
             });
             if (tech) {
               techniqueCounts.set(techId, { id: techId, name: tech.name, count: 0 });
@@ -428,13 +425,12 @@ export class VulnDbService {
         scan: { repository: { tenantId } },
         status: { in: ['open', 'triaged'] },
       },
-      include: { enrichment: true },
     });
 
     const techniqueIds = new Set<string>();
     for (const finding of findings) {
-      if (finding.enrichment?.attackTechniques) {
-        const techniques = finding.enrichment.attackTechniques as string[];
+      if (finding.attackTechniques) {
+        const techniques = finding.attackTechniques as string[];
         techniques.forEach(t => techniqueIds.add(t));
       }
     }

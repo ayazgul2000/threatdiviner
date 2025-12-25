@@ -206,8 +206,8 @@ export default function FindingDetailPage() {
     return 'text-green-500';
   };
 
-  const getConfidenceLabel = (confidence: number | null): string => {
-    if (!confidence) return 'Unknown';
+  const getConfidenceLabel = (confidence: number | null | undefined): string => {
+    if (confidence === null || confidence === undefined) return 'Unknown';
     if (confidence >= 0.9) return 'Very High';
     if (confidence >= 0.7) return 'High';
     if (confidence >= 0.5) return 'Medium';
@@ -460,7 +460,7 @@ export default function FindingDetailPage() {
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <p className="text-sm text-gray-500 dark:text-gray-400">AI Severity</p>
                   <p className="text-xl font-bold">
-                    <SeverityBadge severity={finding.aiSeverity || finding.severity} />
+                    <SeverityBadge severity={(finding.aiSeverity || finding.severity) as 'critical' | 'high' | 'medium' | 'low' | 'info'} />
                   </p>
                 </div>
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -499,7 +499,7 @@ export default function FindingDetailPage() {
             </div>
           ) : (
             <p className="text-gray-500 dark:text-gray-400">
-              AI triage has not been run on this finding. Click "Run AI Triage" to get AI-powered analysis including
+              AI triage has not been run on this finding. Click &quot;Run AI Triage&quot; to get AI-powered analysis including
               false positive detection, severity assessment, exploitability rating, and remediation suggestions.
             </p>
           )}

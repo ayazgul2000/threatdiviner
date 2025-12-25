@@ -279,8 +279,8 @@ export default function FindingsPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-gray-600 dark:text-gray-400 text-sm">
-                        {finding.firstSeenAt || finding.createdAt
-                          ? new Date(finding.firstSeenAt || finding.createdAt).toLocaleDateString()
+                        {(finding.firstSeenAt || finding.createdAt)
+                          ? new Date(finding.firstSeenAt ?? finding.createdAt ?? '').toLocaleDateString()
                           : '-'}
                       </span>
                     </TableCell>

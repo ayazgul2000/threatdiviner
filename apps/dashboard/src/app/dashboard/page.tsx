@@ -91,7 +91,7 @@ export default function OverviewPage() {
           Welcome back, {user?.name || user?.email}
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Here's an overview of your security posture
+          Here&apos;s an overview of your security posture
         </p>
       </div>
 

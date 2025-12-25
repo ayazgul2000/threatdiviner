@@ -738,6 +738,23 @@ model AttackTechnique {
   @@map("attack_techniques")
 }
 
+// MITRE ATT&CK Groups (Threat Actors)
+model AttackGroup {
+  id          String   @id // G0001
+  groupId     String   @unique @map("group_id") // G0001
+  name        String   // APT1
+  description String?
+  aliases     Json     @default("[]") // Alternative names
+  techniques  String[] // Technique IDs used by group
+  software    String[] @default([]) // Software/malware used
+  url         String   // MITRE URL
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@map("attack_groups")
+}
+
 // MITRE CAPEC Attack Patterns
 model CapecPattern {
   id              String   @id // CAPEC-66
