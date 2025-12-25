@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface AttackSurface {
   overallScore: number;
   tacticCoverage: { tactic: string; count: number; percentage: number }[];
@@ -31,7 +33,7 @@ export default function AttackSurfacePage() {
 
   const fetchRepositories = async () => {
     try {
-      const res = await fetch('/api/repositories');
+      const res = await fetch(`${API_URL}/repositories`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setRepositories(data);
@@ -45,9 +47,9 @@ export default function AttackSurfacePage() {
     setLoading(true);
     try {
       const url = repository === 'all'
-        ? '/api/vulndb/attack/surface'
-        : `/api/vulndb/attack/surface/${repository}`;
-      const res = await fetch(url);
+        ? `${API_URL}/vulndb/attack/surface`
+        : `${API_URL}/vulndb/attack/surface/${repository}`;
+      const res = await fetch(url, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setData(data);

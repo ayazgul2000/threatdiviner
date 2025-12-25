@@ -1,19 +1,23 @@
 'use client';
 
+import Link from 'next/link';
 import { Button } from './button';
 
 interface EmptyStateProps {
-  icon?: 'scan' | 'repo' | 'finding' | 'alert' | 'chart' | 'cloud' | 'search' | 'error';
+  icon?: 'scan' | 'repo' | 'finding' | 'alert' | 'chart' | 'cloud' | 'search' | 'error' | 'connection' | 'threat' | 'shield' | 'sbom';
   title: string;
   description?: string;
   action?: {
     label: string;
-    onClick: () => void;
+    onClick?: () => void;
+    href?: string;
   };
   secondaryAction?: {
     label: string;
-    onClick: () => void;
+    onClick?: () => void;
+    href?: string;
   };
+  size?: 'sm' | 'md' | 'lg';
 }
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -57,6 +61,26 @@ const ICONS: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
+  connection: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+    </svg>
+  ),
+  threat: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+    </svg>
+  ),
+  shield: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+  sbom: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ),
 };
 
 export function EmptyState({
@@ -65,13 +89,41 @@ export function EmptyState({
   description,
   action,
   secondaryAction,
+  size = 'md',
 }: EmptyStateProps) {
+  const sizeClasses = {
+    sm: { padding: 'py-8', icon: 'w-12 h-12', title: 'text-base' },
+    md: { padding: 'py-12', icon: 'w-16 h-16', title: 'text-lg' },
+    lg: { padding: 'py-16', icon: 'w-20 h-20', title: 'text-xl' },
+  };
+
+  const renderActionButton = (actionItem: typeof action, variant: 'primary' | 'secondary') => {
+    if (!actionItem) return null;
+
+    const buttonComponent = (
+      <Button
+        variant={variant === 'primary' ? 'primary' : 'outline'}
+        onClick={actionItem.onClick}
+      >
+        {actionItem.label}
+      </Button>
+    );
+
+    if (actionItem.href) {
+      return <Link href={actionItem.href}>{buttonComponent}</Link>;
+    }
+
+    return buttonComponent;
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+    <div className={`flex flex-col items-center justify-center ${sizeClasses[size].padding} px-4 text-center`}>
       <div className="text-gray-400 dark:text-gray-500 mb-4">
-        {ICONS[icon]}
+        <div className={sizeClasses[size].icon}>
+          {ICONS[icon]}
+        </div>
       </div>
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+      <h3 className={`${sizeClasses[size].title} font-medium text-gray-900 dark:text-white mb-2`}>
         {title}
       </h3>
       {description && (
@@ -81,16 +133,8 @@ export function EmptyState({
       )}
       {(action || secondaryAction) && (
         <div className="flex items-center gap-3">
-          {action && (
-            <Button onClick={action.onClick}>
-              {action.label}
-            </Button>
-          )}
-          {secondaryAction && (
-            <Button variant="outline" onClick={secondaryAction.onClick}>
-              {secondaryAction.label}
-            </Button>
-          )}
+          {renderActionButton(action, 'primary')}
+          {renderActionButton(secondaryAction, 'secondary')}
         </div>
       )}
     </div>
@@ -167,6 +211,73 @@ export function ErrorState({ message, onRetry }: { message?: string; onRetry?: (
       title="Something went wrong"
       description={message || 'An error occurred while loading this page. Please try again.'}
       action={onRetry ? { label: 'Try Again', onClick: onRetry } : undefined}
+    />
+  );
+}
+
+export function NoConnectionsEmpty({ onConnect }: { onConnect?: () => void }) {
+  return (
+    <EmptyState
+      icon="connection"
+      title="No connections yet"
+      description="Connect to GitHub, GitLab, or Bitbucket to import your repositories."
+      action={onConnect ? { label: 'Add Connection', onClick: onConnect } : { label: 'Add Connection', href: '/dashboard/connections' }}
+    />
+  );
+}
+
+export function NoThreatModelsEmpty() {
+  return (
+    <EmptyState
+      icon="threat"
+      title="No threat models yet"
+      description="Create your first threat model to analyze and visualize potential security threats."
+      action={{ label: 'Create Threat Model', href: '/dashboard/threat-modeling/new' }}
+    />
+  );
+}
+
+export function NoSbomEmpty() {
+  return (
+    <EmptyState
+      icon="sbom"
+      title="No SBOM data"
+      description="Upload or generate a Software Bill of Materials to track dependencies and vulnerabilities."
+      action={{ label: 'Upload SBOM', href: '/dashboard/sbom/upload' }}
+    />
+  );
+}
+
+export function NoCloudFindingsEmpty() {
+  return (
+    <EmptyState
+      icon="cloud"
+      title="No cloud findings"
+      description="Connect your cloud accounts to start monitoring for misconfigurations."
+      action={{ label: 'Connect Cloud', href: '/dashboard/cloud' }}
+    />
+  );
+}
+
+export function NoMatchingResultsEmpty({ onClear }: { onClear?: () => void }) {
+  return (
+    <EmptyState
+      icon="search"
+      title="No matching results"
+      description="Try adjusting your filters or search terms to find what you're looking for."
+      action={onClear ? { label: 'Clear Filters', onClick: onClear } : undefined}
+      size="sm"
+    />
+  );
+}
+
+export function ZeroStateShield() {
+  return (
+    <EmptyState
+      icon="shield"
+      title="All clear!"
+      description="No security vulnerabilities detected. Your codebase looks secure."
+      size="md"
     />
   );
 }

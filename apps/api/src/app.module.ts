@@ -33,6 +33,9 @@ import { CacheModule } from './cache/cache.module';
 import { SecurityModule } from './common/security/security.module';
 import { VulnDbModule } from './vulndb/vulndb.module';
 import { RagModule } from './rag/rag.module';
+import { ThreatModelingModule } from './threat-modeling/threat-modeling.module';
+import { SbomModule } from './sbom/sbom.module';
+import { EnvironmentsModule } from './environments/environments.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -94,6 +97,9 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     SecurityModule,
     VulnDbModule,
     RagModule,
+    ThreatModelingModule,
+    SbomModule,
+    EnvironmentsModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -2,7 +2,38 @@
 
 All notable changes to ThreatDiviner will be documented in this file.
 
-## [Unreleased] - Phase 6 (2024-12-25)
+## [Unreleased] - E2E Testing Fixes (2025-12-25)
+
+### Fixed
+
+#### Critical: VulnDB and Attack Pages API URL Pattern
+Fixed 11 dashboard pages that were using incorrect relative API URLs (`/api/...`) instead of the proper API base URL (`${API_URL}/...`). This caused 404 errors because the dashboard runs on port 3000 and the API on port 3001.
+
+**Files Fixed:**
+- `apps/dashboard/src/app/dashboard/sla/page.tsx` - 5 fetch calls fixed
+- `apps/dashboard/src/app/dashboard/attack/page.tsx` - 1 fetch call fixed
+- `apps/dashboard/src/app/dashboard/vulndb/page.tsx` - 1 fetch call fixed
+- `apps/dashboard/src/app/dashboard/vulndb/cve/page.tsx` - 1 fetch call fixed
+- `apps/dashboard/src/app/dashboard/vulndb/cwe/page.tsx` - 1 fetch call fixed
+- `apps/dashboard/src/app/dashboard/vulndb/owasp/page.tsx` - 1 fetch call fixed
+- `apps/dashboard/src/app/dashboard/vulndb/sync/page.tsx` - 2 fetch calls fixed
+- `apps/dashboard/src/app/dashboard/attack/killchain/page.tsx` - 1 fetch call fixed
+- `apps/dashboard/src/app/dashboard/attack/threats/page.tsx` - 1 fetch call fixed
+- `apps/dashboard/src/app/dashboard/attack/surface/page.tsx` - 2 fetch calls fixed
+- `apps/dashboard/src/app/dashboard/attack/technique/[id]/page.tsx` - 1 fetch call fixed
+
+#### All Fixes Applied:
+- Added `const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'` to all affected pages
+- Updated all fetch calls to use `${API_URL}/...` pattern
+- Added `credentials: 'include'` to all fetch calls for proper authentication
+
+### Documentation
+- Created `issues.md` documenting all 14 issues found during E2E testing
+- Updated `HANDOFF.md` with E2E testing session details and fixes applied
+
+---
+
+## [Phase 6] - 2024-12-25
 
 ### Added
 

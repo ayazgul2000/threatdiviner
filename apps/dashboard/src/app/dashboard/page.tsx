@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent, Badge, SeverityBadge, StatusBadge } from '@/components/ui';
+import { StatsSkeleton, ListSkeleton, CardSkeleton } from '@/components/ui/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import type { DashboardStats, Scan, Finding } from '@/lib/api';
 
@@ -77,8 +78,27 @@ export default function OverviewPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading dashboard...</div>
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div>
+          <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-4 w-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-2" />
+        </div>
+
+        {/* Stats skeleton */}
+        <StatsSkeleton count={4} />
+
+        {/* Severity breakdown skeleton */}
+        <CardSkeleton showHeader contentLines={2} />
+
+        {/* Recent activity skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <CardSkeleton showHeader contentLines={5} />
+          <CardSkeleton showHeader contentLines={5} />
+        </div>
+
+        {/* Quick actions skeleton */}
+        <CardSkeleton showHeader contentLines={1} />
       </div>
     );
   }

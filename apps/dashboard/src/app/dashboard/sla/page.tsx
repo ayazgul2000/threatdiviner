@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { StatsSkeleton, TableSkeleton } from '@/components/ui/skeletons';
 import Link from 'next/link';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface SlaSummary {
   total: number;
@@ -52,11 +55,11 @@ export default function SlaDashboardPage() {
   const fetchData = async () => {
     try {
       const [summaryRes, bySeverityRes, atRiskRes, breachedRes, mttrRes] = await Promise.all([
-        fetch('/api/vulndb/sla/summary'),
-        fetch('/api/vulndb/sla/summary/by-severity'),
-        fetch('/api/vulndb/sla/at-risk'),
-        fetch('/api/vulndb/sla/breached'),
-        fetch('/api/vulndb/sla/mttr'),
+        fetch(`${API_URL}/vulndb/sla/summary`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/summary/by-severity`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/at-risk`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/breached`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/mttr`, { credentials: 'include' }),
       ]);
 
       if (summaryRes.ok) setSummary(await summaryRes.json());

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Modal, ModalHeader, ModalBody, ModalFooter, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui';
+import { TableSkeleton } from '@/components/ui/skeletons';
 import { connectionsApi, type ScmConnection } from '@/lib/api';
 
 export default function ConnectionsPage() {
@@ -104,8 +105,15 @@ export default function ConnectionsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading connections...</div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-2" />
+          </div>
+          <div className="h-10 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        </div>
+        <TableSkeleton rows={4} columns={6} />
       </div>
     );
   }

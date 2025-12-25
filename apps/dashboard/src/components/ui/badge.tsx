@@ -2,7 +2,7 @@
 
 import { HTMLAttributes, forwardRef } from 'react';
 
-export type BadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'info' | 'critical' | 'high' | 'medium' | 'low' | 'outline';
+export type BadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'destructive' | 'info' | 'primary' | 'critical' | 'high' | 'medium' | 'low' | 'outline';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -17,6 +17,7 @@ const variants: Record<BadgeVariant, string> = {
   danger: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
   destructive: 'bg-red-600 text-white dark:bg-red-700 dark:text-white',
   info: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  primary: 'bg-blue-600 text-white dark:bg-blue-700 dark:text-white',
   outline: 'bg-transparent border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300',
   // Severity-specific variants
   critical: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',

@@ -1,12 +1,376 @@
 # ThreatDiviner - Development Handoff Document
 
-## Project Status: Bug Fixes and Build Verification Complete
+## Project Status: ALL PHASES COMPLETE + E2E TESTING FIXES
 
-Last Updated: 2025-12-25 (Overnight Autonomous Session)
+Last Updated: 2025-12-25 (E2E Testing and Bug Fixes Session)
+
+### Latest Session: Comprehensive E2E Testing & Fixes
+
+#### Summary
+- Conducted comprehensive E2E testing across all dashboard pages
+- Identified and fixed 14 issues (4 Critical, 3 High, 5 Medium, 2 Low)
+- Created `issues.md` documenting all findings
+- All fixes verified with successful TypeScript compilation
+
+#### Critical Issues Fixed
+
+**Issue: Wrong API URL Pattern in VulnDB/Attack Pages**
+
+The following pages were using relative URLs (`/api/...`) instead of the proper API base URL (`${API_URL}/...`), causing 404 errors since the dashboard runs on port 3000 and the API on port 3001.
+
+**Files Fixed:**
+1. `apps/dashboard/src/app/dashboard/sla/page.tsx` - Fixed 5 fetch calls
+2. `apps/dashboard/src/app/dashboard/attack/page.tsx` - Fixed 1 fetch call
+3. `apps/dashboard/src/app/dashboard/vulndb/page.tsx` - Fixed 1 fetch call
+4. `apps/dashboard/src/app/dashboard/vulndb/cve/page.tsx` - Fixed 1 fetch call
+5. `apps/dashboard/src/app/dashboard/vulndb/cwe/page.tsx` - Fixed 1 fetch call
+6. `apps/dashboard/src/app/dashboard/vulndb/owasp/page.tsx` - Fixed 1 fetch call
+7. `apps/dashboard/src/app/dashboard/vulndb/sync/page.tsx` - Fixed 2 fetch calls
+8. `apps/dashboard/src/app/dashboard/attack/killchain/page.tsx` - Fixed 1 fetch call
+9. `apps/dashboard/src/app/dashboard/attack/threats/page.tsx` - Fixed 1 fetch call
+10. `apps/dashboard/src/app/dashboard/attack/surface/page.tsx` - Fixed 2 fetch calls
+11. `apps/dashboard/src/app/dashboard/attack/technique/[id]/page.tsx` - Fixed 1 fetch call
+
+**Fix Applied:**
+```typescript
+// Before (broken):
+fetch('/api/vulndb/sla/summary')
+
+// After (fixed):
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+fetch(`${API_URL}/vulndb/sla/summary`, { credentials: 'include' })
+```
+
+#### Build Verification
+- API: TypeScript compiles successfully
+- Dashboard: TypeScript compiles successfully
+- Prisma Schema: Valid
 
 ---
 
-## Completed Features (Latest Session)
+### Previous Session Summary
+- Phase 1-6: UI/UX Polish - Skeleton loading, empty states, error boundaries, toasts, confirmations, form validation
+- Phase 7-10: Threat Model Schema + API - Prisma models, NestJS service/controller, full CRUD
+- Phase 11-15: Threat Model Dashboard - List, create, detail pages with full editing capabilities
+- Phase 16-18: Threat Model Diagrams - Mermaid diagram rendering with export functionality
+- Phase 19-25: SBOM & Environment Tracking - Schema, API, and dashboard for SBOMs and deployments
+
+---
+
+## Completed Features (Previous Sessions)
+
+### Phase 1-6: UI/UX Polish Components
+
+#### Phase 1: Skeleton Loading Components
+Created `apps/dashboard/src/components/ui/skeletons/`:
+- `table-skeleton.tsx` - Table loading state with configurable rows/columns
+- `card-skeleton.tsx` - Card loading state with optional header
+- `stats-skeleton.tsx` - Stats grid loading state
+- `chart-skeleton.tsx` - Chart loading state (bar, line, pie, donut)
+- `list-skeleton.tsx` - List loading state with avatar/badge options
+- `matrix-skeleton.tsx` - ATT&CK matrix loading state
+- `finding-detail-skeleton.tsx` - Finding detail page loading state
+- `index.ts` - Barrel exports
+
+Applied skeleton loading states to all major dashboard pages:
+- Main dashboard page
+- Findings page
+- Scans page
+- Repositories page
+- Connections page
+- Analytics page
+- Attack matrix page
+- VulnDB page
+- SLA dashboard page
+
+#### Phase 2: Empty State Components
+Enhanced `apps/dashboard/src/components/ui/empty-state.tsx`:
+- Added size variants (sm, md, lg)
+- Added Link support for actions
+- Added new icons: connection, threat, shield, sbom
+- Added new empty states:
+  - `NoConnectionsEmpty` - For connections page
+  - `NoThreatModelsEmpty` - For threat modeling
+  - `NoSbomEmpty` - For SBOM tracking
+  - `NoCloudFindingsEmpty` - For cloud findings
+  - `NoMatchingResultsEmpty` - For filtered results
+  - `ZeroStateShield` - For all-clear state
+
+#### Phase 3: Error Boundary & States
+Created `apps/dashboard/src/components/ui/error-boundary.tsx`:
+- `ErrorBoundary` - React error boundary component
+- `ErrorFallback` - Fallback UI with retry button
+- `InlineError` - Inline error display for forms
+- `ApiErrorBanner` - API error banner with dismiss/retry
+- `NotFound` - Resource not found state
+
+#### Phase 4: Toast Notifications
+Toast system already existed and works properly:
+- `ToastProvider` context
+- `useToast` hook with success/error/warning/info methods
+- Auto-dismiss with configurable duration
+- Slide-in animation
+
+#### Phase 5: Confirmation Dialogs
+Created `apps/dashboard/src/components/ui/confirm-dialog.tsx`:
+- `ConfirmDialogProvider` - Context-based confirmation system
+- `useConfirmDialog` hook with:
+  - `confirm()` - Generic confirmation
+  - `confirmDelete()` - Delete confirmation with danger styling
+  - `confirmAction()` - Action confirmation
+- `ConfirmDialog` - Standalone confirmation component
+- Variant support: danger, warning, info
+
+#### Phase 6: Form Validation with Zod
+Installed dependencies: `zod`, `react-hook-form`, `@hookform/resolvers`
+
+Created `apps/dashboard/src/lib/validation.ts`:
+- Common schemas: email, password, url, severity, status
+- Repository config schema
+- PAT connection schema
+- Finding update schema
+- Scan config schema
+- Threat model schema
+- SBOM upload schema
+- Notification settings schema
+- User profile schema
+- Team invite schema
+
+Created `apps/dashboard/src/components/ui/form.tsx`:
+- `Form` - Form wrapper
+- `FormField` - Field wrapper
+- `Label` - Form label with required indicator
+- `Input` - Text input with error state
+- `Textarea` - Multiline input
+- `Select` - Dropdown select
+- `Checkbox` - Checkbox with label
+- `Toggle` - Switch toggle
+- `FormError` - Error message display
+- `FormHelp` - Help text
+- `FormActions` - Button row
+
+### Phase 7: Threat Model Prisma Schema
+Added threat modeling models to `apps/api/prisma/schema.prisma`:
+- `ThreatModel` - Main threat model entity
+  - STRIDE/PASTA/LINDDUN methodology support
+  - Status tracking (draft, in_progress, completed, archived)
+  - Version control
+  - Repository linking
+- `ThreatModelComponent` - System components
+  - Types: process, datastore, external_entity, trust_boundary
+  - Position tracking for diagram rendering
+  - Criticality and data classification
+- `ThreatModelDataFlow` - Data flows between components
+  - Protocol and data type tracking
+  - Authentication/encryption flags
+- `Threat` - Identified threats
+  - STRIDE category mapping
+  - Likelihood and impact scoring
+  - Risk score calculation
+  - ATT&CK, CWE, CAPEC linkage
+  - Status workflow
+- `ThreatMitigation` - Countermeasures
+  - Type: preventive, detective, corrective, compensating
+  - Implementation status tracking
+  - Effort/cost estimation
+  - Jira integration
+- Junction tables for many-to-many relationships
+
+### Phase 8-10: Threat Model API
+Created `apps/api/src/threat-modeling/` module:
+- `threat-modeling.service.ts` - Full CRUD service
+  - Threat model management (list, get, create, update, delete, duplicate)
+  - Component management (add, update, delete)
+  - Data flow management (add, update, delete)
+  - Threat management (add, update, delete) with risk scoring
+  - Mitigation management (add, update, delete) with status tracking
+  - Analytics and statistics
+  - Mermaid diagram generation
+- `threat-modeling.controller.ts` - REST API endpoints
+- `threat-modeling.module.ts` - NestJS module
+
+#### Threat Modeling API Endpoints
+- `GET /threat-modeling` - List threat models
+- `GET /threat-modeling/:id` - Get threat model with all relations
+- `POST /threat-modeling` - Create threat model
+- `PUT /threat-modeling/:id` - Update threat model
+- `DELETE /threat-modeling/:id` - Delete threat model
+- `POST /threat-modeling/:id/duplicate` - Duplicate threat model
+- `GET /threat-modeling/:id/stats` - Get statistics
+- `GET /threat-modeling/:id/diagram` - Generate Mermaid diagram
+- Component endpoints: `POST/PUT/DELETE`
+- Data flow endpoints: `POST/PUT/DELETE`
+- Threat endpoints: `POST/PUT/DELETE`
+- Mitigation endpoints: `POST/PUT/DELETE`
+
+### Phase 11-15: Threat Model Dashboard Pages
+Created `apps/dashboard/src/app/dashboard/threat-modeling/`:
+- `page.tsx` - List page with filtering by status
+  - Table view with methodology badges
+  - Component/threat/mitigation counts
+  - Duplicate and delete functionality
+  - Skeleton loading state
+- `new/page.tsx` - Create new threat model
+  - Form with name, description, methodology selection
+  - STRIDE/PASTA/LINDDUN/Custom methodology options
+  - Getting started guide
+- `[id]/page.tsx` - Full detail page
+  - Tabbed interface: Overview, Components, Data Flows, Threats, Mitigations
+  - Component CRUD with type, technology, criticality
+  - Data flow CRUD with source/target, protocol, encryption/auth flags
+  - Threat CRUD with STRIDE category, likelihood, impact, risk score
+  - Mitigation CRUD with type, priority, effort, status
+  - Stats overview cards
+
+### Phase 16-18: Threat Model Diagrams
+Created `apps/dashboard/src/app/dashboard/threat-modeling/[id]/diagram/`:
+- `page.tsx` - Mermaid diagram visualization
+  - Dynamic Mermaid rendering
+  - Export to SVG and PNG
+  - Copy Mermaid source
+  - Component type legend
+  - Data flow visualization
+
+Added dependencies:
+- `mermaid` v11.12.2 for diagram rendering
+
+### Phase 19-25: SBOM & Environment Tracking
+
+#### Prisma Schema Updates
+Added to `apps/api/prisma/schema.prisma`:
+- `Sbom` - SBOM document with SPDX/CycloneDX support
+  - Version, format, source tracking
+  - Component and vulnerability counts
+- `SbomComponent` - Package/dependency tracking
+  - PURL, version, type, license
+  - Direct/transitive dependency tracking
+  - Dependency depth and scope
+- `SbomVulnerability` - Vulnerability tracking
+  - CVE/GHSA/OSV ID support
+  - CVSS score and vector
+  - Fix recommendations
+  - Status workflow (open, patched, ignored, accepted)
+- `SbomComponentVuln` - Junction table
+- `ContainerRegistry` - Registry connections
+  - Docker Hub, ECR, GCR, ACR, GHCR, Harbor support
+  - Credential storage
+- `ContainerImage` - Container images
+  - Repository, tag, digest tracking
+- `ContainerScan` - Container scan results
+  - Vulnerability counts by severity
+  - Layer analysis
+- `ContainerFinding` - Container vulnerabilities
+- `Environment` - Deployment environments
+  - Kubernetes, ECS, Cloud Run, Lambda, VM types
+  - Kubernetes config and namespace
+  - Cloud provider settings
+- `Deployment` - Deployed services
+  - Version and image tracking
+  - Health status (healthy, degraded, unhealthy, unknown)
+  - Security posture tracking
+  - Ingress and port exposure
+
+#### SBOM API Module
+Created `apps/api/src/sbom/`:
+- `sbom.service.ts` - Full SBOM management
+  - CRUD operations
+  - SPDX parsing and import
+  - CycloneDX parsing and import
+  - Component management
+  - Vulnerability tracking and status updates
+  - Statistics calculation
+  - Dependency tree generation
+- `sbom.controller.ts` - REST API endpoints
+- `sbom.module.ts` - NestJS module
+
+#### SBOM API Endpoints
+- `GET /sbom` - List SBOMs
+- `GET /sbom/:id` - Get SBOM with components and vulnerabilities
+- `DELETE /sbom/:id` - Delete SBOM
+- `GET /sbom/:id/stats` - Get statistics
+- `GET /sbom/:id/tree` - Get dependency tree
+- `POST /sbom/upload/spdx` - Upload SPDX SBOM
+- `POST /sbom/upload/cyclonedx` - Upload CycloneDX SBOM
+- `POST /sbom/:id/components` - Add component
+- `DELETE /sbom/components/:id` - Delete component
+- `POST /sbom/:id/vulnerabilities` - Add vulnerability
+- `POST /sbom/vulnerabilities/:id/status` - Update vulnerability status
+
+#### Environments API Module
+Created `apps/api/src/environments/`:
+- `environments.service.ts` - Environment and deployment management
+  - Environment CRUD with health aggregation
+  - Deployment CRUD with status tracking
+  - Security posture aggregation
+  - Summary statistics
+- `environments.controller.ts` - REST API endpoints
+- `environments.module.ts` - NestJS module
+
+#### Environments API Endpoints
+- `GET /environments` - List environments with stats
+- `GET /environments/summary` - Get summary statistics
+- `GET /environments/:id` - Get environment with deployments
+- `POST /environments` - Create environment
+- `PUT /environments/:id` - Update environment
+- `DELETE /environments/:id` - Delete environment
+- `GET /environments/deployments/all` - List all deployments
+- `GET /environments/:id/deployments` - List deployments in environment
+- `GET /environments/deployments/:id` - Get deployment
+- `POST /environments/:id/deployments` - Create deployment
+- `PUT /environments/deployments/:id` - Update deployment
+- `DELETE /environments/deployments/:id` - Delete deployment
+
+#### Dashboard Pages
+
+##### SBOM Dashboard
+Created `apps/dashboard/src/app/dashboard/sbom/`:
+- `page.tsx` - SBOM list page
+  - Stats overview cards
+  - Table with format, source, component counts
+  - Security status badges
+  - Upload modal for SPDX/CycloneDX
+- `[id]/page.tsx` - SBOM detail page
+  - Tabbed interface: Overview, Components, Vulnerabilities
+  - Component filtering and search
+  - License distribution chart
+  - Vulnerability list with status management
+  - CVE linking and CVSS display
+
+##### Environments Dashboard
+Created `apps/dashboard/src/app/dashboard/environments/`:
+- `page.tsx` - Environments overview
+  - Environment cards with health indicators
+  - Stats grid (environments, deployments, healthy, degraded, vulns)
+  - Create environment modal
+  - Type icons (Kubernetes, ECS, Cloud Run, Lambda, VM)
+- `[id]/page.tsx` - Environment detail page
+  - Stats overview
+  - Deployments table with status
+  - Add deployment modal
+  - Status update controls
+  - Vulnerability tracking per deployment
+
+#### UI Component Updates
+- Created `apps/dashboard/src/components/ui/tabs.tsx`
+  - Tabs, TabsList, TabsTrigger, TabsContent components
+  - Context-based state management
+  - Accessible with ARIA attributes
+- Added `primary` variant to Badge component
+
+---
+
+## All Phases Complete
+
+All planned phases have been successfully completed:
+- Phase 1-6: UI/UX Polish
+- Phase 7-10: Threat Model Schema + API
+- Phase 11-15: Threat Model Dashboard Pages
+- Phase 16-18: Threat Model Diagrams
+- Phase 19-25: SBOM & Environment Tracking
+
+---
+
+## Previous Session: Bug Fixes and Build Verification
 
 ### Bug Fixes and Build Verification
 

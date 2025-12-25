@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface Cve {
   id: string;
   cveId: string;
@@ -51,7 +53,7 @@ export default function CveSearchPage() {
       params.append('limit', limit.toString());
       params.append('offset', (page * limit).toString());
 
-      const res = await fetch(`/api/vulndb/cve?${params.toString()}`);
+      const res = await fetch(`${API_URL}/vulndb/cve?${params.toString()}`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setResults(data);
