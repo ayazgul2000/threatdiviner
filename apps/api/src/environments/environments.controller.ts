@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
 import { EnvironmentsService } from './environments.service';
 import { JwtAuthGuard } from '../libs/auth/guards/jwt-auth.guard';
@@ -28,8 +29,14 @@ export class EnvironmentsController {
   // ===== ENVIRONMENTS =====
 
   @Get()
-  async listEnvironments(@Req() req: AuthRequest) {
-    return this.service.listEnvironments(req.user.tenantId);
+  async listEnvironments(
+    @Req() req: AuthRequest,
+    @Query('projectId') projectId: string,
+  ) {
+    if (!projectId) {
+      throw new BadRequestException('projectId query parameter is required');
+    }
+    return this.service.listEnvironments(req.user.tenantId, projectId);
   }
 
   @Get('summary')
@@ -47,6 +54,7 @@ export class EnvironmentsController {
     @Req() req: AuthRequest,
     @Body() body: {
       name: string;
+      projectId: string;
       type: string;
       description?: string;
       kubeConfig?: string;
@@ -57,6 +65,9 @@ export class EnvironmentsController {
       cloudProject?: string;
     },
   ) {
+    if (!body.projectId) {
+      throw new BadRequestException('projectId is required');
+    }
     return this.service.createEnvironment(req.user.tenantId, body);
   }
 

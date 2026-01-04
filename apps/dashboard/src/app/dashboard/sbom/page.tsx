@@ -17,7 +17,9 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  PageHeader,
 } from '@/components/ui';
+import { useProject } from '@/contexts/project-context';
 import { TableSkeleton } from '@/components/ui/skeletons';
 import { NoSbomEmpty } from '@/components/ui/empty-state';
 
@@ -52,6 +54,7 @@ const sourceLabels: Record<string, string> = {
 };
 
 export default function SbomListPage() {
+  const { currentProject } = useProject();
   const [sboms, setSboms] = useState<Sbom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,13 +65,18 @@ export default function SbomListPage() {
   const [uploadName, setUploadName] = useState('');
 
   useEffect(() => {
+    if (!currentProject) {
+      setLoading(false);
+      return;
+    }
     fetchSboms();
-  }, []);
+  }, [currentProject]);
 
   const fetchSboms = async () => {
+    if (!currentProject) return;
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/sbom`, {
+      const res = await fetch(`${API_URL}/sbom?projectId=${currentProject.id}`, {
         credentials: 'include',
       });
 
@@ -149,6 +157,28 @@ export default function SbomListPage() {
           <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
         </div>
         <TableSkeleton rows={5} columns={7} />
+      </div>
+    );
+  }
+
+  if (!currentProject) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="SBOM" breadcrumbs={[{ label: 'SBOM' }]} />
+        <Card variant="bordered">
+          <CardContent className="p-12 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">No project selected</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              Select a project from the sidebar to view SBOM data
+            </p>
+            <Link href="/dashboard/projects">
+              <Button>Go to Projects</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }

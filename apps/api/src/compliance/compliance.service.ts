@@ -9,6 +9,9 @@ import {
   HIPAA_CONTROLS,
   GDPR_CONTROLS,
   ISO27001_CONTROLS,
+  OWASP2021_CONTROLS,
+  CWE_TOP25_CONTROLS,
+  ESSENTIAL_EIGHT_CONTROLS,
   ComplianceControl,
 } from './frameworks';
 
@@ -59,14 +62,19 @@ export class ComplianceService {
   }
 
   /**
-   * Get compliance score for a tenant
+   * Get compliance score for a tenant (optionally filtered by project)
    */
-  async getTenantComplianceScore(tenantId: string, frameworkId?: string): Promise<ComplianceSummary> {
+  async getTenantComplianceScore(tenantId: string, frameworkId?: string, projectId?: string): Promise<ComplianceSummary> {
+    const where: Record<string, unknown> = {
+      tenantId,
+      status: { in: ['open', 'triaged'] },
+    };
+    if (projectId) {
+      where.projectId = projectId;
+    }
+
     const findings = await this.prisma.finding.findMany({
-      where: {
-        tenantId,
-        status: { in: ['open', 'triaged'] },
-      },
+      where,
       select: {
         id: true,
         severity: true,
@@ -142,14 +150,18 @@ export class ComplianceService {
     frameworkId: string,
     controlId?: string,
     repositoryId?: string,
+    projectId?: string,
   ): Promise<ControlViolation[]> {
-    const where: any = {
+    const where: Record<string, unknown> = {
       tenantId,
       status: { in: ['open', 'triaged'] },
     };
 
     if (repositoryId) {
       where.repositoryId = repositoryId;
+    }
+    if (projectId) {
+      where.projectId = projectId;
     }
 
     const findings = await this.prisma.finding.findMany({
@@ -200,13 +212,14 @@ export class ComplianceService {
     frameworkId: string,
     days = 30,
     repositoryId?: string,
+    projectId?: string,
   ) {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     // Get scans within the period
-    const where: any = {
+    const where: Record<string, unknown> = {
       tenantId,
       status: 'completed',
       completedAt: { gte: startDate, lte: endDate },
@@ -214,6 +227,9 @@ export class ComplianceService {
 
     if (repositoryId) {
       where.repositoryId = repositoryId;
+    }
+    if (projectId) {
+      where.projectId = projectId;
     }
 
     const scans = await this.prisma.scan.findMany({
@@ -267,12 +283,13 @@ export class ComplianceService {
     tenantId: string,
     frameworkId: string,
     repositoryId?: string,
+    projectId?: string,
   ) {
     const [complianceScore, violations] = await Promise.all([
       repositoryId
         ? this.getRepositoryComplianceScore(tenantId, repositoryId, frameworkId)
-        : this.getTenantComplianceScore(tenantId, frameworkId),
-      this.getControlViolations(tenantId, frameworkId, undefined, repositoryId),
+        : this.getTenantComplianceScore(tenantId, frameworkId, projectId),
+      this.getControlViolations(tenantId, frameworkId, undefined, repositoryId, projectId),
     ]);
 
     const framework = getAllFrameworks().find(f => f.id === frameworkId);
@@ -380,6 +397,15 @@ export class ComplianceService {
 
   private getControlsForFramework(frameworkId: string): ComplianceControl[] {
     switch (frameworkId.toLowerCase()) {
+      case 'owasp-2021':
+      case 'owasp':
+        return OWASP2021_CONTROLS;
+      case 'cwe-top-25':
+      case 'cwe':
+        return CWE_TOP25_CONTROLS;
+      case 'essential-eight':
+      case 'e8':
+        return ESSENTIAL_EIGHT_CONTROLS;
       case 'soc2':
         return SOC2_CONTROLS;
       case 'pci':

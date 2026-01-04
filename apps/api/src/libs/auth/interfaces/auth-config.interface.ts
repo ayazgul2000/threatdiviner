@@ -155,6 +155,8 @@ export interface ITenantRepository {
 export interface JwtPayload {
   /** User ID */
   sub: string;
+  /** User ID alias for controllers */
+  userId?: string;
   /** User email */
   email: string;
   /** User role */

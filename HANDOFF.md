@@ -1,10 +1,1458 @@
 # ThreatDiviner - Development Handoff Document
 
-## Project Status: ALL PHASES COMPLETE + E2E TESTING FIXES
+## Project Status: ALL PHASES COMPLETE + BATCH 21: Fix Broken Features from BATCH-20
 
-Last Updated: 2025-12-25 (E2E Testing and Bug Fixes Session)
+Last Updated: 2026-01-02 (BATCH 21: Fix Broken Features - Verification + Fixes Complete)
 
-### Latest Session: Comprehensive E2E Testing & Fixes
+### Latest Session: BATCH 21 - Fix Broken Features (2026-01-02)
+
+#### Summary
+Reviewed and fixed issues from BATCH-20 implementation. Most features were already working correctly; main fix was adding projectId filtering to the compliance service and updating the compliance page to pass projectId.
+
+#### Issues Identified and Status
+
+| Issue | Status | Notes |
+|-------|--------|-------|
+| FIX 1: OWASP 2012/2017 | **Verified OK** | Only OWASP 2021 exists in frameworks.ts |
+| FIX 2: Project Scoping | **Fixed** | Added projectId to compliance service/controller |
+| FIX 3: ProjectContext | **Verified + Fixed** | Compliance page now passes projectId |
+| FIX 4: Sidebar | **Verified OK** | Already project-aware |
+| FIX 5: Empty States | **Verified OK** | All pages have proper empty states |
+| FIX 6: Settings Nav | **Verified OK** | Hub pages exist and link correctly |
+
+#### Files Modified
+
+**API (Compliance projectId filtering):**
+- `apps/api/src/compliance/compliance.service.ts` - Added projectId to all methods
+- `apps/api/src/compliance/compliance.controller.ts` - Added projectId query parameter
+
+**Dashboard (Compliance page fix):**
+- `apps/dashboard/src/app/dashboard/compliance/page.tsx` - Pass projectId to API, add no-project state
+
+#### Key Findings
+
+1. **OWASP Versions**: frameworks.ts already only has OWASP 2021 - no old versions to remove
+2. **Project Scoping**: Most services (threat-modeling, environments, sbom, scm) already had projectId filtering
+3. **Compliance Service**: Was missing projectId - now fixed
+4. **Frontend Pages**: All project-scoped pages already pass projectId and show no-project states
+5. **Sidebar**: Already dynamically shows project section based on currentProject context
+6. **Settings**: Hub pages at /settings/project and /settings/org exist and work
+
+---
+
+### Previous Session: Performance + Security + Multi-Tenant (BATCH 16)
+
+#### Summary
+Added k6 performance testing infrastructure, comprehensive security tests, and multi-tenant isolation tests. Verified CI/CD workflows and Dockerfiles. All 155 functional tests pass with 100% success rate.
+
+#### Test Results
+
+**Functional Test Suite:**
+| Metric | Value |
+|--------|-------|
+| Core API Tests | 120 |
+| Security Tests | 23 |
+| Multi-Tenant Tests | 12 |
+| **Total Tests** | **155** |
+| Passed | 155 |
+| Failed | 0 |
+| **Pass Rate** | **100%** |
+
+#### BATCH 16 Additions
+
+**PART A: Performance Testing (k6)**
+- `apps/api/test/performance/config.js` - k6 configuration with stages
+- `apps/api/test/performance/helpers/auth.js` - Authentication helper
+- `apps/api/test/performance/smoke.test.js` - Smoke test (5 VUs, 1 minute)
+- `apps/api/test/performance/load.test.js` - Load test (50 VUs, 9 minutes)
+- `apps/api/test/performance/stress.test.js` - Stress test (200 VUs, 16 minutes)
+- `apps/api/test/performance/spike.test.js` - Spike test (500 VUs burst)
+
+**PART B: Security Tests (23 tests)**
+- Security - Authentication (5 tests): No auth rejection, invalid JWT, expired JWT, tampered JWT, brute force
+- Security - Authorization (3 tests): Role-based access, horizontal privilege escalation, resource ownership
+- Security - Input Validation (8 tests): SQL injection, XSS, path traversal, UUID validation, null bytes
+- Security - Headers (3 tests): Security headers, sensitive headers, CORS
+- Security - Sensitive Data (4 tests): Password exposure, stack traces, audit log masking, API key secrets
+
+**PART C: Multi-Tenant Isolation Tests (12 tests)**
+- Project isolation (3 tests): List, access, modify/delete other tenant
+- Finding isolation (2 tests): List, cross-tenant access
+- Resource isolation (7 tests): API keys, audit logs, scans, repositories, alert rules, environments
+
+**PART D: CI/CD Infrastructure (Already Exists)**
+- `.github/workflows/ci.yml` - Lint, typecheck, test, build, security scan
+- `.github/workflows/docker-build.yml` - Multi-stage Docker builds
+- `apps/api/Dockerfile` - NestJS multi-stage build
+- `apps/dashboard/Dockerfile` - Next.js standalone build
+- `deploy/docker/docker-compose.prod.yml` - Production deployment
+
+#### How to Run Performance Tests
+```bash
+# Pull k6 Docker image
+docker pull grafana/k6
+
+# Run smoke test
+docker run --rm -i grafana/k6 run --vus 5 --duration 1m - < apps/api/test/performance/smoke.test.js
+
+# Run load test
+docker run --rm -i grafana/k6 run - < apps/api/test/performance/load.test.js
+
+# Run stress test
+docker run --rm -i grafana/k6 run - < apps/api/test/performance/stress.test.js
+```
+
+---
+
+### Previous Session: Integration Tests (BATCH 15)
+
+#### Summary
+Added comprehensive integration tests for email, webhooks, scan execution, SBOM operations, and container scanning. Created test helpers and fixtures. All 163 tests pass with 100% success rate.
+
+#### Test Results (Pre-BATCH 16)
+
+**Total Test Suite:**
+| Metric | Value |
+|--------|-------|
+| API Tests | 120 |
+| E2E Tests | 43 |
+| **Total Tests** | **163** |
+| Passed | 163 |
+| Failed | 0 |
+| **Pass Rate** | **100%** |
+
+#### New Integration Test Blocks Added (33 tests)
+
+1. **Email Integration** (4 tests)
+   - MailHog API connection
+   - Clear inbox
+   - POST /alerts/test-notification
+   - GET /settings/notifications/email
+
+2. **Webhook Integration** (5 tests)
+   - MockServer connection
+   - GET /webhooks
+   - POST /webhooks (create)
+   - POST /webhooks/:id/test
+   - DELETE /webhooks/:id
+
+3. **Scan Execution** (8 tests)
+   - GET /scanners/types
+   - GET /scanners/health
+   - POST /scm/scans (queue)
+   - GET /scm/scans/:id/status
+   - GET /scm/scans/:id/results
+   - POST /scm/scans/:id/cancel
+   - GET /scm/scans/:id/logs
+   - POST /scm/repositories/:id/rescan
+
+4. **SBOM Operations** (7 tests)
+   - POST /sbom/upload (CycloneDX)
+   - POST /sbom/upload (SPDX)
+   - POST /sbom/:id/analyze
+   - GET /sbom/:id/components
+   - GET /sbom/:id/vulnerabilities
+   - GET /sbom/:id/export
+   - POST /sbom/compare
+
+5. **Container Scanning** (9 tests)
+   - GET /containers/registries
+   - POST /containers/registries
+   - GET /containers/images
+   - POST /containers/scan
+   - GET /containers/scans/:id
+   - GET /containers/images/:id/layers
+   - POST /containers/analyze-dockerfile
+   - GET /containers/recommendations
+   - DELETE /containers/registries/:id
+
+#### Files Created
+- `apps/api/test/helpers/email.helper.ts` - MailHog API helper functions
+- `apps/api/test/helpers/webhook.helper.ts` - MockServer API helper functions
+- `apps/api/test/fixtures/mock-scan-results.ts` - Mock SAST, SCA, Secrets, IAC results
+- `apps/api/test/fixtures/mock-sbom.ts` - Mock CycloneDX and SPDX SBOMs
+- `apps/api/test/fixtures/mock-container.ts` - Mock container images and scan results
+
+#### Files Modified
+- `apps/api/test/functional.e2e-spec.ts` - Added 33 integration tests (87 → 120 total)
+- `DEBUG-LOG.md` - Added BATCH 15 session
+- `FUNCTIONAL-REPORT.md` - Updated test counts
+- `HANDOFF.md` - Added BATCH 15 section
+
+#### How to Run Tests
+
+**API Functional Tests:**
+```bash
+cd apps/api
+npx jest test/functional.e2e-spec.ts --testRegex=".*" --rootDir="." --forceExit --testTimeout=120000
+```
+
+**E2E UI Tests:**
+```bash
+cd apps/dashboard
+npx playwright test e2e/full-flow.spec.ts --reporter=list
+```
+
+**Start Test Infrastructure:**
+```bash
+docker compose -f docker-compose.test.yml up -d
+```
+
+---
+
+### Previous Session: UI E2E Tests + Remaining CRUD (BATCH 14)
+
+#### Summary
+Comprehensive E2E UI testing using Playwright (43 tests) and extended API CRUD tests (17 new tests). All tests pass with 100% success rate on both suites.
+
+#### Test Results
+
+**E2E UI Tests:**
+| Metric | Value |
+|--------|-------|
+| Total Tests | 43 |
+| Passed | 43 |
+| Failed | 0 |
+| Pass Rate | 100% |
+| Execution Time | ~2 minutes |
+
+**API Functional Tests:**
+| Metric | Value |
+|--------|-------|
+| Total Tests | 87 |
+| Passed | 87 |
+| Failed | 0 |
+| Pass Rate | 100% |
+| Execution Time | ~7 seconds |
+
+#### E2E Test Coverage (16 page groups)
+- Authentication (4 tests): login page, invalid credentials, login success, redirect
+- Dashboard Home (3 tests): load, navigation menu, user info
+- Projects (5 tests): load, list, create button, modal, detail
+- Repositories (3 tests): load, list, provider icons
+- Scans (3 tests): load, list, status indicators
+- Findings (5 tests): load, list, severity, filter, detail
+- Threat Modeling (3 tests): load, list, create button
+- Environments (2 tests): load, list
+- Compliance (2 tests): load, score/frameworks
+- Connections (2 tests): load, SCM providers
+- Settings (2 tests): load, sections
+- API Keys (2 tests): load, create button
+- Alert Rules (2 tests): load, rules
+- Baselines (2 tests): load, list
+- SBOM (2 tests): load, list
+- Logout (1 test): logout flow
+
+#### New CRUD Test Blocks Added (17 tests)
+1. **Environment CRUD** (3 tests) - Create, update, delete
+2. **Threat Model CRUD** (5 tests) - Create, get, list threats, update, delete
+3. **Alert Rule CRUD** (3 tests) - Create, update, delete
+4. **Pipeline Gate CRUD** (4 tests) - Create, get, update, delete
+5. **Connection Operations** (2 tests) - Create, delete
+
+#### Files Created/Modified
+- `apps/dashboard/e2e/full-flow.spec.ts` - Created (43 E2E tests)
+- `apps/dashboard/playwright.config.ts` - Updated Playwright configuration
+- `apps/api/test/functional.e2e-spec.ts` - Added 17 new tests (70 → 87 total)
+- `DEBUG-LOG.md` - Added BATCH 14 session
+- `FUNCTIONAL-REPORT.md` - Updated test counts
+- `HANDOFF.md` - Added BATCH 14 section
+
+#### How to Run Tests
+
+**E2E UI Tests:**
+```bash
+cd apps/dashboard
+npx playwright test e2e/full-flow.spec.ts --reporter=list
+```
+
+**API Functional Tests:**
+```bash
+cd apps/api
+npx jest test/functional.e2e-spec.ts --testRegex=".*" --rootDir="." --forceExit --testTimeout=120000
+```
+
+---
+
+### Previous Session: Comprehensive Functional Testing (BATCH 13)
+
+#### Summary
+Extended functional test suite from 37 to 70 tests covering all API endpoints. Fixed 2 bugs discovered during testing. All tests pass with 100% success rate.
+
+#### Test Results
+| Metric | Value |
+|--------|-------|
+| Total Tests | 70 |
+| Passed | 70 |
+| Failed | 0 |
+| Pass Rate | 100% |
+| Execution Time | ~5 seconds |
+
+#### New Test Blocks Added (33 tests)
+1. **Baseline** (4 tests) - List, create, compare, delete baselines
+2. **CSPM** (5 tests) - Cloud accounts, findings, summary
+3. **Compliance** (5 tests) - Frameworks, score, violations, trend, report
+4. **API Keys** (4 tests) - Scopes, list, create, revoke
+5. **Audit Logs** (3 tests) - List, recent, stats
+6. **Export** (4 tests) - Findings, scans, repositories, audit logs
+7. **SLA Policies** (4 tests) - Policies, summary, at-risk, breached
+8. **Scan Operations** (1 test) - Trigger scan
+9. **Finding Mutations** (1 test) - Update finding status
+10. **Deployments** (2 tests) - List all, list by environment
+
+#### Bugs Fixed
+1. **Baseline Controller: user.id → user.userId**
+   - File: `apps/api/src/baseline/baseline.controller.ts`
+   - Issue: Controller used `user.id` but JWT returns `user.userId`
+   - Fix: Changed to `user.userId` in addToBaseline() and importFromScan()
+
+2. **API Keys Controller: user.id → user.userId**
+   - File: `apps/api/src/apikeys/apikeys.controller.ts`
+   - Issue: Controller used `user.id` but JWT returns `user.userId`
+   - Fix: Changed to `user.userId` in all methods
+
+#### Files Modified
+- `apps/api/test/functional.e2e-spec.ts` - Added 33 new tests
+- `apps/api/src/baseline/baseline.controller.ts` - Fixed user.userId
+- `apps/api/src/apikeys/apikeys.controller.ts` - Fixed user.userId
+- `FUNCTIONAL-REPORT.md` - Updated with complete test coverage
+
+#### How to Run Tests
+```bash
+cd apps/api
+npx jest test/functional.e2e-spec.ts --testRegex=".*" --rootDir="." --forceExit --testTimeout=60000
+```
+
+---
+
+### Previous Session: BATCH 12 - Initial Functional Testing
+
+#### Summary
+Created comprehensive functional test infrastructure and 37 initial API tests. Fixed JWT userId field, Finding GET by ID endpoint, and response format mismatches. All 37 tests passed.
+
+---
+
+### Previous Session: Debug and Stabilization (BATCH 11)
+
+#### Summary
+Verified the application is fully functional. API starts, Dashboard loads, login works, all navigation pages render correctly.
+
+#### Verification Results
+| Check | Status |
+|-------|--------|
+| API starts without crashing | PASS |
+| `curl http://localhost:3001/health` returns 200 | PASS |
+| Dashboard loads at http://localhost:3000 | PASS |
+| Login works (admin@acme.com / admin123 / acme-corp) | PASS |
+| Dashboard pages load without errors | PASS |
+| No console errors | PASS |
+
+#### Login Credentials
+```
+Email: admin@acme.com
+Password: admin123
+Tenant Slug: acme-corp
+```
+
+**Note:** Multi-tenant login requires all three fields. Tokens are set as httpOnly cookies.
+
+#### Quick Start Commands
+```bash
+# Start services (from project root)
+cd apps/api && pnpm start:dev &
+cd apps/dashboard && pnpm dev &
+
+# Test API health
+curl http://localhost:3001/health
+
+# Test login (get cookies)
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@acme.com","password":"admin123","tenantSlug":"acme-corp"}'
+```
+
+#### Files Created
+- `DEBUG-LOG.md` - Detailed debug log for session continuity
+- `apps/dashboard/.env.local` - Dashboard environment configuration
+
+---
+
+### Previous Session: Hierarchy, Connectivity, Functional Testing (BATCH 10)
+
+#### Summary
+Completed app lifecycle management scripts, tenant isolation components, project hierarchy with linking, SCM connection health monitoring, and comprehensive functional test scripts. All TypeScript compiles cleanly.
+
+---
+
+### BATCH 10: Hierarchy, Connectivity, Functional Testing
+
+#### Phase 0: App Lifecycle Management
+
+**Scripts Created:**
+- `scripts/app.sh` (Linux/Mac) - App management with start/stop/restart/status/logs
+- `scripts/app.ps1` (Windows PowerShell) - Windows equivalent with same functionality
+
+**Features:**
+- PID tracking in `.pids/` directory for clean process management
+- Centralized logging to `.logs/` directory
+- Service health checks with HTTP polling
+- Graceful shutdown with process cleanup
+- Port-based process killing for reliable cleanup
+
+**Usage:**
+```bash
+# Linux/Mac
+./scripts/app.sh start    # Start API and Dashboard
+./scripts/app.sh stop     # Stop all services
+./scripts/app.sh status   # Check service status
+./scripts/app.sh logs     # View recent logs
+
+# Windows PowerShell
+.\scripts\app.ps1 -Action start
+.\scripts\app.ps1 -Action stop
+.\scripts\app.ps1 -Action status
+.\scripts\app.ps1 -Action logs
+```
+
+#### Phase 1: Tenant Isolation
+
+**New Components:**
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| TenantGuard | `common/guards/tenant.guard.ts` | Enforces tenant context on requests |
+| TenantId Decorator | `common/decorators/tenant.decorator.ts` | Extract tenant ID from request |
+| CurrentTenant Decorator | `common/decorators/tenant.decorator.ts` | Extract full tenant object |
+| TenantContextMiddleware | `common/middleware/tenant-context.middleware.ts` | Loads tenant, validates status, sets Prisma RLS |
+
+**Usage Pattern:**
+```typescript
+@Get()
+@UseGuards(JwtAuthGuard, TenantGuard)
+async findAll(@TenantId() tenantId: string) {
+  return this.service.findAll(tenantId);
+}
+```
+
+#### Phase 2: Project Hierarchy & Relationships
+
+**New Endpoint:**
+- `GET /projects/:id/hierarchy` - Returns project with full hierarchy
+
+**Hierarchy Includes:**
+- Repositories with recent scans and open findings count
+- Threat models with component/threat counts
+- Environments with recent deployments
+- Pipeline gates with rules
+
+**Service Method:**
+- `ProjectsService.getProjectHierarchy(tenantId, projectId)` - Full nested data retrieval
+
+#### Phase 3: Connection & SCM Integration
+
+**New Service:**
+- `ConnectionStatusService` (`scm/services/connection-status.service.ts`)
+  - Hourly scheduled connection health checks
+  - Per-provider validation (GitHub, GitLab, Bitbucket, Azure DevOps)
+  - Token validation via API calls
+  - Status summary with connection details
+
+**New Endpoints:**
+- `GET /scm/connections/status` - Get all connections with health status
+- `POST /scm/connections/:id/check` - Manually trigger connection check
+- `POST /scm/connections/:id/sync` - Sync repositories from provider
+
+#### Phase 5: Functional Testing
+
+**Test Scripts Created:**
+- `scripts/functional-test.ps1` (Windows PowerShell)
+- `scripts/functional-test.sh` (Linux/Mac Bash)
+
+**Test Coverage:**
+- API health check verification
+- 25+ API endpoint tests (auth-protected, expect 401/403)
+- 19 dashboard page accessibility tests
+- Build verification (dist folders, Prisma client)
+- Pass/fail summary with percentage calculation
+
+**Usage:**
+```bash
+# Windows
+.\scripts\functional-test.ps1
+
+# Linux/Mac
+./scripts/functional-test.sh
+```
+
+#### Files Created (BATCH 10)
+
+**Scripts:**
+- `scripts/app.sh` - Linux/Mac app management
+- `scripts/app.ps1` - Windows PowerShell app management
+- `scripts/functional-test.sh` - Linux/Mac functional tests
+- `scripts/functional-test.ps1` - Windows functional tests
+
+**API - Tenant Isolation:**
+- `apps/api/src/common/guards/tenant.guard.ts`
+- `apps/api/src/common/decorators/tenant.decorator.ts`
+- `apps/api/src/common/middleware/tenant-context.middleware.ts`
+
+**API - Connection Management:**
+- `apps/api/src/scm/services/connection-status.service.ts`
+
+#### Files Modified (BATCH 10)
+
+- `.gitignore` - Added `.pids/` and `.logs/`
+- `apps/api/src/projects/projects.service.ts` - Added `getProjectHierarchy` method
+- `apps/api/src/projects/projects.controller.ts` - Added hierarchy endpoint
+- `apps/api/src/scm/scm.module.ts` - Added ConnectionStatusService
+- `apps/api/src/scm/scm.controller.ts` - Added connection status endpoints
+- `apps/api/src/scm/services/index.ts` - Export ConnectionStatusService
+
+#### Build Status
+- **API:** TypeScript compiles successfully
+- **Dashboard:** TypeScript compiles successfully
+- **Prisma Schema:** Valid
+
+---
+
+### Previous Session: Robustness, Completeness, Error Handling (BATCH 9)
+
+#### Summary
+Completed comprehensive robustness improvements including global exception filters, timeout handling, error boundaries, graceful shutdown, and module completion. All TypeScript compiles cleanly.
+
+---
+
+### BATCH 9: Robustness, Completeness, Error Handling
+
+#### Phase 1: Robustness Infrastructure
+
+**API Error Handling:**
+
+| Component | File | Features |
+|-----------|------|----------|
+| Global Exception Filter | `common/filters/all-exceptions.filter.ts` | Prisma error handling, consistent error format, stack traces in dev mode |
+| Timeout Interceptor | `common/interceptors/timeout.interceptor.ts` | 30s default timeout, route-specific overrides |
+| Service Availability Guard | `common/guards/service-available.guard.ts` | Database health check with 5s cache |
+
+**Main.ts Enhancements:**
+- Global exception filter registration
+- Graceful shutdown handlers (SIGTERM, SIGINT)
+- Connection cleanup and job drain
+
+**Dashboard Error Handling:**
+
+| Component | File | Features |
+|-----------|------|----------|
+| Error Boundary | `components/error-boundary.tsx` | React error boundary with retry, error fallback UI |
+| Safe Fetch Hook | `hooks/use-safe-fetch.ts` | Timeout, retries, abort controller, error states |
+
+#### Phase 2: Module Completion (73% → 100%)
+
+**Baseline Management - COMPLETE:**
+- `apps/dashboard/src/app/dashboard/baselines/page.tsx` - Full baseline management UI
+  - Create baseline with fingerprint and reason
+  - Baseline list with expiration tracking
+  - Delete baseline with confirmation
+  - Stats cards (total, critical, high, expired)
+  - Filter by severity
+
+**Alert Rules UI - COMPLETE:**
+- `apps/dashboard/src/app/dashboard/settings/alerts/page.tsx` - Full alert configuration
+  - Create alert rules with filters (event types, sources, severities)
+  - Pattern matching, threshold, time window configuration
+  - Notification channels (Slack, Email, Jira)
+  - Toggle enable/disable
+  - Delete rules
+  - Alert history view
+
+**Alerts API Module:**
+- `apps/api/src/alerts/alerts.service.ts` - Alert rule processing
+  - CRUD operations for alert rules
+  - Event processing with rule matching
+  - Cooldown/time window enforcement
+  - Alert history tracking
+  - Slack and email notification integration
+- `apps/api/src/alerts/alerts.controller.ts` - REST endpoints
+- `apps/api/src/alerts/alerts.module.ts` - NestJS module
+
+#### Phase 3: Scheduled Tasks
+
+**Auto-Resolve Stale Findings (2am daily):**
+- Compares last two scans per repository
+- Identifies findings not present in latest scan
+- Auto-resolves missing findings with reason
+- Uses fingerprint matching for accuracy
+
+**SBOM CVE Monitoring (3am daily):**
+- Queries all SBOMs from active repositories
+- Logs scheduled CVE check trigger
+- CVE matching handled by SbomCveMatcherService
+
+**Baseline Cleanup (4am daily):**
+- Finds expired baselines
+- Reopens baselined findings
+- Cleans up expired baseline records
+
+#### Phase 4: Scanner Health Checks
+
+- `apps/api/src/scanners/services/scanner-health.service.ts`
+  - Checks scanner availability on startup
+  - Tests: semgrep, gitleaks, trivy, checkov, bandit, gosec
+  - Logs available/missing scanners
+
+#### Phase 5: UI Polish
+
+**404 Page:**
+- `apps/dashboard/src/app/not-found.tsx`
+  - Branded 404 error page
+  - Navigation back to dashboard
+
+**Page Skeletons:**
+- `apps/dashboard/src/components/ui/page-skeleton.tsx`
+  - PageSkeleton with variants (default, table, cards, detail)
+  - DashboardSkeleton, TablePageSkeleton, CardGridSkeleton, DetailPageSkeleton
+  - InlineLoadingState component
+
+**Sidebar Updates:**
+- Added Baselines link under Security group
+- Added Alert Rules link under Settings
+
+#### Phase 6: Permissions
+
+**Added to Permission Enum:**
+- `ALERTS_READ = 'alerts:read'`
+- `ALERTS_WRITE = 'alerts:write'`
+
+**Role Mappings:** (Admin has all alert permissions)
+
+---
+
+#### Files Created (BATCH 9)
+
+**API - Error Handling:**
+- `apps/api/src/common/filters/all-exceptions.filter.ts`
+- `apps/api/src/common/interceptors/timeout.interceptor.ts`
+- `apps/api/src/common/guards/service-available.guard.ts`
+
+**API - Alerts Module:**
+- `apps/api/src/alerts/alerts.service.ts`
+- `apps/api/src/alerts/alerts.controller.ts`
+- `apps/api/src/alerts/alerts.module.ts`
+- `apps/api/src/alerts/index.ts`
+
+**API - Scanner Health:**
+- `apps/api/src/scanners/services/scanner-health.service.ts`
+
+**Dashboard - Pages:**
+- `apps/dashboard/src/app/dashboard/baselines/page.tsx`
+- `apps/dashboard/src/app/dashboard/settings/alerts/page.tsx`
+- `apps/dashboard/src/app/not-found.tsx`
+
+**Dashboard - Components:**
+- `apps/dashboard/src/components/ui/page-skeleton.tsx`
+- `apps/dashboard/src/components/error-boundary.tsx`
+- `apps/dashboard/src/hooks/use-safe-fetch.ts`
+
+#### Files Modified (BATCH 9)
+
+- `apps/api/src/main.ts` - Global filters, graceful shutdown
+- `apps/api/src/app.module.ts` - AlertsModule import
+- `apps/api/src/scheduler/scheduler.service.ts` - Auto-resolve, SBOM check, baseline cleanup
+- `apps/api/src/libs/auth/permissions/permissions.enum.ts` - Alert permissions
+- `apps/dashboard/src/components/layout/sidebar.tsx` - Baselines and Alerts links
+- `apps/dashboard/src/components/ui/index.ts` - Page skeleton exports
+- `apps/dashboard/src/components/ui/page-header.tsx` - className prop support
+- `apps/dashboard/tsconfig.json` - Exclude e2e from main build
+
+#### Build Status
+- **API:** TypeScript compiles successfully
+- **Dashboard:** TypeScript compiles successfully
+- All Prisma schema valid
+
+---
+
+### Previous Session: Testing, UI Polish, Security Hardening, Documentation (BATCHES 5-8)
+
+#### Summary
+Completed comprehensive testing suite, UI polish components, security hardening with DTOs and audit logging, and documentation. All infrastructure verified.
+
+---
+
+### BATCH 5: Testing & Quality Assurance
+
+#### API Unit Tests Created
+
+| Service | File | Test Coverage |
+|---------|------|---------------|
+| ProjectsService | `projects.service.spec.ts` | findAll, findOne, create, update, archive, delete, linkRepository, unlinkRepository, getStats |
+| ThreatModelingService | `threat-modeling.service.spec.ts` | findAll, findOne, create, update, delete, duplicate, addComponent, addThreat, generateDiagram, getStats |
+| SbomService | `sbom.service.spec.ts` | findAll, findOne, delete, parseCycloneDX, parseSPDX, getStats, getTree, updateVulnerabilityStatus, addComponent |
+| EnvironmentsService | `environments.service.spec.ts` | findAll, findOne, create, update, delete, getSummary, createDeployment, updateDeployment, deleteDeployment, getAllDeployments |
+
+#### Dashboard Component Tests
+
+| Component | File | Tests |
+|-----------|------|-------|
+| PageHeader | `page-header.test.tsx` | Rendering, props, actions |
+| ProjectSelector | `project-selector.test.tsx` | Mocked fetch, selection, creation |
+
+#### E2E Tests with Playwright
+
+| Spec | File | Tests |
+|------|------|-------|
+| Authentication | `e2e/auth.spec.ts` | Login, logout, validation |
+| Dashboard | `e2e/dashboard.spec.ts` | Navigation, page loads |
+| Scan Flow | `e2e/scan-flow.spec.ts` | Trigger scan, view results |
+
+#### API Integration Tests
+- `apps/api/test/projects.e2e-spec.ts` - Full Projects API E2E tests
+
+---
+
+### BATCH 6: UI Polish & Performance
+
+#### New UI Components
+
+| Component | File | Features |
+|-----------|------|----------|
+| Pagination | `pagination.tsx` | Page numbers, first/last, prev/next, configurable items per page |
+| TableToolbar | `table-toolbar.tsx` | Search with debounce, filter dropdowns, action buttons |
+| SortableHeader | `sortable-header.tsx` | useSort hook, ASC/DESC indicators, click to toggle |
+| ApiError | `api-error.tsx` | ApiError, InlineError, ApiErrorBanner with retry |
+
+---
+
+### BATCH 7: Security Hardening
+
+#### Validation DTOs Created
+
+| DTO | File | Purpose |
+|-----|------|---------|
+| PaginationDto | `common/dto/pagination.dto.ts` | Page, limit, sort, order validation |
+| PaginatedResponseDto | `common/dto/pagination.dto.ts` | Generic paginated response wrapper |
+| CreateProjectDto | `projects/dto/create-project.dto.ts` | Name (3-100 chars), description (max 500) |
+| UpdateProjectDto | `projects/dto/create-project.dto.ts` | Partial project update |
+| CreateScanDto | `scm/dto/create-scan.dto.ts` | Scanner type enum validation |
+| UpdateFindingDto | `scm/dto/update-finding.dto.ts` | Status, severity validation |
+| BulkUpdateFindingsDto | `scm/dto/update-finding.dto.ts` | Batch operations |
+
+#### Audit Logging
+
+**Decorator:** `@AuditLog({ action: 'CREATE', resource: 'PROJECT' })`
+
+**Interceptor Features:**
+- Automatic audit trail to `auditLog` table
+- Sensitive field sanitization (password, token, apiKey, secret, privateKey, credentials)
+- IP address extraction (x-forwarded-for, x-real-ip, remoteAddress)
+- User agent capture
+- Success/failure tracking with error messages
+- Request duration logging
+
+---
+
+### BATCH 8: Deployment & Documentation
+
+#### Documentation Created
+
+| Document | Path | Contents |
+|----------|------|----------|
+| User Guide | `docs/USER_GUIDE.md` | Getting started, features, best practices, FAQ |
+| Admin Guide | `docs/ADMIN_GUIDE.md` | Installation, config, operations, troubleshooting |
+
+#### Verified Infrastructure
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| Health Controller | Verified | `GET /health` returns status, uptime |
+| Health Module | Verified | Proper module structure |
+| CI Workflow | Verified | Lint, typecheck, test, build, security scan jobs |
+
+---
+
+### Files Created (BATCHES 5-8)
+
+**Tests:**
+- `apps/api/src/projects/projects.service.spec.ts`
+- `apps/api/src/threat-modeling/threat-modeling.service.spec.ts`
+- `apps/api/src/sbom/sbom.service.spec.ts`
+- `apps/api/src/environments/environments.service.spec.ts`
+- `apps/dashboard/src/components/ui/page-header.test.tsx`
+- `apps/dashboard/src/components/layout/project-selector.test.tsx`
+- `apps/dashboard/e2e/auth.spec.ts`
+- `apps/dashboard/e2e/dashboard.spec.ts`
+- `apps/dashboard/e2e/scan-flow.spec.ts`
+- `apps/dashboard/playwright.config.ts`
+- `apps/api/test/projects.e2e-spec.ts`
+
+**UI Components:**
+- `apps/dashboard/src/components/ui/pagination.tsx`
+- `apps/dashboard/src/components/ui/table-toolbar.tsx`
+- `apps/dashboard/src/components/ui/sortable-header.tsx`
+- `apps/dashboard/src/components/ui/api-error.tsx`
+
+**DTOs:**
+- `apps/api/src/common/dto/pagination.dto.ts`
+- `apps/api/src/projects/dto/create-project.dto.ts`
+- `apps/api/src/scm/dto/create-scan.dto.ts`
+- `apps/api/src/scm/dto/update-finding.dto.ts`
+
+**Security:**
+- `apps/api/src/common/decorators/audit-log.decorator.ts`
+- `apps/api/src/common/interceptors/audit-log.interceptor.ts`
+
+**Documentation:**
+- `docs/USER_GUIDE.md`
+- `docs/ADMIN_GUIDE.md`
+
+---
+
+### Previous Session: Wiring, Definitions, Seed Data, E2E Verification (BATCH 4)
+
+#### Summary
+Completed the final wiring and verification phase. Created comprehensive documentation, E2E verification scripts, and seed data for testing. Verified OAuth, DAST, and scan trigger implementations are all functional.
+
+#### New Documentation
+
+| File | Description |
+|------|-------------|
+| `docs/GLOSSARY.md` | 600-line system glossary with entity definitions |
+| `scripts/verify-e2e.sh` | Bash E2E verification script |
+| `scripts/verify-e2e.ps1` | PowerShell E2E verification script |
+
+#### GLOSSARY.md Contents
+- **Entities**: Tenant, User, Project, Repository, Scan, Finding, ThreatModel, SBOM, Environment, etc.
+- **Enumerations**: ScanStatus, FindingStatus, FindingSeverity, etc.
+- **Relationships**: Entity relationship documentation
+- **API Endpoints**: Comprehensive endpoint list with methods
+
+#### E2E Verification Script Features
+```bash
+# Run on Linux/macOS
+./scripts/verify-e2e.sh
+
+# Run on Windows PowerShell
+.\scripts\verify-e2e.ps1
+```
+
+**Checks performed:**
+1. Pre-flight (Node.js, pnpm, Docker)
+2. Service health (API at :3001, Dashboard at :3000)
+3. API endpoints (25+ endpoints tested)
+4. Dashboard pages (18+ pages tested)
+5. Build verification (dist folders, Prisma client)
+
+#### Seed Data Created
+The seed script now creates comprehensive test data:
+- 1 Tenant: "Acme Corp"
+- 1 User: demo@acme.com / password123
+- 2 Projects: "Frontend App", "Backend Services"
+- 5 Repositories across projects
+- 12 Scans with various statuses
+- 53 Findings (mixed severities)
+- Threat models, SBOMs, environments
+
+#### Verified Implementations
+
+| Feature | Status | Location |
+|---------|--------|----------|
+| OAuth connections | Already implemented | `connections/page.tsx:111` - handleOAuthConnect |
+| DAST (Nuclei) | Already wired | `scan.processor.ts:280-284` |
+| Scan trigger | Functional | POST `/scm/scans` |
+
+#### UI Consistency Fixes
+- Added PageHeader to `containers/page.tsx`
+- Added PageHeader to `threat-intel/page.tsx`
+
+#### Files Created
+- `docs/GLOSSARY.md`
+- `scripts/verify-e2e.sh`
+- `scripts/verify-e2e.ps1`
+
+#### Files Updated
+- `apps/api/prisma/seed.ts`
+- `apps/dashboard/src/app/dashboard/containers/page.tsx`
+- `apps/dashboard/src/app/dashboard/threat-intel/page.tsx`
+- `CHANGELOG.md`
+- `HANDOFF.md`
+
+---
+
+### Previous Session: Detail Pages, Settings, and Action Buttons (BATCH 3)
+
+#### Summary
+Created all detail pages with proper navigation, breadcrumbs, and working action buttons. Added API key management to settings.
+
+#### New Detail Pages
+
+| Page | Path | Key Features |
+|------|------|--------------|
+| Repository Detail | `/dashboard/repositories/[id]` | Run Scan, View Source, Settings buttons, Stats cards, Findings/Scans tabs |
+| Scan Detail | `/dashboard/scans/[id]` | Re-run Scan, Scanner breakdown, Findings list |
+| Finding Detail | `/dashboard/findings/[id]` | AI Triage, Apply Fix, Suppress, Create Jira buttons, Code snippet, Status dropdown |
+| Threat Model Detail | `/dashboard/threat-modeling/[id]` | Run STRIDE/PASTA/LINDDUN analysis, Components/Threats/Mitigations tabs |
+
+#### Action Buttons Implementation
+
+```typescript
+// Finding Detail - AI Triage
+const handleAiTriage = async () => {
+  const res = await fetch(`${API_URL}/fix/triage/${id}`, { method: 'POST' });
+  // Updates finding with AI analysis
+};
+
+// Finding Detail - Apply Fix
+const handleApplyFix = async () => {
+  const res = await fetch(`${API_URL}/fix/${id}`, { method: 'POST' });
+};
+
+// Threat Modeling - Run Analysis
+const runAnalysis = async (methodology: 'stride' | 'pasta' | 'linddun') => {
+  const res = await fetch(`${API_URL}/threat-modeling/${id}/analyze`, {
+    method: 'POST',
+    body: JSON.stringify({ methodology }),
+  });
+};
+
+// Repository Detail - Trigger Scan
+const triggerScan = async () => {
+  const res = await fetch(`${API_URL}/scm/scans`, {
+    method: 'POST',
+    body: JSON.stringify({ repositoryId: id }),
+  });
+};
+```
+
+#### Settings Pages
+
+| Page | Path | Features |
+|------|------|----------|
+| Settings Overview | `/dashboard/settings` | Navigation grid to all settings |
+| Team | `/dashboard/settings/team` | Member list, invite, roles |
+| Notifications | `/dashboard/settings/notifications` | Slack webhook, triggers |
+| API Keys | `/dashboard/settings/api-keys` | Create, list, revoke keys |
+
+#### Files Created/Updated
+- `apps/dashboard/src/app/dashboard/repositories/[id]/page.tsx` (NEW)
+- `apps/dashboard/src/app/dashboard/scans/[id]/page.tsx` (NEW)
+- `apps/dashboard/src/app/dashboard/findings/[id]/page.tsx` (NEW)
+- `apps/dashboard/src/app/dashboard/settings/api-keys/page.tsx` (NEW)
+- `apps/dashboard/src/app/dashboard/settings/page.tsx` (UPDATED)
+- `apps/dashboard/src/app/dashboard/threat-modeling/[id]/page.tsx` (UPDATED)
+
+#### Build Status
+- API: TypeScript compiles successfully
+- Dashboard: TypeScript compiles successfully
+
+---
+
+### Previous Session: Project Context Wiring (BATCH 2)
+
+#### Summary
+Wired project context through ALL dashboard pages so users see data scoped to their currently selected project. All pages now filter by `currentProject.id` and show "Select a project" message when no project is selected.
+
+#### Dashboard Pages Updated
+All pages now use the `useProject` hook and filter by `currentProject.id`:
+
+| Page | Path | Changes |
+|------|------|---------|
+| Main Dashboard | `/dashboard` | Stats filtered by project |
+| Repositories | `/dashboard/repositories` | List & create scoped to project |
+| Scans | `/dashboard/scans` | Scan list filtered by project |
+| Findings | `/dashboard/findings` | Findings list filtered by project |
+| Threat Modeling | `/dashboard/threat-modeling` | Threat models scoped to project |
+| SBOM | `/dashboard/sbom` | SBOMs filtered by project |
+| Environments | `/dashboard/environments` | Environments scoped to project |
+| Pipeline | `/dashboard/pipeline` | Pipeline gates filtered by project |
+| Analytics | `/dashboard/analytics` | Analytics data scoped to project |
+| SLA Dashboard | `/dashboard/sla` | SLA metrics filtered by project |
+| Reports | `/dashboard/reports` | Reports scoped to project |
+
+#### API Endpoints Updated
+- `GET /scm/repositories?projectId=` - Filter by project
+- `POST /scm/repositories` - Accept projectId in body
+- `GET /scm/scans?projectId=` - Filter by project
+- `GET /scm/findings?projectId=` - Filter by project
+
+#### Pattern Applied to All Pages
+```typescript
+// 1. Import useProject
+import { useProject } from '@/contexts/project-context';
+
+// 2. Get currentProject
+const { currentProject } = useProject();
+
+// 3. Early return in useEffect if no project
+useEffect(() => {
+  if (!currentProject) {
+    setLoading(false);
+    return;
+  }
+  // fetch with projectId
+}, [currentProject]);
+
+// 4. Add projectId to fetch URLs
+fetch(`${API_URL}/endpoint?projectId=${currentProject.id}`)
+
+// 5. Show "No project selected" when !currentProject after loading
+if (!currentProject) {
+  return <NoProjectSelected />;
+}
+```
+
+#### Files Modified
+- `apps/dashboard/src/app/dashboard/page.tsx`
+- `apps/dashboard/src/app/dashboard/repositories/page.tsx`
+- `apps/dashboard/src/app/dashboard/scans/page.tsx`
+- `apps/dashboard/src/app/dashboard/findings/page.tsx`
+- `apps/dashboard/src/app/dashboard/threat-modeling/page.tsx`
+- `apps/dashboard/src/app/dashboard/sbom/page.tsx`
+- `apps/dashboard/src/app/dashboard/environments/page.tsx`
+- `apps/dashboard/src/app/dashboard/pipeline/page.tsx`
+- `apps/dashboard/src/app/dashboard/analytics/page.tsx`
+- `apps/dashboard/src/app/dashboard/sla/page.tsx`
+- `apps/dashboard/src/app/dashboard/reports/page.tsx`
+- `apps/api/src/scm/scm.controller.ts`
+- `apps/api/src/scm/services/scm.service.ts`
+- `apps/dashboard/src/lib/api.ts`
+
+#### Build Verification
+- API: TypeScript compiles successfully
+- Dashboard: TypeScript compiles successfully
+
+---
+
+### Previous Session: Project-Scoped Architecture
+
+#### Summary
+Implemented comprehensive project-scoped architecture allowing users to organize security resources (repositories, scans, findings, threat models, SBOMs, environments) by application/project.
+
+#### Prisma Schema Changes
+Added to `apps/api/prisma/schema.prisma`:
+- `Project` model with tenant scoping, name, description, status
+- `ProjectStatus` enum: `ACTIVE`, `ARCHIVED`, `DELETED`
+- Optional `projectId` foreign key added to: Repository, Scan, Finding, ThreatModel, Sbom, Environment, PipelineGate
+- Unique constraint on `[tenantId, name]` per project
+
+#### Projects API Module
+Created `apps/api/src/projects/`:
+- `projects.module.ts` - NestJS module with PrismaModule dependency
+- `projects.service.ts` - Full CRUD operations:
+  - `findAll(tenantId)` - List projects with _count of relations
+  - `findOne(tenantId, id)` - Get project with stats
+  - `create(tenantId, data)` - Create new project
+  - `update(tenantId, id, data)` - Update project
+  - `archive(tenantId, id)` - Soft archive (status = ARCHIVED)
+  - `delete(tenantId, id)` - Soft delete (status = DELETED)
+  - `getStats(tenantId, id)` - Project statistics
+  - `linkRepository(tenantId, projectId, repositoryId)` - Link repo to project
+  - `unlinkRepository(tenantId, projectId, repositoryId)` - Unlink repo
+- `projects.controller.ts` - REST endpoints with `@CurrentUser()` for tenant scoping
+
+#### API Endpoints
+```
+GET    /projects                           - List all projects
+GET    /projects/:id                       - Get project by ID
+GET    /projects/:id/stats                 - Get project statistics
+POST   /projects                           - Create project
+PUT    /projects/:id                       - Update project
+POST   /projects/:id/archive               - Archive project
+DELETE /projects/:id                       - Delete project (soft)
+POST   /projects/:id/repositories/:repoId  - Link repository
+DELETE /projects/:id/repositories/:repoId  - Unlink repository
+```
+
+#### Frontend Components
+
+**ProjectProvider Context** (`apps/dashboard/src/contexts/project-context.tsx`)
+- React context for global project state
+- `projects` - List of all user projects
+- `currentProject` - Currently selected project
+- `setCurrentProject(project)` - Set current project (persists to localStorage)
+- `createProject(name, description)` - Create new project
+- `loading` / `error` states
+- `refetch()` - Refresh projects list
+
+**ProjectSelector Component** (`apps/dashboard/src/components/layout/project-selector.tsx`)
+- Dropdown in sidebar for switching between projects
+- Shows current project name with folder icon
+- Dropdown lists all projects with checkmark on current
+- "New Project" button opens creation modal
+- Creation modal with name and description fields
+
+**Projects Page** (`apps/dashboard/src/app/dashboard/projects/page.tsx`)
+- Grid of project cards with stats
+- Shows repository count, scan count, finding count, threat model count
+- "Current" badge on selected project
+- Click card to select and navigate to dashboard
+- Create project modal with form validation
+- Empty state for new users
+
+#### Files Created
+- `apps/api/src/projects/projects.module.ts`
+- `apps/api/src/projects/projects.service.ts`
+- `apps/api/src/projects/projects.controller.ts`
+- `apps/api/src/projects/index.ts`
+- `apps/dashboard/src/contexts/project-context.tsx`
+- `apps/dashboard/src/components/layout/project-selector.tsx`
+- `apps/dashboard/src/app/dashboard/projects/page.tsx`
+
+#### Files Modified
+- `apps/api/prisma/schema.prisma` - Added Project model and relations
+- `apps/api/src/app.module.ts` - Added ProjectsModule to imports
+- `apps/dashboard/src/components/layout/dashboard-layout.tsx` - Added ProjectProvider wrapper
+- `apps/dashboard/src/components/layout/sidebar.tsx` - Added ProjectSelector component
+
+#### Database Migration
+Ran `prisma db push` to sync schema - database now has `projects` table and updated foreign keys.
+
+---
+
+### Previous Session: Navigation Fixes
+
+#### Summary
+Diagnosed and fixed all broken navigation links in the dashboard sidebar:
+- Identified 20+ working pages across all navigation groups
+- Fixed sidebar link bug (threat-models -> threat-modeling)
+- Created missing Reports page
+
+#### Issues Fixed
+
+**Sidebar Navigation Bug** (`apps/dashboard/src/components/layout/sidebar.tsx:137`)
+- Changed `/dashboard/threat-models` to `/dashboard/threat-modeling`
+- The page exists at `threat-modeling/` but sidebar incorrectly linked to `threat-models/`
+
+**ToastProvider Missing Error** (`apps/dashboard/src/components/layout/dashboard-layout.tsx`)
+- Added `ToastProvider` and `ConfirmDialogProvider` wrappers to DashboardLayout
+- Fixed "useToast must be used within a ToastProvider" runtime error
+- All dashboard pages now have access to toast notifications and confirmation dialogs
+
+**Missing Reports Page** (`apps/dashboard/src/app/dashboard/reports/page.tsx`)
+Created comprehensive 450-line reports page with:
+- 5 report templates: Executive Summary, Compliance, Vulnerability, SBOM, Custom
+- Export formats: PDF, HTML, CSV, JSON
+- Report generation modal with two-step template selection
+- Reports table with status badges (Pending, Generating, Completed, Failed)
+- Download and delete actions
+- Loading skeletons and empty states
+
+#### All Working Navigation Items
+
+| Group | Page | Path | Status |
+|-------|------|------|--------|
+| Overview | Dashboard | `/dashboard` | Working |
+| Overview | Analytics | `/dashboard/analytics` | Working |
+| Source Code | Connections | `/dashboard/connections` | Working |
+| Source Code | Repositories | `/dashboard/repositories` | Working |
+| Pipeline | Scans | `/dashboard/scans` | Working |
+| Pipeline | Environments | `/dashboard/environments` | Working |
+| Pipeline | CI/CD | `/dashboard/pipeline` | Working |
+| Security | Findings | `/dashboard/findings` | Working |
+| Security | Threat Models | `/dashboard/threat-modeling` | Fixed |
+| Security | SBOM | `/dashboard/sbom` | Working |
+| Security | SLA Dashboard | `/dashboard/sla` | Working |
+| Cloud | CSPM | `/dashboard/cloud` | Working |
+| Cloud | Containers | `/dashboard/containers` | Working |
+| Intelligence | VulnDB | `/dashboard/vulndb` | Working |
+| Intelligence | ATT&CK Matrix | `/dashboard/attack` | Working |
+| Intelligence | Threat Intel | `/dashboard/threat-intel` | Working |
+| Operations | SIEM | `/dashboard/siem` | Working |
+| Operations | Reports | `/dashboard/reports` | Created |
+| Operations | Settings | `/dashboard/settings` | Working |
+
+#### Files Modified
+- `apps/dashboard/src/components/layout/sidebar.tsx` - Fixed threat-models href
+- `apps/dashboard/src/components/layout/dashboard-layout.tsx` - Added ToastProvider and ConfirmDialogProvider
+- `apps/dashboard/src/app/dashboard/reports/page.tsx` - New file
+
+---
+
+### Previous Session: Dashboard UI Improvements
+
+#### Summary
+Comprehensive dashboard UI improvements for better navigation and user experience:
+- Created reusable PageHeader and Breadcrumb components
+- Rewrote sidebar with grouped navigation and collapsible sections
+- Created useApiQuery hook for consistent data fetching with caching
+- Enhanced Connections, Repositories, Scans, and Findings pages
+
+#### New Components Created
+
+**PageHeader Component** (`apps/dashboard/src/components/ui/page-header.tsx`)
+- Title with optional description
+- Breadcrumb navigation
+- Back button support
+- Context display (type, status, metadata)
+- Action buttons slot
+
+**Breadcrumb Component** (`apps/dashboard/src/components/ui/breadcrumb.tsx`)
+- Home icon link
+- Hierarchical navigation
+- Active item highlighting
+
+**useApiQuery Hook** (`apps/dashboard/src/hooks/use-api-query.ts`)
+- React Query-like API for data fetching
+- In-memory caching with stale time
+- Auto-refetch support
+- Loading/error states
+- Cache invalidation helpers
+
+#### Sidebar Improvements
+
+Rewrote `apps/dashboard/src/components/layout/sidebar.tsx`:
+- **7 Navigation Groups**: Overview, Source Code, Pipeline, Security, Cloud, Intelligence, Operations
+- Collapsible groups with chevron indicators
+- Active state highlighting based on current route
+- User info display at bottom with avatar and logout button
+- Default expanded states for frequently used sections
+
+#### Page Updates
+
+**Connections Page**
+- Added PageHeader with breadcrumbs
+- Support for all 4 SCM providers (GitHub, GitLab, Bitbucket, Azure DevOps)
+- Provider-specific icons and colors
+- OAuth and PAT connection flows for each provider
+- Required scopes displayed for PAT connections
+
+**Repositories Page**
+- Added PageHeader with breadcrumbs
+- Search functionality for filtering repositories
+- Import modal with repository search
+- Provider icons (GitHub, GitLab, etc.)
+- Trigger badges (Push, PR, Schedule, Manual)
+- Quick actions: Scan, Settings, Delete
+
+**Scans Page**
+- Added PageHeader with breadcrumbs
+- Status summary cards (Total, Running, Pending, Completed, Failed)
+- Trigger filter chips (All, Push, PR, Manual, Schedule)
+- Auto-refresh every 30 seconds
+- "Clean" badge for scans with no findings
+- View button linking to scan details
+
+**Findings Page**
+- Added PageHeader with breadcrumbs
+- Severity summary cards showing open counts
+- Bulk selection with checkbox
+- Bulk actions: Mark Fixed, Ignore, False Positive, AI Triage
+- Scanner filter dropdown
+- Status filter chips
+- Improved action buttons
+
+#### Files Modified
+
+**New Files:**
+- `apps/dashboard/src/components/ui/breadcrumb.tsx`
+- `apps/dashboard/src/components/ui/page-header.tsx`
+- `apps/dashboard/src/hooks/use-api-query.ts`
+- `apps/dashboard/src/hooks/index.ts`
+
+**Updated Files:**
+- `apps/dashboard/src/components/layout/sidebar.tsx` - Full rewrite
+- `apps/dashboard/src/components/ui/index.ts` - Added new exports
+- `apps/dashboard/src/app/dashboard/connections/page.tsx`
+- `apps/dashboard/src/app/dashboard/repositories/page.tsx`
+- `apps/dashboard/src/app/dashboard/scans/page.tsx`
+- `apps/dashboard/src/app/dashboard/findings/page.tsx`
+
+---
+
+### Previous Session: Final Cleanup & Testing
+
+#### Summary
+Final cleanup session completing TypeScript compilation fixes and creating dashboard pages:
+- Phase 1: Installed missing dependencies (@nestjs/axios, js-yaml)
+- Phase 2: Fixed all TypeScript compilation errors in API
+- Phase 3: Created dashboard pages for Threat Intel and Containers
+- Phase 4: Registered ThreatIntelModule and ContainersModule in app.module.ts
+- Phase 5: Verified API builds successfully
+- Phase 6: Updated documentation
+
+#### TypeScript Fixes Applied
+
+##### Removed Unused Logger Imports
+- `stride.analyzer.ts` - Removed unused Logger import and logger declaration
+- `pasta.analyzer.ts` - Removed unused Logger import and logger declaration
+- `linddun.analyzer.ts` - Removed unused Logger import and logger declaration
+- `dread.calculator.ts` - Removed unused Logger import and logger declaration
+- `attack-tree.generator.ts` - Removed unused Logger import and logger declaration
+
+##### Fixed Unused Parameters (Prefixed with underscore)
+- `stride.analyzer.ts` - `_components` parameter
+- `pasta.analyzer.ts` - `_entryPoint`, `_scope`, `_threat` parameters
+- `linddun.analyzer.ts` - `_dataFlows`, `_template`, `_components` parameters
+- `threat-intel.service.ts` - `_type`, `_sources` parameters
+- `sbom-cve-matcher.service.ts` - `_hasKEV` parameter
+- `terraform.parser.ts` - `_sourceType` parameters
+
+##### Other TypeScript Fixes
+- `attack-tree.generator.ts` - Made `id` optional in AttackTreeNode interface to fix template type errors
+- `sbom-cve-matcher.service.ts` - Added type assertion for Map.get() call
+- `threat-intel.service.ts` - Added null check for epssSource
+- `scheduler.service.ts` - Added @ts-ignore for cron-parser import (missing types)
+- `dread.calculator.ts` - Removed unused `_description` variable
+
+#### New Dashboard Pages Created
+
+##### Threat Intelligence Page (`/dashboard/threat-intel`)
+`apps/dashboard/src/app/dashboard/threat-intel/page.tsx`
+- Query IP, domain, hash, URL, email, or CVE indicators
+- Multi-source aggregation results (AbuseIPDB, ThreatFox, URLhaus, MalwareBazaar)
+- CVE intelligence (NVD, CISA KEV, EPSS)
+- Risk scoring and recommendations
+- Query history sidebar
+- Supported sources info panel
+
+##### Containers Page (`/dashboard/containers`)
+`apps/dashboard/src/app/dashboard/containers/page.tsx`
+- Container image inspection (Docker Hub, GHCR, GCR, ECR, ACR, Quay)
+- Vulnerability scanning with severity breakdown
+- Image digest verification
+- Layer information display
+- Tabbed interface (Info, Scan, Verify)
+- Supported registries info panel
+
+#### Modules Registered in app.module.ts
+- `ThreatIntelModule` - Threat intelligence service
+- `ContainersModule` - Container registry service
+
+#### Build Status
+- **API**: Builds successfully (`pnpm build`)
+- **Dashboard**: Has pre-existing SSR/SSG issue with AuthProvider context during static generation. This is an architectural issue that predates this session and affects all pages. The API correctly separates frontend and backend concerns.
+
+#### Known Issue: Dashboard Static Generation
+The dashboard has a pre-existing SSR issue where `useContext` returns null during static page generation. This affects the AuthProvider and all pages that use authentication context. Resolution options:
+1. Add `export const dynamic = 'force-dynamic'` to pages requiring auth
+2. Restructure AuthProvider to handle SSR properly
+3. Use client-side only rendering for authenticated pages
+
+---
+
+### Previous Session: Overnight Autonomous Feature Implementation
+
+#### Summary
+Implemented major missing features during autonomous overnight session:
+- Phase 4: Threat Model Source Parsers (OpenAPI, Terraform)
+- Phase 5: Threat Analyzers (STRIDE, PASTA, LINDDUN, DREAD, Attack Trees)
+- Phase 6: Live Threat Intel Query Service
+- Phase 7: SBOM CVE Matching with OSV/EPSS/KEV Integration
+- Phase 8: Container Registry Pull and Scan Service
+- Phase 9: CLI SBOM Upload Command
+
+#### New Modules Created
+
+##### Threat Modeling Parsers (`apps/api/src/threat-modeling/parsers/`)
+- `openapi.parser.ts` - Parses OpenAPI/Swagger specs for threat modeling
+  - Extracts endpoints, parameters, security schemes
+  - Generates components and data flows automatically
+  - Identifies security concerns (unauthenticated endpoints, sensitive data in query strings)
+- `terraform.parser.ts` - Parses Terraform IaC configurations
+  - Supports AWS, Azure, GCP resources
+  - Generates components with criticality and data classification
+  - Creates data flows between resources
+  - Identifies security concerns (public S3, unencrypted storage)
+
+##### Threat Analyzers (`apps/api/src/threat-modeling/analyzers/`)
+- `stride.analyzer.ts` - STRIDE threat analysis
+  - Comprehensive threat templates for all 6 STRIDE categories
+  - CWE mappings and ATT&CK technique IDs
+  - Risk scoring with component contextualization
+- `pasta.analyzer.ts` - PASTA (7-stage) threat modeling
+  - Business objective analysis
+  - Technical scope decomposition
+  - Vulnerability and attack modeling
+  - Risk matrix generation with mitigation strategies
+- `linddun.analyzer.ts` - Privacy threat modeling
+  - All 7 LINDDUN categories
+  - GDPR article mappings
+  - Privacy pattern recommendations
+  - Compliance gap identification
+- `dread.calculator.ts` - DREAD risk assessment
+  - Factor-based scoring (Damage, Reproducibility, Exploitability, Affected Users, Discoverability)
+  - Auto-assessment from threat characteristics
+  - Batch assessment and comparison
+  - Calibration examples
+- `attack-tree.generator.ts` - Attack tree generation
+  - Template-based tree generation
+  - AND/OR node analysis
+  - Path probability calculation
+  - Mermaid export
+
+##### Threat Intelligence (`apps/api/src/threat-intel/`)
+- `threat-intel.service.ts` - Live threat intelligence queries
+  - Multi-source aggregation (AbuseIPDB, ThreatFox, URLhaus, MalwareBazaar)
+  - CVE intelligence (NVD, CISA KEV, EPSS)
+  - IP, domain, hash, URL, and CVE indicator types
+  - Risk scoring and recommendations
+- `threat-intel.controller.ts` - REST API endpoints
+- `threat-intel.module.ts` - NestJS module
+
+##### SBOM CVE Matching (`apps/api/src/sbom/`)
+- `sbom-cve-matcher.service.ts` - SBOM vulnerability analysis
+  - OSV (Open Source Vulnerabilities) API integration
+  - CISA KEV checking
+  - EPSS score enrichment
+  - CycloneDX and SPDX parsing
+  - Risk scoring with recommendations
+- Updated `sbom.controller.ts` with new endpoints
+- Updated `sbom.module.ts` with new service
+
+##### Container Registry (`apps/api/src/containers/`)
+- `container-registry.service.ts` - Container image analysis
+  - Docker Hub, GHCR, GCR, ECR, ACR support
+  - Image manifest and config retrieval
+  - Layer information extraction
+  - Vulnerability scanning (mock implementation)
+  - Digest verification
+- `containers.controller.ts` - REST API endpoints
+- `containers.module.ts` - NestJS module
+
+##### CLI Enhancements (`packages/cli/src/commands/`)
+- `sbom.ts` - SBOM management commands
+  - Upload and analyze SBOM files
+  - Check individual packages
+  - Generate SBOM from package.json/requirements.txt
+  - JSON output for CI/CD integration
+
+#### New API Endpoints
+
+##### Threat Intelligence
+- `POST /threat-intel/query` - Query indicator
+- `GET /threat-intel/query/:indicator` - Query by URL param
+- `POST /threat-intel/cve` - Query CVE
+- `GET /threat-intel/cve/:cveId` - Query CVE by ID
+- `POST /threat-intel/bulk` - Bulk query indicators
+- `GET /threat-intel/sources` - List supported sources
+
+##### SBOM Analysis
+- `POST /sbom/analyze` - Analyze packages for CVEs
+- `POST /sbom/analyze/content` - Analyze SBOM content
+- `POST /sbom/check-package` - Check single package
+- `GET /sbom/supported-formats` - List supported formats
+
+##### Container Registry
+- `POST /containers/info` - Get image info
+- `GET /containers/info/:imageRef` - Get image info by ref
+- `POST /containers/tags` - List repository tags
+- `POST /containers/layers` - Get layer info
+- `POST /containers/scan` - Scan image for vulnerabilities
+- `POST /containers/verify` - Verify image digest
+- `GET /containers/registries` - List supported registries
+
+#### Dependencies Needed
+The following dependencies need to be installed:
+```bash
+cd apps/api
+npm install @nestjs/axios js-yaml
+```
+
+#### TypeScript Compilation Notes
+Some TypeScript errors remain (unused variables, missing dependencies) but core functionality is complete. Install the above dependencies and remove unused variable declarations to resolve.
+
+---
+
+### Previous Session: Comprehensive E2E Testing & Fixes
 
 #### Summary
 - Conducted comprehensive E2E testing across all dashboard pages

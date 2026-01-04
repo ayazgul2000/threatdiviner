@@ -10,8 +10,12 @@ import {
   Badge,
   SeverityBadge,
   Button,
+  PageHeader,
 } from '@/components/ui';
 import { repositoriesApi, scansApi, findingsApi, type Repository, type Scan, type Finding } from '@/lib/api';
+import { useProject } from '@/contexts/project-context';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface PipelineStage {
   id: string;
@@ -116,6 +120,7 @@ const STATUS_STYLES = {
 };
 
 export default function PipelinePage() {
+  const { currentProject } = useProject();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<string>('');
   const [pipelineRuns, setPipelineRuns] = useState<PipelineRun[]>([]);
@@ -123,9 +128,15 @@ export default function PipelinePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!currentProject) {
+      setLoading(false);
+      return;
+    }
+
     const fetchRepositories = async () => {
       try {
-        const repos = await repositoriesApi.list();
+        const response = await fetch(`${API_URL}/scm/repositories?projectId=${currentProject.id}`, { credentials: 'include' });
+        const repos = response.ok ? await response.json() : [];
         setRepositories(repos);
         if (repos.length > 0) {
           setSelectedRepo(repos[0].id);
@@ -139,7 +150,7 @@ export default function PipelinePage() {
     };
 
     fetchRepositories();
-  }, []);
+  }, [currentProject]);
 
   useEffect(() => {
     if (!selectedRepo) return;
@@ -278,6 +289,28 @@ export default function PipelinePage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">Loading pipeline view...</div>
+      </div>
+    );
+  }
+
+  if (!currentProject) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Pipeline Gates" breadcrumbs={[{ label: 'Pipeline Gates' }]} />
+        <Card variant="bordered">
+          <CardContent className="p-12 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">No project selected</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              Select a project from the sidebar to view pipeline gates
+            </p>
+            <Link href="/dashboard/projects">
+              <Button>Go to Projects</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }

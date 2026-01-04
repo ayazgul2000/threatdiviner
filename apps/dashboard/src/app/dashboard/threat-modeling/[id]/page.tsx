@@ -25,8 +25,11 @@ import {
   Textarea,
   Select,
   FormError,
+  PageHeader,
+  useToast,
 } from '@/components/ui';
 import { CardSkeleton } from '@/components/ui/skeletons';
+import { useProject } from '@/contexts/project-context';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -160,10 +163,13 @@ const threatStatusColors: Record<string, string> = {
 export default function ThreatModelDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { currentProject } = useProject();
+  const toastCtx = useToast();
   const [model, setModel] = useState<ThreatModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [analyzing, setAnalyzing] = useState<string | null>(null);
 
   // Modal states
   const [componentModal, setComponentModal] = useState<{ open: boolean; editing: Component | null }>({ open: false, editing: null });
@@ -200,6 +206,31 @@ export default function ThreatModelDetailPage() {
       setError('Failed to load threat model');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Run analysis
+  const runAnalysis = async (methodology: string) => {
+    setAnalyzing(methodology);
+    try {
+      const res = await fetch(`${API_URL}/threat-modeling/${params.id}/analyze`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ methodology }),
+      });
+
+      if (!res.ok) throw new Error(`Failed to run ${methodology} analysis`);
+
+      const data = await res.json();
+      toastCtx.success('Analysis Complete', `${methodology.toUpperCase()} analysis generated ${data.threatsGenerated || 0} threats`);
+      await fetchThreatModel();
+      setActiveTab('threats');
+    } catch (err: any) {
+      console.error('Analysis failed:', err);
+      toastCtx.error('Analysis Failed', err.message || 'Failed to run analysis');
+    } finally {
+      setAnalyzing(null);
     }
   };
 
@@ -448,37 +479,58 @@ export default function ThreatModelDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/dashboard/threat-modeling"
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{model.name}</h1>
-            <div className="flex items-center gap-3 mt-1">
-              <Badge variant="outline">{model.methodology.toUpperCase()}</Badge>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[model.status]}`}>
-                {model.status.replace('_', ' ')}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href={`/dashboard/threat-modeling/${model.id}/diagram`}>
-            <Button variant="secondary">
-              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-              </svg>
-              View Diagram
+      <PageHeader
+        title={model.name}
+        description={model.description}
+        backHref="/dashboard/threat-modeling"
+        breadcrumbs={[
+          { label: currentProject?.name || 'Project', href: '/dashboard' },
+          { label: 'Threat Modeling', href: '/dashboard/threat-modeling' },
+          { label: model.name },
+        ]}
+        context={{
+          type: 'threat-model',
+          status: model.status.toUpperCase(),
+          metadata: {
+            Methodology: model.methodology.toUpperCase(),
+            Components: String(model.components.length),
+            Threats: String(model.threats.length),
+          },
+        }}
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => runAnalysis('stride')}
+              disabled={analyzing !== null}
+            >
+              {analyzing === 'stride' ? 'Analyzing...' : 'Run STRIDE'}
             </Button>
-          </Link>
-        </div>
-      </div>
+            <Button
+              variant="secondary"
+              onClick={() => runAnalysis('pasta')}
+              disabled={analyzing !== null}
+            >
+              {analyzing === 'pasta' ? 'Analyzing...' : 'Run PASTA'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => runAnalysis('linddun')}
+              disabled={analyzing !== null}
+            >
+              {analyzing === 'linddun' ? 'Analyzing...' : 'Run LINDDUN'}
+            </Button>
+            <Link href={`/dashboard/threat-modeling/${model.id}/diagram`}>
+              <Button variant="secondary">
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+                View Diagram
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       {/* Stats Overview */}
       <div className="grid grid-cols-4 gap-4">

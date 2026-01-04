@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   Card,
   CardHeader,
@@ -8,7 +9,10 @@ import {
   CardContent,
   Button,
 } from '@/components/ui';
-import { scansApi, findingsApi, repositoriesApi, type Scan, type Finding, type Repository } from '@/lib/api';
+import { useProject } from '@/contexts/project-context';
+import { type Scan, type Finding, type Repository } from '@/lib/api';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 import {
   LineChart,
   Line,
@@ -52,20 +56,40 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 export default function AnalyticsPage() {
+  const { currentProject } = useProject();
   const [dateRange, setDateRange] = useState<DateRange>('30d');
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!currentProject) {
+      setLoading(false);
+      return;
+    }
+
     const fetchAnalytics = async () => {
       setLoading(true);
       try {
-        const [scans, findingsData, repos] = await Promise.all([
-          scansApi.list(),
-          findingsApi.list({ limit: 1000 }),
-          repositoriesApi.list(),
+        const token = localStorage.getItem('token');
+        const headers = {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        };
+
+        const [scansRes, findingsRes, reposRes] = await Promise.all([
+          fetch(`${API_URL}/scm/scans?projectId=${currentProject.id}`, { headers, credentials: 'include' }),
+          fetch(`${API_URL}/scm/findings?projectId=${currentProject.id}&limit=1000`, { headers, credentials: 'include' }),
+          fetch(`${API_URL}/scm/repositories?projectId=${currentProject.id}`, { headers, credentials: 'include' }),
         ]);
+
+        if (!scansRes.ok || !findingsRes.ok || !reposRes.ok) {
+          throw new Error('Failed to fetch analytics data');
+        }
+
+        const scans = await scansRes.json() as Scan[];
+        const findingsData = await findingsRes.json() as { findings: Finding[]; total: number };
+        const repos = await reposRes.json() as Repository[];
 
         const findings = findingsData.findings || [];
 
@@ -187,7 +211,7 @@ export default function AnalyticsPage() {
     };
 
     fetchAnalytics();
-  }, [dateRange]);
+  }, [dateRange, currentProject]);
 
   const handleExportCSV = () => {
     if (!analytics) return;
@@ -250,6 +274,19 @@ export default function AnalyticsPage() {
           ))}
         </div>
       </div>
+    );
+  }
+
+  if (!currentProject) {
+    return (
+      <Card variant="bordered">
+        <CardHeader>
+          <CardTitle>Analytics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-500 dark:text-gray-400">No project selected</p>
+        </CardContent>
+      </Card>
     );
   }
 

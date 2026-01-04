@@ -9,9 +9,17 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
+  Header,
+  BadRequestException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ThreatModelingService } from './threat-modeling.service';
 import { JwtAuthGuard } from '../libs/auth/guards/jwt-auth.guard';
+import { StrideAnalyzer } from './analyzers/stride.analyzer';
+import { EnterpriseStrideAnalyzer } from './analyzers/enterprise-stride.analyzer';
+import { ThreatModelDiagramService } from './services/diagram.service';
+import { ThreatModelExportService } from './services/export.service';
 
 interface AuthRequest {
   user: {
@@ -23,19 +31,30 @@ interface AuthRequest {
 @Controller('threat-modeling')
 @UseGuards(JwtAuthGuard)
 export class ThreatModelingController {
-  constructor(private readonly service: ThreatModelingService) {}
+  constructor(
+    private readonly service: ThreatModelingService,
+    private readonly strideAnalyzer: StrideAnalyzer,
+    private readonly enterpriseStrideAnalyzer: EnterpriseStrideAnalyzer,
+    private readonly diagramService: ThreatModelDiagramService,
+    private readonly exportService: ThreatModelExportService,
+  ) {}
 
   // ===== THREAT MODELS =====
 
   @Get()
   async listThreatModels(
     @Req() req: AuthRequest,
+    @Query('projectId') projectId: string,
     @Query('status') status?: string,
     @Query('repositoryId') repositoryId?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
+    if (!projectId) {
+      throw new BadRequestException('projectId query parameter is required');
+    }
     return this.service.listThreatModels(req.user.tenantId, {
+      projectId,
       status,
       repositoryId,
       limit: limit ? parseInt(limit) : undefined,
@@ -53,11 +72,15 @@ export class ThreatModelingController {
     @Req() req: AuthRequest,
     @Body() body: {
       name: string;
+      projectId: string;
       description?: string;
       methodology?: string;
       repositoryId?: string;
     },
   ) {
+    if (!body.projectId) {
+      throw new BadRequestException('projectId is required');
+    }
     return this.service.createThreatModel(req.user.tenantId, req.user.userId, body);
   }
 
@@ -96,8 +119,129 @@ export class ThreatModelingController {
 
   @Get(':id/diagram')
   async getDiagram(@Req() req: AuthRequest, @Param('id') id: string) {
-    const mermaid = await this.service.generateMermaidDiagram(req.user.tenantId, id);
+    const mermaid = await this.diagramService.generateMermaidDiagram(id, req.user.tenantId);
     return { mermaid };
+  }
+
+  @Get(':id/diagram/matrix')
+  async getThreatMatrix(@Req() req: AuthRequest, @Param('id') id: string) {
+    const matrix = await this.diagramService.generateThreatMatrix(id, req.user.tenantId);
+    return { matrix };
+  }
+
+  @Get(':id/diagram/heatmap')
+  async getRiskHeatmap(@Req() req: AuthRequest, @Param('id') id: string) {
+    const heatmap = await this.diagramService.generateRiskHeatmap(id, req.user.tenantId);
+    return { heatmap };
+  }
+
+  @Get(':id/export/xlsx')
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  async exportToExcel(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Res() res: Response,
+    @Query('includeComponents') includeComponents?: string,
+    @Query('includeDataFlows') includeDataFlows?: string,
+    @Query('includeMatrix') includeMatrix?: string,
+  ) {
+    const buffer = await this.exportService.exportToExcel(id, req.user.tenantId, {
+      format: 'xlsx',
+      includeComponents: includeComponents !== 'false',
+      includeDataFlows: includeDataFlows !== 'false',
+      includeMatrix: includeMatrix !== 'false',
+    });
+
+    res.setHeader('Content-Disposition', `attachment; filename=threat-model-${id}.xlsx`);
+    res.send(buffer);
+  }
+
+  @Get(':id/export/csv')
+  @Header('Content-Type', 'text/csv')
+  async exportToCsv(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportService.exportToCsv(id, req.user.tenantId);
+
+    res.setHeader('Content-Disposition', `attachment; filename=threat-model-${id}.csv`);
+    res.send(csv);
+  }
+
+  @Post(':id/analyze')
+  async analyzeThreats(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() _body: { methodology?: string },
+  ) {
+    // Get the threat model with components and data flows
+    const model = await this.service.getThreatModel(req.user.tenantId, id);
+
+    if (!model.components || model.components.length === 0) {
+      return {
+        success: false,
+        error: 'No components found. Add components before analyzing.',
+        threats: [],
+        summary: { totalThreats: 0, byCategory: {}, byRiskLevel: { high: 0, medium: 0, low: 0 } },
+      };
+    }
+
+    // Run STRIDE analysis (default methodology)
+    const result = this.strideAnalyzer.analyze(
+      model.id,
+      model.components,
+      model.dataFlows || [],
+    );
+
+    // Save the generated threats to the database
+    for (const threat of result.threats) {
+      await this.service.addThreat(req.user.tenantId, id, req.user.userId, {
+        title: threat.title,
+        description: threat.description,
+        category: threat.strideCategory,
+        strideCategory: threat.strideCategory,
+        likelihood: threat.likelihood,
+        impact: threat.impact,
+        cweIds: threat.cweIds,
+        attackTechniqueIds: threat.attackTechniqueIds,
+      });
+    }
+
+    return {
+      success: true,
+      threatsGenerated: result.threats.length,
+      summary: result.summary,
+    };
+  }
+
+  @Post(':id/analyze/enterprise')
+  async analyzeThreatsEnterprise(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    // Get the threat model to verify it exists and has components
+    const model = await this.service.getThreatModel(req.user.tenantId, id);
+
+    if (!model.components || model.components.length === 0) {
+      return {
+        success: false,
+        error: 'No components found. Add components before analyzing.',
+        threats: [],
+        summary: { totalThreats: 0, byCategory: {}, byRiskLevel: { critical: 0, high: 0, medium: 0, low: 0 } },
+      };
+    }
+
+    // Run Enterprise STRIDE analysis - this saves threats directly to DB with all EMIA fields
+    const result = await this.enterpriseStrideAnalyzer.analyze(id, req.user.tenantId);
+
+    return {
+      success: result.success,
+      threatsGenerated: result.threatsCreated,
+      threats: result.threats.length,
+      methodology: result.methodology,
+      enterpriseFormat: true,
+    };
   }
 
   // ===== COMPONENTS =====

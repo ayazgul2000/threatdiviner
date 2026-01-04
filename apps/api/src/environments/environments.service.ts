@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 
 interface CreateEnvironmentDto {
   name: string;
+  projectId: string;
   type: string;
   description?: string;
   kubeConfig?: string;
@@ -39,9 +40,14 @@ export class EnvironmentsService {
 
   // ===== ENVIRONMENTS =====
 
-  async listEnvironments(tenantId: string) {
+  async listEnvironments(tenantId: string, projectId?: string) {
+    const where: Prisma.EnvironmentWhereInput = { tenantId };
+    if (projectId) {
+      where.projectId = projectId;
+    }
+
     const environments = await this.prisma.environment.findMany({
-      where: { tenantId },
+      where,
       include: {
         _count: {
           select: { deployments: true },
@@ -53,26 +59,64 @@ export class EnvironmentsService {
             status: true,
             vulnCount: true,
             criticalCount: true,
+            repositoryId: true,
           },
         },
       },
       orderBy: { name: 'asc' },
     });
 
-    return environments.map((env) => ({
-      ...env,
-      deploymentCount: env._count.deployments,
-      healthySummary: {
-        healthy: env.deployments.filter((d) => d.status === 'healthy').length,
-        degraded: env.deployments.filter((d) => d.status === 'degraded').length,
-        unhealthy: env.deployments.filter((d) => d.status === 'unhealthy').length,
-        unknown: env.deployments.filter((d) => d.status === 'unknown').length,
-      },
-      securitySummary: {
-        totalVulns: env.deployments.reduce((sum, d) => sum + d.vulnCount, 0),
-        criticalVulns: env.deployments.reduce((sum, d) => sum + d.criticalCount, 0),
-      },
-    }));
+    // Enrich with findings from linked repositories
+    const enrichedEnvironments = await Promise.all(
+      environments.map(async (env) => {
+        // Get repository IDs from deployments
+        const repoIds = env.deployments
+          .filter((d) => d.repositoryId)
+          .map((d) => d.repositoryId as string);
+
+        // Query open findings for these repositories
+        let openFindingsCount = 0;
+        let criticalFindingsCount = 0;
+        let highFindingsCount = 0;
+
+        if (repoIds.length > 0) {
+          const findingStats = await this.prisma.finding.groupBy({
+            by: ['severity'],
+            where: {
+              tenantId,
+              repositoryId: { in: repoIds },
+              status: 'open',
+            },
+            _count: { severity: true },
+          });
+
+          criticalFindingsCount = findingStats.find((f) => f.severity === 'critical')?._count?.severity || 0;
+          highFindingsCount = findingStats.find((f) => f.severity === 'high')?._count?.severity || 0;
+          openFindingsCount = findingStats.reduce((sum, f) => sum + (f._count?.severity || 0), 0);
+        }
+
+        return {
+          ...env,
+          deploymentCount: env._count.deployments,
+          healthySummary: {
+            healthy: env.deployments.filter((d) => d.status === 'healthy').length,
+            degraded: env.deployments.filter((d) => d.status === 'degraded').length,
+            unhealthy: env.deployments.filter((d) => d.status === 'unhealthy').length,
+            unknown: env.deployments.filter((d) => d.status === 'unknown').length,
+          },
+          securitySummary: {
+            totalVulns: env.deployments.reduce((sum, d) => sum + d.vulnCount, 0),
+            criticalVulns: env.deployments.reduce((sum, d) => sum + d.criticalCount, 0),
+            // Add findings from repositories
+            openFindings: openFindingsCount,
+            criticalFindings: criticalFindingsCount,
+            highFindings: highFindingsCount,
+          },
+        };
+      }),
+    );
+
+    return enrichedEnvironments;
   }
 
   async getEnvironment(tenantId: string, id: string) {
@@ -105,6 +149,7 @@ export class EnvironmentsService {
     return this.prisma.environment.create({
       data: {
         tenantId,
+        projectId: dto.projectId,
         name: dto.name,
         type: dto.type,
         description: dto.description,

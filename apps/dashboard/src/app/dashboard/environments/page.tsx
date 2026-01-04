@@ -19,8 +19,11 @@ import {
   Input,
   Textarea,
   Select,
+  PageHeader,
 } from '@/components/ui';
+import { useProject } from '@/contexts/project-context';
 import { CardSkeleton } from '@/components/ui/skeletons';
+import { NoProjectSelectedEmpty, NoEnvironmentsEmpty } from '@/components/ui/empty-state';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -99,6 +102,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function EnvironmentsPage() {
+  const { currentProject } = useProject();
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,13 +118,17 @@ export default function EnvironmentsPage() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    if (!currentProject) {
+      setLoading(false);
+      return;
+    }
     fetchEnvironments();
-  }, []);
+  }, [currentProject]);
 
   const fetchEnvironments = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/environments`, {
+      const res = await fetch(`${API_URL}/environments?projectId=${currentProject!.id}`, {
         credentials: 'include',
       });
 
@@ -145,7 +153,7 @@ export default function EnvironmentsPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, projectId: currentProject?.id }),
       });
 
       if (!res.ok) {
@@ -200,6 +208,17 @@ export default function EnvironmentsPage() {
           <CardSkeleton />
           <CardSkeleton />
         </div>
+      </div>
+    );
+  }
+
+  if (!currentProject) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Environments" breadcrumbs={[{ label: 'Environments' }]} />
+        <Card variant="bordered">
+          <NoProjectSelectedEmpty />
+        </Card>
       </div>
     );
   }
@@ -285,14 +304,7 @@ export default function EnvironmentsPage() {
       {/* Environment Cards */}
       {environments.length === 0 ? (
         <Card variant="bordered">
-          <CardContent className="py-12 text-center">
-            <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-            </svg>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No environments yet</h3>
-            <p className="text-gray-500 mb-4">Add your first environment to start tracking deployments</p>
-            <Button onClick={() => setCreateModal(true)}>Add Environment</Button>
-          </CardContent>
+          <NoEnvironmentsEmpty onAdd={() => setCreateModal(true)} />
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -23,7 +23,7 @@ export class ExportController {
   @Get('findings')
   @RequirePermission(Permission.FINDINGS_READ)
   @ApiOperation({ summary: 'Export findings data' })
-  @ApiQuery({ name: 'format', enum: ['csv', 'json'], required: false })
+  @ApiQuery({ name: 'format', enum: ['csv', 'json', 'xlsx'], required: false })
   @ApiQuery({ name: 'repositoryId', required: false })
   @ApiQuery({ name: 'scanId', required: false })
   @ApiQuery({ name: 'severity', isArray: true, required: false })
@@ -63,7 +63,7 @@ export class ExportController {
   @Get('scans')
   @RequirePermission(Permission.SCANS_READ)
   @ApiOperation({ summary: 'Export scans data' })
-  @ApiQuery({ name: 'format', enum: ['csv', 'json'], required: false })
+  @ApiQuery({ name: 'format', enum: ['csv', 'json', 'xlsx'], required: false })
   @ApiQuery({ name: 'repositoryId', required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
@@ -94,7 +94,7 @@ export class ExportController {
   @Get('repositories')
   @RequirePermission(Permission.REPOS_READ)
   @ApiOperation({ summary: 'Export repositories data' })
-  @ApiQuery({ name: 'format', enum: ['csv', 'json'], required: false })
+  @ApiQuery({ name: 'format', enum: ['csv', 'json', 'xlsx'], required: false })
   async exportRepositories(
     @CurrentTenant() tenantId: string,
     @Res() res: Response,
@@ -112,7 +112,7 @@ export class ExportController {
   @Get('audit-logs')
   @RequirePermission(Permission.AUDIT_LOGS_READ)
   @ApiOperation({ summary: 'Export audit logs' })
-  @ApiQuery({ name: 'format', enum: ['csv', 'json'], required: false })
+  @ApiQuery({ name: 'format', enum: ['csv', 'json', 'xlsx'], required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   async exportAuditLogs(
@@ -153,8 +153,8 @@ export class ExportController {
   }
 
   private validateFormat(format: string): void {
-    if (!['csv', 'json'].includes(format)) {
-      throw new BadRequestException('Format must be csv or json');
+    if (!['csv', 'json', 'xlsx'].includes(format)) {
+      throw new BadRequestException('Format must be csv, json, or xlsx');
     }
   }
 

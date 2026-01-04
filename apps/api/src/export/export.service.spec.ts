@@ -91,6 +91,19 @@ describe('ExportService', () => {
       expect(result.data).toContain('id,title,severity');
     });
 
+    it('should export findings as XLSX', async () => {
+      mockPrismaService.finding.findMany.mockResolvedValue(mockFindings);
+
+      const result = await service.exportFindings('tenant-1', {
+        format: 'xlsx',
+      });
+
+      expect(result.contentType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(result.filename).toContain('.xlsx');
+      expect(Buffer.isBuffer(result.data)).toBe(true);
+      expect((result.data as Buffer).length).toBeGreaterThan(0);
+    });
+
     it('should apply filters', async () => {
       mockPrismaService.finding.findMany.mockResolvedValue([]);
 
@@ -173,6 +186,16 @@ describe('ExportService', () => {
       expect(result.contentType).toBe('text/csv');
       expect(result.data).toContain('id,repository,branch');
     });
+
+    it('should export scans as XLSX', async () => {
+      mockPrismaService.scan.findMany.mockResolvedValue(mockScans);
+
+      const result = await service.exportScans('tenant-1', { format: 'xlsx' });
+
+      expect(result.contentType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(result.filename).toContain('.xlsx');
+      expect(Buffer.isBuffer(result.data)).toBe(true);
+    });
   });
 
   describe('exportRepositories', () => {
@@ -212,6 +235,16 @@ describe('ExportService', () => {
       expect(result.contentType).toBe('text/csv');
       expect(result.data).toContain('id,name,fullName');
     });
+
+    it('should export repositories as XLSX', async () => {
+      mockPrismaService.repository.findMany.mockResolvedValue(mockRepositories);
+
+      const result = await service.exportRepositories('tenant-1', { format: 'xlsx' });
+
+      expect(result.contentType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(result.filename).toContain('.xlsx');
+      expect(Buffer.isBuffer(result.data)).toBe(true);
+    });
   });
 
   describe('exportAuditLogs', () => {
@@ -248,6 +281,16 @@ describe('ExportService', () => {
 
       expect(result.contentType).toBe('text/csv');
       expect(result.data).toContain('id,action,resource');
+    });
+
+    it('should export audit logs as XLSX', async () => {
+      mockPrismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+
+      const result = await service.exportAuditLogs('tenant-1', { format: 'xlsx' });
+
+      expect(result.contentType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(result.filename).toContain('.xlsx');
+      expect(Buffer.isBuffer(result.data)).toBe(true);
     });
   });
 

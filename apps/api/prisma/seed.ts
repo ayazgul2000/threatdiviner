@@ -3,129 +3,2466 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('Seeding database...');
+// Fixed UUIDs for idempotent seeding
+const IDS = {
+  // Tenant
+  tenant: '550e8400-e29b-41d4-a716-446655440001',
+  // User
+  adminUser: '550e8400-e29b-41d4-a716-446655440011',
+  // RBAC Members
+  orgMemberAdmin: '550e8400-e29b-41d4-a716-446655440021',
+  projectMemberPayment: '550e8400-e29b-41d4-a716-446655440022',
+  projectMemberPortal: '550e8400-e29b-41d4-a716-446655440023',
+  // Projects
+  paymentGateway: 'clproject001paymentgateway01',
+  customerPortal: 'clproject002customerportal01',
+  // SCM Connection
+  scmConnection: '550e8400-e29b-41d4-a716-446655440100',
+  // Repositories
+  repoPaymentApi: '550e8400-e29b-41d4-a716-446655440201',
+  repoPaymentUI: '550e8400-e29b-41d4-a716-446655440202',
+  repoPaymentWorker: '550e8400-e29b-41d4-a716-446655440203',
+  repoPortalWeb: '550e8400-e29b-41d4-a716-446655440204',
+  repoPortalApi: '550e8400-e29b-41d4-a716-446655440205',
+  // ScanConfigs
+  configPaymentApi: '550e8400-e29b-41d4-a716-446655440301',
+  configPaymentUI: '550e8400-e29b-41d4-a716-446655440302',
+  configPaymentWorker: '550e8400-e29b-41d4-a716-446655440303',
+  configPortalWeb: '550e8400-e29b-41d4-a716-446655440304',
+  configPortalApi: '550e8400-e29b-41d4-a716-446655440305',
+  // Scans
+  scans: [
+    '550e8400-e29b-41d4-a716-446655440401',
+    '550e8400-e29b-41d4-a716-446655440402',
+    '550e8400-e29b-41d4-a716-446655440403',
+    '550e8400-e29b-41d4-a716-446655440404',
+    '550e8400-e29b-41d4-a716-446655440405',
+    '550e8400-e29b-41d4-a716-446655440406',
+    '550e8400-e29b-41d4-a716-446655440407',
+    '550e8400-e29b-41d4-a716-446655440408',
+    '550e8400-e29b-41d4-a716-446655440409',
+    '550e8400-e29b-41d4-a716-446655440410',
+    '550e8400-e29b-41d4-a716-446655440411',
+    '550e8400-e29b-41d4-a716-446655440412',
+  ],
+  // Threat Model
+  threatModel: '550e8400-e29b-41d4-a716-446655440500',
+  // Threat Model Components
+  components: [
+    '550e8400-e29b-41d4-a716-446655440510',
+    '550e8400-e29b-41d4-a716-446655440511',
+    '550e8400-e29b-41d4-a716-446655440512',
+    '550e8400-e29b-41d4-a716-446655440513',
+    '550e8400-e29b-41d4-a716-446655440514',
+  ],
+  // Threats
+  threats: [
+    '550e8400-e29b-41d4-a716-446655440520',
+    '550e8400-e29b-41d4-a716-446655440521',
+    '550e8400-e29b-41d4-a716-446655440522',
+    '550e8400-e29b-41d4-a716-446655440523',
+  ],
+  // Environments
+  envDevelopment: '550e8400-e29b-41d4-a716-446655440600',
+  envProduction: '550e8400-e29b-41d4-a716-446655440601',
+  // Deployments
+  deployments: [
+    '550e8400-e29b-41d4-a716-446655440610',
+    '550e8400-e29b-41d4-a716-446655440611',
+    '550e8400-e29b-41d4-a716-446655440612',
+    '550e8400-e29b-41d4-a716-446655440613',
+  ],
+  // SBOM
+  sbom: '550e8400-e29b-41d4-a716-446655440700',
+};
 
-  // Create test tenants
-  const acmeCorp = await prisma.tenant.upsert({
+async function main() {
+  console.log('Starting database seed...');
+
+  // ============================================
+  // 1. TENANT
+  // ============================================
+  console.log('Creating tenant...');
+  const tenant = await prisma.tenant.upsert({
     where: { slug: 'acme-corp' },
-    update: {},
+    update: {
+      name: 'Acme Corporation',
+      plan: 'professional',
+      maxUsers: 25,
+      maxRepositories: 100,
+      aiTriageEnabled: true,
+    },
     create: {
-      id: '550e8400-e29b-41d4-a716-446655440001',
+      id: IDS.tenant,
       name: 'Acme Corporation',
       slug: 'acme-corp',
       plan: 'professional',
+      maxUsers: 25,
+      maxRepositories: 100,
+      aiTriageEnabled: true,
     },
   });
+  console.log(`  Created tenant: ${tenant.name} (${tenant.slug})`);
 
-  const betaInc = await prisma.tenant.upsert({
-    where: { slug: 'beta-inc' },
-    update: {},
-    create: {
-      id: '550e8400-e29b-41d4-a716-446655440002',
-      name: 'Beta Inc',
-      slug: 'beta-inc',
-      plan: 'starter',
-    },
-  });
-
-  console.log('Created tenants:', { acmeCorp: acmeCorp.slug, betaInc: betaInc.slug });
-
-  // Hash passwords with bcrypt
-  const adminPasswordHash = await bcrypt.hash('admin123', 10);
-  const devPasswordHash = await bcrypt.hash('dev123', 10);
-
-  // Create users for Acme Corp
-  const acmeAdmin = await prisma.user.upsert({
+  // ============================================
+  // 2. USER
+  // ============================================
+  console.log('Creating user...');
+  const passwordHash = await bcrypt.hash('admin123', 10);
+  const user = await prisma.user.upsert({
     where: {
       tenantId_email: {
-        tenantId: acmeCorp.id,
+        tenantId: tenant.id,
         email: 'admin@acme.com',
       },
     },
     update: {
-      passwordHash: adminPasswordHash,
+      passwordHash,
+      name: 'Admin User',
+      role: 'admin',
+      status: 'active',
     },
     create: {
-      id: '550e8400-e29b-41d4-a716-446655440011',
-      tenantId: acmeCorp.id,
+      id: IDS.adminUser,
+      tenantId: tenant.id,
       email: 'admin@acme.com',
-      passwordHash: adminPasswordHash,
+      passwordHash,
+      name: 'Admin User',
+      role: 'admin',
+      status: 'active',
+    },
+  });
+  console.log(`  Created user: ${user.email} (${user.role})`);
+
+  // ============================================
+  // 3. PROJECTS
+  // ============================================
+  console.log('Creating projects...');
+
+  // Delete existing projects first to handle upsert correctly
+  await prisma.project.deleteMany({
+    where: {
+      tenantId: tenant.id,
+      name: { in: ['Payment Gateway', 'Customer Portal'] },
+    },
+  });
+
+  const paymentGatewayProject = await prisma.project.create({
+    data: {
+      id: IDS.paymentGateway,
+      tenantId: tenant.id,
+      name: 'Payment Gateway',
+      description: 'Core payment processing system handling credit cards, ACH, and digital wallets',
+      status: 'ACTIVE',
+    },
+  });
+
+  const customerPortalProject = await prisma.project.create({
+    data: {
+      id: IDS.customerPortal,
+      tenantId: tenant.id,
+      name: 'Customer Portal',
+      description: 'Self-service customer portal for account management and billing',
+      status: 'ACTIVE',
+    },
+  });
+
+  console.log(`  Created projects: ${paymentGatewayProject.name}, ${customerPortalProject.name}`);
+
+  // ============================================
+  // 3.5 RBAC MEMBERS
+  // ============================================
+  console.log('Creating RBAC members...');
+
+  // Delete existing members to ensure clean state
+  await prisma.orgMember.deleteMany({
+    where: { tenantId: tenant.id },
+  });
+  await prisma.projectMember.deleteMany({
+    where: { projectId: { in: [paymentGatewayProject.id, customerPortalProject.id] } },
+  });
+
+  // Create org member for admin user
+  const orgMember = await prisma.orgMember.create({
+    data: {
+      id: IDS.orgMemberAdmin,
+      userId: user.id,
+      tenantId: tenant.id,
+      role: 'owner', // Admin user is org owner
+    },
+  });
+  console.log(`  Created OrgMember: ${user.email} as ${orgMember.role}`);
+
+  // Create project members for admin user
+  const projectMemberPayment = await prisma.projectMember.create({
+    data: {
+      id: IDS.projectMemberPayment,
+      userId: user.id,
+      projectId: paymentGatewayProject.id,
       role: 'admin',
     },
   });
 
-  const acmeMember = await prisma.user.upsert({
-    where: {
-      tenantId_email: {
-        tenantId: acmeCorp.id,
-        email: 'dev@acme.com',
-      },
-    },
-    update: {
-      passwordHash: devPasswordHash,
-    },
-    create: {
-      id: '550e8400-e29b-41d4-a716-446655440012',
-      tenantId: acmeCorp.id,
-      email: 'dev@acme.com',
-      passwordHash: devPasswordHash,
-      role: 'member',
-    },
-  });
-
-  // Create users for Beta Inc
-  const betaAdmin = await prisma.user.upsert({
-    where: {
-      tenantId_email: {
-        tenantId: betaInc.id,
-        email: 'admin@beta.io',
-      },
-    },
-    update: {
-      passwordHash: adminPasswordHash,
-    },
-    create: {
-      id: '550e8400-e29b-41d4-a716-446655440021',
-      tenantId: betaInc.id,
-      email: 'admin@beta.io',
-      passwordHash: adminPasswordHash,
+  const projectMemberPortal = await prisma.projectMember.create({
+    data: {
+      id: IDS.projectMemberPortal,
+      userId: user.id,
+      projectId: customerPortalProject.id,
       role: 'admin',
     },
   });
+  console.log(`  Created ProjectMembers: ${projectMemberPayment.role} on ${paymentGatewayProject.name}, ${projectMemberPortal.role} on ${customerPortalProject.name}`);
 
-  const betaMember = await prisma.user.upsert({
+  // ============================================
+  // 4. SCM CONNECTION
+  // ============================================
+  console.log('Creating SCM connection...');
+
+  // Delete existing connection to avoid conflicts
+  await prisma.scmConnection.deleteMany({
     where: {
-      tenantId_email: {
-        tenantId: betaInc.id,
-        email: 'dev@beta.io',
+      tenantId: tenant.id,
+      provider: 'github',
+      externalId: 'acme-corp',
+    },
+  });
+
+  const scmConnection = await prisma.scmConnection.create({
+    data: {
+      id: IDS.scmConnection,
+      tenantId: tenant.id,
+      provider: 'github',
+      authMethod: 'oauth',
+      accessToken: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      externalId: 'acme-corp',
+      externalName: 'acme-corp',
+      scope: ['repo', 'read:org', 'write:repo_hook'],
+      isActive: true,
+    },
+  });
+  console.log(`  Created SCM connection: ${scmConnection.provider} (${scmConnection.externalName})`);
+
+  // ============================================
+  // 5. REPOSITORIES
+  // ============================================
+  console.log('Creating repositories...');
+
+  // Delete existing repositories to avoid conflicts
+  await prisma.repository.deleteMany({
+    where: { tenantId: tenant.id },
+  });
+
+  const repositories = await Promise.all([
+    // Payment Gateway repositories
+    prisma.repository.create({
+      data: {
+        id: IDS.repoPaymentApi,
+        tenantId: tenant.id,
+        connectionId: scmConnection.id,
+        projectId: paymentGatewayProject.id,
+        name: 'payment-api',
+        fullName: 'acme-corp/payment-api',
+        cloneUrl: 'https://github.com/acme-corp/payment-api.git',
+        htmlUrl: 'https://github.com/acme-corp/payment-api',
+        defaultBranch: 'main',
+        language: 'TypeScript',
+        isPrivate: true,
+        isActive: true,
       },
-    },
-    update: {
-      passwordHash: devPasswordHash,
-    },
-    create: {
-      id: '550e8400-e29b-41d4-a716-446655440022',
-      tenantId: betaInc.id,
-      email: 'dev@beta.io',
-      passwordHash: devPasswordHash,
-      role: 'member',
-    },
+    }),
+    prisma.repository.create({
+      data: {
+        id: IDS.repoPaymentUI,
+        tenantId: tenant.id,
+        connectionId: scmConnection.id,
+        projectId: paymentGatewayProject.id,
+        name: 'payment-ui',
+        fullName: 'acme-corp/payment-ui',
+        cloneUrl: 'https://github.com/acme-corp/payment-ui.git',
+        htmlUrl: 'https://github.com/acme-corp/payment-ui',
+        defaultBranch: 'main',
+        language: 'TypeScript',
+        isPrivate: true,
+        isActive: true,
+      },
+    }),
+    prisma.repository.create({
+      data: {
+        id: IDS.repoPaymentWorker,
+        tenantId: tenant.id,
+        connectionId: scmConnection.id,
+        projectId: paymentGatewayProject.id,
+        name: 'payment-worker',
+        fullName: 'acme-corp/payment-worker',
+        cloneUrl: 'https://github.com/acme-corp/payment-worker.git',
+        htmlUrl: 'https://github.com/acme-corp/payment-worker',
+        defaultBranch: 'main',
+        language: 'Python',
+        isPrivate: true,
+        isActive: true,
+      },
+    }),
+    // Customer Portal repositories
+    prisma.repository.create({
+      data: {
+        id: IDS.repoPortalWeb,
+        tenantId: tenant.id,
+        connectionId: scmConnection.id,
+        projectId: customerPortalProject.id,
+        name: 'portal-web',
+        fullName: 'acme-corp/portal-web',
+        cloneUrl: 'https://github.com/acme-corp/portal-web.git',
+        htmlUrl: 'https://github.com/acme-corp/portal-web',
+        defaultBranch: 'main',
+        language: 'TypeScript',
+        isPrivate: true,
+        isActive: true,
+      },
+    }),
+    prisma.repository.create({
+      data: {
+        id: IDS.repoPortalApi,
+        tenantId: tenant.id,
+        connectionId: scmConnection.id,
+        projectId: customerPortalProject.id,
+        name: 'portal-api',
+        fullName: 'acme-corp/portal-api',
+        cloneUrl: 'https://github.com/acme-corp/portal-api.git',
+        htmlUrl: 'https://github.com/acme-corp/portal-api',
+        defaultBranch: 'main',
+        language: 'Go',
+        isPrivate: true,
+        isActive: true,
+      },
+    }),
+  ]);
+
+  console.log(`  Created ${repositories.length} repositories`);
+
+  // ============================================
+  // 6. SCAN CONFIGS
+  // ============================================
+  console.log('Creating scan configs...');
+
+  // Delete existing scan configs
+  await prisma.scanConfig.deleteMany({
+    where: { tenantId: tenant.id },
   });
 
-  console.log('Created users:', {
-    acmeAdmin: acmeAdmin.email,
-    acmeMember: acmeMember.email,
-    betaAdmin: betaAdmin.email,
-    betaMember: betaMember.email,
+  const scanConfigs = await Promise.all([
+    prisma.scanConfig.create({
+      data: {
+        id: IDS.configPaymentApi,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPaymentApi,
+        enableSast: true,
+        enableSca: true,
+        enableSecrets: true,
+        enableIac: true,
+        enableDast: true,
+        enableContainerScan: true,
+        targetUrls: ['https://api.payment.acme.com'],
+        containerImages: ['acme/payment-api:latest'],
+        branches: ['main', 'develop'],
+        autoScanOnPush: true,
+        autoScanOnPR: true,
+        scheduleEnabled: true,
+        scheduleCron: '0 2 * * *',
+        prCommentsEnabled: true,
+      },
+    }),
+    prisma.scanConfig.create({
+      data: {
+        id: IDS.configPaymentUI,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPaymentUI,
+        enableSast: true,
+        enableSca: true,
+        enableSecrets: true,
+        enableIac: false,
+        branches: ['main', 'develop'],
+        autoScanOnPush: true,
+        autoScanOnPR: true,
+      },
+    }),
+    prisma.scanConfig.create({
+      data: {
+        id: IDS.configPaymentWorker,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPaymentWorker,
+        enableSast: true,
+        enableSca: true,
+        enableSecrets: true,
+        enableIac: true,
+        branches: ['main'],
+        autoScanOnPush: true,
+        autoScanOnPR: true,
+      },
+    }),
+    prisma.scanConfig.create({
+      data: {
+        id: IDS.configPortalWeb,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPortalWeb,
+        enableSast: true,
+        enableSca: true,
+        enableSecrets: true,
+        enableIac: false,
+        branches: ['main', 'staging'],
+        autoScanOnPush: true,
+        autoScanOnPR: true,
+      },
+    }),
+    prisma.scanConfig.create({
+      data: {
+        id: IDS.configPortalApi,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPortalApi,
+        enableSast: true,
+        enableSca: true,
+        enableSecrets: true,
+        enableIac: true,
+        enableContainerScan: true,
+        containerImages: ['acme/portal-api:latest'],
+        branches: ['main'],
+        autoScanOnPush: true,
+        autoScanOnPR: true,
+      },
+    }),
+  ]);
+
+  console.log(`  Created ${scanConfigs.length} scan configs`);
+
+  // ============================================
+  // 7. SCANS
+  // ============================================
+  console.log('Creating scans...');
+
+  // Delete existing scans and findings
+  await prisma.finding.deleteMany({
+    where: { tenantId: tenant.id },
+  });
+  await prisma.scan.deleteMany({
+    where: { tenantId: tenant.id },
   });
 
-  console.log('Seeding complete!');
+  const now = new Date();
+  const scanData = [
+    // Completed scans
+    {
+      id: IDS.scans[0],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      commitSha: 'a1b2c3d4e5f6789012345678901234567890abcd',
+      branch: 'main',
+      status: 'completed',
+      triggeredBy: 'webhook',
+      triggerEvent: 'push',
+      startedAt: new Date(now.getTime() - 3600000),
+      completedAt: new Date(now.getTime() - 3500000),
+      duration: 100,
+    },
+    {
+      id: IDS.scans[1],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      commitSha: 'b2c3d4e5f6789012345678901234567890abcde',
+      branch: 'develop',
+      status: 'completed',
+      triggeredBy: 'webhook',
+      triggerEvent: 'pull_request',
+      pullRequestId: '42',
+      pullRequestUrl: 'https://github.com/acme-corp/payment-api/pull/42',
+      startedAt: new Date(now.getTime() - 7200000),
+      completedAt: new Date(now.getTime() - 7100000),
+      duration: 100,
+    },
+    {
+      id: IDS.scans[2],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPaymentUI,
+      projectId: paymentGatewayProject.id,
+      commitSha: 'c3d4e5f6789012345678901234567890abcdef',
+      branch: 'main',
+      status: 'completed',
+      triggeredBy: 'scheduled',
+      startedAt: new Date(now.getTime() - 86400000),
+      completedAt: new Date(now.getTime() - 86300000),
+      duration: 100,
+    },
+    {
+      id: IDS.scans[3],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      commitSha: 'd4e5f6789012345678901234567890abcdef12',
+      branch: 'main',
+      status: 'completed',
+      triggeredBy: 'manual',
+      startedAt: new Date(now.getTime() - 172800000),
+      completedAt: new Date(now.getTime() - 172700000),
+      duration: 100,
+    },
+    {
+      id: IDS.scans[4],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      commitSha: 'e5f6789012345678901234567890abcdef1234',
+      branch: 'main',
+      status: 'completed',
+      triggeredBy: 'webhook',
+      triggerEvent: 'push',
+      startedAt: new Date(now.getTime() - 259200000),
+      completedAt: new Date(now.getTime() - 259100000),
+      duration: 100,
+    },
+    {
+      id: IDS.scans[5],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      commitSha: 'f6789012345678901234567890abcdef123456',
+      branch: 'main',
+      status: 'completed',
+      triggeredBy: 'webhook',
+      triggerEvent: 'push',
+      startedAt: new Date(now.getTime() - 345600000),
+      completedAt: new Date(now.getTime() - 345500000),
+      duration: 100,
+    },
+    // Running scans
+    {
+      id: IDS.scans[6],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      commitSha: 'g789012345678901234567890abcdef12345678',
+      branch: 'feature/new-payment-method',
+      status: 'scanning',
+      triggeredBy: 'webhook',
+      triggerEvent: 'pull_request',
+      pullRequestId: '45',
+      pullRequestUrl: 'https://github.com/acme-corp/payment-api/pull/45',
+      startedAt: new Date(now.getTime() - 60000),
+    },
+    {
+      id: IDS.scans[7],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      commitSha: 'h89012345678901234567890abcdef1234567890',
+      branch: 'develop',
+      status: 'cloning',
+      triggeredBy: 'manual',
+      startedAt: new Date(now.getTime() - 30000),
+    },
+    // Queued scans
+    {
+      id: IDS.scans[8],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      commitSha: 'i9012345678901234567890abcdef123456789012',
+      branch: 'main',
+      status: 'pending',
+      triggeredBy: 'scheduled',
+    },
+    {
+      id: IDS.scans[9],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      commitSha: 'j012345678901234567890abcdef1234567890123',
+      branch: 'main',
+      status: 'pending',
+      triggeredBy: 'webhook',
+      triggerEvent: 'push',
+    },
+    // Failed scans
+    {
+      id: IDS.scans[10],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPaymentUI,
+      projectId: paymentGatewayProject.id,
+      commitSha: 'k12345678901234567890abcdef12345678901234',
+      branch: 'feature/broken-build',
+      status: 'failed',
+      triggeredBy: 'webhook',
+      triggerEvent: 'push',
+      startedAt: new Date(now.getTime() - 432000000),
+      completedAt: new Date(now.getTime() - 431900000),
+      duration: 100,
+      errorMessage: 'Repository clone failed: Authentication error',
+    },
+    {
+      id: IDS.scans[11],
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      commitSha: 'l2345678901234567890abcdef123456789012345',
+      branch: 'main',
+      status: 'failed',
+      triggeredBy: 'manual',
+      startedAt: new Date(now.getTime() - 518400000),
+      completedAt: new Date(now.getTime() - 518300000),
+      duration: 100,
+      errorMessage: 'Scanner timeout: Semgrep analysis exceeded 30 minute limit',
+    },
+  ];
+
+  const scans = await Promise.all(
+    scanData.map((scan) => prisma.scan.create({ data: scan })),
+  );
+  console.log(`  Created ${scans.length} scans`);
+
+  // ============================================
+  // 8. FINDINGS
+  // ============================================
+  console.log('Creating findings...');
+
+  const findingsData = [
+    // Critical findings
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.express.security.audit.xss.mustache-escape',
+      severity: 'critical',
+      title: 'Cross-Site Scripting (XSS) in Template Rendering',
+      description: 'User input is rendered without proper escaping in Mustache template, allowing XSS attacks.',
+      filePath: 'src/controllers/payment.controller.ts',
+      startLine: 145,
+      endLine: 148,
+      snippet: 'res.render("receipt", { message: req.query.message })',
+      cweId: 'CWE-79',
+      owasp: 'A03:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-001-xss-payment-controller',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.security.audit.sqli.node-postgres-sqli',
+      severity: 'critical',
+      title: 'SQL Injection in Transaction Query',
+      description: 'SQL query uses string concatenation with user input, enabling SQL injection attacks.',
+      filePath: 'src/services/transaction.service.ts',
+      startLine: 89,
+      endLine: 92,
+      snippet: 'const query = `SELECT * FROM transactions WHERE id = ${transactionId}`;',
+      cweId: 'CWE-89',
+      cveId: null,
+      owasp: 'A03:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-002-sqli-transaction-service',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'gitleaks',
+      ruleId: 'stripe-api-key',
+      severity: 'critical',
+      title: 'Stripe API Key Exposed in Source Code',
+      description: 'A Stripe secret API key was found hardcoded in the source code.',
+      filePath: 'src/config/payment.config.ts',
+      startLine: 12,
+      endLine: 12,
+      snippet: 'const STRIPE_KEY = "sk_live_51ABC...xyz"',
+      cweId: 'CWE-798',
+      owasp: 'A07:2021',
+      confidence: 'high',
+      status: 'triaged',
+      triagedBy: IDS.adminUser,
+      triagedAt: new Date(),
+      fingerprint: 'fp-003-secret-stripe-key',
+    },
+    // High severity findings
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2024-21626',
+      severity: 'high',
+      title: 'Container Escape Vulnerability in runc',
+      description: 'runc before 1.1.12 has a vulnerability that allows container escape via working directory manipulation.',
+      filePath: 'Dockerfile',
+      startLine: 1,
+      endLine: 1,
+      snippet: 'FROM node:18-alpine',
+      cweId: 'CWE-668',
+      cveId: 'CVE-2024-21626',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-004-cve-runc-escape',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[1],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.security.audit.path-traversal',
+      severity: 'high',
+      title: 'Path Traversal in File Download Endpoint',
+      description: 'User input is used directly in file path without validation, allowing directory traversal attacks.',
+      filePath: 'src/controllers/invoice.controller.ts',
+      startLine: 67,
+      endLine: 70,
+      snippet: 'const filePath = path.join(uploadsDir, req.params.filename);',
+      cweId: 'CWE-22',
+      owasp: 'A01:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-005-path-traversal-invoice',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[1],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.jwt.security.jwt-hardcoded-secret',
+      severity: 'high',
+      title: 'Hardcoded JWT Secret',
+      description: 'JWT secret is hardcoded in the source code instead of using environment variables.',
+      filePath: 'src/auth/jwt.strategy.ts',
+      startLine: 15,
+      endLine: 15,
+      snippet: 'const JWT_SECRET = "super-secret-key-12345"',
+      cweId: 'CWE-798',
+      owasp: 'A07:2021',
+      confidence: 'high',
+      status: 'fixed',
+      fixedInCommit: 'c3d4e5f6789012345678901234567890abcdef',
+      fingerprint: 'fp-006-jwt-hardcoded',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[2],
+      repositoryId: IDS.repoPaymentUI,
+      projectId: paymentGatewayProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2024-28849',
+      severity: 'high',
+      title: 'Prototype Pollution in follow-redirects',
+      description: 'follow-redirects before 1.15.6 is vulnerable to prototype pollution via URL redirect.',
+      filePath: 'package-lock.json',
+      startLine: 1245,
+      endLine: 1245,
+      snippet: '"follow-redirects": "1.15.4"',
+      cweId: 'CWE-1321',
+      cveId: 'CVE-2024-28849',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-007-follow-redirects-cve',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[2],
+      repositoryId: IDS.repoPaymentUI,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'react.security.audit.react-dangerouslysetinnerhtml',
+      severity: 'high',
+      title: 'Dangerous innerHTML Usage in React Component',
+      description: 'Using dangerouslySetInnerHTML with unsanitized user input can lead to XSS vulnerabilities.',
+      filePath: 'src/components/TransactionDetails.tsx',
+      startLine: 78,
+      endLine: 81,
+      snippet: '<div dangerouslySetInnerHTML={{ __html: transaction.notes }} />',
+      cweId: 'CWE-79',
+      owasp: 'A03:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-008-react-xss',
+    },
+    // Medium severity findings
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.security.audit.incomplete-sanitization',
+      severity: 'medium',
+      title: 'Incomplete Input Sanitization',
+      description: 'Input sanitization does not cover all attack vectors.',
+      filePath: 'src/utils/sanitizer.ts',
+      startLine: 23,
+      endLine: 26,
+      snippet: 'return input.replace(/<script>/gi, "")',
+      cweId: 'CWE-20',
+      owasp: 'A03:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-009-incomplete-sanitization',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_DOCKER_2',
+      severity: 'medium',
+      title: 'Container Running as Root',
+      description: 'Container does not specify a non-root user, which violates the principle of least privilege.',
+      filePath: 'Dockerfile',
+      startLine: 1,
+      endLine: 25,
+      snippet: 'FROM node:18-alpine\n# No USER instruction',
+      cweId: 'CWE-250',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-010-docker-root',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[1],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.express.security.audit.express-cookie-settings',
+      severity: 'medium',
+      title: 'Insecure Cookie Configuration',
+      description: 'Session cookie is not configured with Secure and HttpOnly flags.',
+      filePath: 'src/app.ts',
+      startLine: 34,
+      endLine: 37,
+      snippet: 'app.use(session({ cookie: { maxAge: 3600000 } }))',
+      cweId: 'CWE-614',
+      owasp: 'A05:2021',
+      confidence: 'high',
+      status: 'triaged',
+      triagedBy: IDS.adminUser,
+      triagedAt: new Date(),
+      fingerprint: 'fp-011-insecure-cookie',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'python.lang.security.audit.insecure-hash-algorithms',
+      severity: 'medium',
+      title: 'Weak Hashing Algorithm (MD5)',
+      description: 'MD5 is cryptographically broken and should not be used for security purposes.',
+      filePath: 'workers/payment_processor.py',
+      startLine: 89,
+      endLine: 89,
+      snippet: 'hashlib.md5(data).hexdigest()',
+      cweId: 'CWE-328',
+      owasp: 'A02:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-012-weak-hash-md5',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2023-37920',
+      severity: 'medium',
+      title: 'certifi Package Vulnerability',
+      description: 'certifi before 2023.07.22 includes root certificate for e-Tugra which was revoked.',
+      filePath: 'requirements.txt',
+      startLine: 15,
+      endLine: 15,
+      snippet: 'certifi==2023.5.7',
+      cweId: 'CWE-295',
+      cveId: 'CVE-2023-37920',
+      owasp: null,
+      confidence: 'high',
+      status: 'false_positive',
+      dismissReason: 'Application does not use certificate validation for external connections',
+      dismissedAt: new Date(),
+      fingerprint: 'fp-013-certifi-cve',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[4],
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'typescript.react.security.insecure-form-action',
+      severity: 'medium',
+      title: 'Form Submits to HTTP Endpoint',
+      description: 'Form action uses HTTP instead of HTTPS, exposing form data to interception.',
+      filePath: 'src/pages/Login.tsx',
+      startLine: 45,
+      endLine: 48,
+      snippet: '<form action="http://api.acme.com/login" method="POST">',
+      cweId: 'CWE-319',
+      owasp: 'A02:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-014-http-form',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[4],
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2024-29041',
+      severity: 'medium',
+      title: 'express Package ReDoS Vulnerability',
+      description: 'Express.js before 4.19.2 has a Regular Expression Denial of Service vulnerability.',
+      filePath: 'package-lock.json',
+      startLine: 2341,
+      endLine: 2341,
+      snippet: '"express": "4.18.2"',
+      cweId: 'CWE-1333',
+      cveId: 'CVE-2024-29041',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-015-express-redos',
+    },
+    // Low severity findings
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.best-practice.leftover-debugging',
+      severity: 'low',
+      title: 'Debug Statement Left in Code',
+      description: 'Console.log statement found in production code.',
+      filePath: 'src/services/payment.service.ts',
+      startLine: 156,
+      endLine: 156,
+      snippet: 'console.log("Payment processed:", result)',
+      cweId: 'CWE-489',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-016-debug-statement',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[1],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_DOCKER_3',
+      severity: 'low',
+      title: 'Missing HEALTHCHECK Instruction',
+      description: 'Dockerfile should include a HEALTHCHECK instruction for container orchestration.',
+      filePath: 'Dockerfile',
+      startLine: 1,
+      endLine: 25,
+      snippet: 'FROM node:18-alpine\n...',
+      cweId: null,
+      owasp: null,
+      confidence: 'high',
+      status: 'accepted',
+      dismissReason: 'Health check is implemented at Kubernetes level',
+      dismissedAt: new Date(),
+      fingerprint: 'fp-017-missing-healthcheck',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[2],
+      repositoryId: IDS.repoPaymentUI,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.correctness.useless-comparison',
+      severity: 'low',
+      title: 'Potentially Useless Comparison',
+      description: 'Comparison may always evaluate to the same result.',
+      filePath: 'src/utils/validation.ts',
+      startLine: 34,
+      endLine: 34,
+      snippet: 'if (value === undefined || value === undefined)',
+      cweId: 'CWE-570',
+      owasp: null,
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-018-useless-comparison',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'go.lang.security.audit.database-sqli',
+      severity: 'critical',
+      title: 'SQL Injection in User Query',
+      description: 'User input directly concatenated in SQL query without parameterization.',
+      filePath: 'internal/repository/user_repo.go',
+      startLine: 45,
+      endLine: 48,
+      snippet: 'query := fmt.Sprintf("SELECT * FROM users WHERE email = \'%s\'", email)',
+      cweId: 'CWE-89',
+      owasp: 'A03:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-019-go-sqli',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'go.lang.security.audit.ssrf',
+      severity: 'high',
+      title: 'Server-Side Request Forgery (SSRF)',
+      description: 'URL from user input is used directly in HTTP request without validation.',
+      filePath: 'internal/handlers/webhook_handler.go',
+      startLine: 78,
+      endLine: 82,
+      snippet: 'resp, err := http.Get(req.FormValue("callback_url"))',
+      cweId: 'CWE-918',
+      owasp: 'A10:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-020-go-ssrf',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'gitleaks',
+      ruleId: 'aws-access-key-id',
+      severity: 'critical',
+      title: 'AWS Access Key ID Exposed',
+      description: 'AWS Access Key ID found in source code.',
+      filePath: 'config/aws.go',
+      startLine: 8,
+      endLine: 8,
+      snippet: 'const AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"',
+      cweId: 'CWE-798',
+      owasp: 'A07:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-021-aws-key',
+    },
+    // Additional findings to reach 50+
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'python.lang.security.insecure-random',
+      severity: 'medium',
+      title: 'Use of Insecure Random for Security',
+      description: 'random module is not suitable for security/cryptographic purposes.',
+      filePath: 'workers/token_generator.py',
+      startLine: 12,
+      endLine: 14,
+      snippet: 'import random\ntoken = "".join(random.choices(string.ascii_letters, k=32))',
+      cweId: 'CWE-330',
+      owasp: 'A02:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-022-insecure-random',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2024-0450',
+      severity: 'high',
+      title: 'zipfile Path Traversal in Python',
+      description: 'Python zipfile module vulnerable to path traversal when extracting archives.',
+      filePath: 'requirements.txt',
+      startLine: 1,
+      endLine: 1,
+      snippet: 'python==3.10.0',
+      cweId: 'CWE-22',
+      cveId: 'CVE-2024-0450',
+      owasp: 'A01:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-023-python-zip-traversal',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[4],
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.browser.security.open-redirect',
+      severity: 'medium',
+      title: 'Open Redirect Vulnerability',
+      description: 'Application redirects to URL from user input without validation.',
+      filePath: 'src/pages/OAuth.tsx',
+      startLine: 23,
+      endLine: 26,
+      snippet: 'window.location.href = searchParams.get("returnUrl")',
+      cweId: 'CWE-601',
+      owasp: 'A01:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-024-open-redirect',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[4],
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'typescript.react.best-practice.react-missing-noopener',
+      severity: 'low',
+      title: 'Missing rel=noopener on External Link',
+      description: 'External links with target=_blank should include rel="noopener noreferrer".',
+      filePath: 'src/components/Footer.tsx',
+      startLine: 45,
+      endLine: 45,
+      snippet: '<a href={link.url} target="_blank">',
+      cweId: 'CWE-1022',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-025-missing-noopener',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'go.lang.security.audit.crypto-weak-cipher',
+      severity: 'high',
+      title: 'Use of Weak Cipher (DES)',
+      description: 'DES cipher is considered weak and should be replaced with AES.',
+      filePath: 'internal/crypto/encrypt.go',
+      startLine: 34,
+      endLine: 38,
+      snippet: 'block, _ := des.NewCipher(key)',
+      cweId: 'CWE-327',
+      owasp: 'A02:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-026-weak-cipher-des',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_K8S_8',
+      severity: 'medium',
+      title: 'Container Missing Liveness Probe',
+      description: 'Kubernetes deployment should define liveness probe for container health monitoring.',
+      filePath: 'k8s/deployment.yaml',
+      startLine: 45,
+      endLine: 60,
+      snippet: 'containers:\n  - name: portal-api\n    image: acme/portal-api:latest',
+      cweId: null,
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-027-missing-liveness-probe',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_K8S_9',
+      severity: 'medium',
+      title: 'Container Missing Readiness Probe',
+      description: 'Kubernetes deployment should define readiness probe for traffic routing.',
+      filePath: 'k8s/deployment.yaml',
+      startLine: 45,
+      endLine: 60,
+      snippet: 'containers:\n  - name: portal-api\n    image: acme/portal-api:latest',
+      cweId: null,
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-028-missing-readiness-probe',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_K8S_28',
+      severity: 'medium',
+      title: 'Container Running Without Resource Limits',
+      description: 'Container should have CPU and memory limits defined.',
+      filePath: 'k8s/deployment.yaml',
+      startLine: 45,
+      endLine: 60,
+      snippet: 'containers:\n  - name: portal-api',
+      cweId: 'CWE-770',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-029-missing-resource-limits',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[2],
+      repositoryId: IDS.repoPaymentUI,
+      projectId: paymentGatewayProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2024-4068',
+      severity: 'high',
+      title: 'braces Package ReDoS Vulnerability',
+      description: 'braces before 3.0.3 has a Regular Expression Denial of Service vulnerability.',
+      filePath: 'package-lock.json',
+      startLine: 567,
+      endLine: 567,
+      snippet: '"braces": "3.0.2"',
+      cweId: 'CWE-1333',
+      cveId: 'CVE-2024-4068',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-030-braces-redos',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[2],
+      repositoryId: IDS.repoPaymentUI,
+      projectId: paymentGatewayProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2024-4067',
+      severity: 'medium',
+      title: 'micromatch ReDoS Vulnerability',
+      description: 'micromatch before 4.0.6 has a Regular Expression Denial of Service vulnerability.',
+      filePath: 'package-lock.json',
+      startLine: 2345,
+      endLine: 2345,
+      snippet: '"micromatch": "4.0.5"',
+      cweId: 'CWE-1333',
+      cveId: 'CVE-2024-4067',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-031-micromatch-redos',
+    },
+    // More findings for additional coverage
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.express.security.audit.express-nosql-injection',
+      severity: 'high',
+      title: 'NoSQL Injection in MongoDB Query',
+      description: 'User input is passed directly to MongoDB query without sanitization.',
+      filePath: 'src/services/customer.service.ts',
+      startLine: 112,
+      endLine: 115,
+      snippet: 'const user = await db.collection("users").findOne({ email: req.body.email })',
+      cweId: 'CWE-943',
+      owasp: 'A03:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-032-nosql-injection',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.security.audit.vm-runinthiscontext',
+      severity: 'critical',
+      title: 'Arbitrary Code Execution via vm.runInThisContext',
+      description: 'User input is executed as JavaScript code, allowing remote code execution.',
+      filePath: 'src/services/formula.service.ts',
+      startLine: 34,
+      endLine: 37,
+      snippet: 'const result = vm.runInThisContext(userFormula)',
+      cweId: 'CWE-94',
+      owasp: 'A03:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-033-code-execution',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[1],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.security.audit.insufficient-postmessage-validation',
+      severity: 'medium',
+      title: 'Insufficient postMessage Origin Validation',
+      description: 'postMessage handler does not properly validate message origin.',
+      filePath: 'src/utils/iframe-communication.ts',
+      startLine: 23,
+      endLine: 28,
+      snippet: 'window.addEventListener("message", (event) => {\n  handleMessage(event.data)\n})',
+      cweId: 'CWE-346',
+      owasp: 'A07:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-034-postmessage-validation',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'python.django.security.audit.csrf-exempt',
+      severity: 'medium',
+      title: 'CSRF Protection Disabled',
+      description: 'View is decorated with @csrf_exempt, disabling CSRF protection.',
+      filePath: 'workers/api_handler.py',
+      startLine: 45,
+      endLine: 48,
+      snippet: '@csrf_exempt\ndef webhook_handler(request):',
+      cweId: 'CWE-352',
+      owasp: 'A01:2021',
+      confidence: 'high',
+      status: 'triaged',
+      triagedBy: IDS.adminUser,
+      triagedAt: new Date(),
+      fingerprint: 'fp-035-csrf-exempt',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'python.lang.security.audit.subprocess-shell-true',
+      severity: 'critical',
+      title: 'Command Injection via subprocess',
+      description: 'subprocess is called with shell=True and user input, allowing command injection.',
+      filePath: 'workers/file_processor.py',
+      startLine: 67,
+      endLine: 70,
+      snippet: 'subprocess.call(f"convert {input_file} {output_file}", shell=True)',
+      cweId: 'CWE-78',
+      owasp: 'A03:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-036-command-injection',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'python.lang.security.audit.exec-used',
+      severity: 'high',
+      title: 'Dynamic Code Execution with exec()',
+      description: 'exec() is used with potentially untrusted input.',
+      filePath: 'workers/config_loader.py',
+      startLine: 34,
+      endLine: 36,
+      snippet: 'exec(config_script)',
+      cweId: 'CWE-94',
+      owasp: 'A03:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-037-exec-used',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[4],
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'typescript.react.security.audit.react-missing-csp',
+      severity: 'medium',
+      title: 'Missing Content Security Policy',
+      description: 'Application does not set Content-Security-Policy header.',
+      filePath: 'src/server.ts',
+      startLine: 12,
+      endLine: 20,
+      snippet: 'app.use(helmet())',
+      cweId: 'CWE-693',
+      owasp: 'A05:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-038-missing-csp',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[4],
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'typescript.react.security.audit.react-insecure-iframe',
+      severity: 'medium',
+      title: 'Insecure iframe Configuration',
+      description: 'iframe does not include sandbox attribute, allowing full access.',
+      filePath: 'src/components/EmbeddedWidget.tsx',
+      startLine: 23,
+      endLine: 25,
+      snippet: '<iframe src={widgetUrl} />',
+      cweId: 'CWE-1021',
+      owasp: 'A05:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-039-insecure-iframe',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'go.lang.security.audit.timing-attack-comparison',
+      severity: 'medium',
+      title: 'Timing Attack in Password Comparison',
+      description: 'String comparison is not constant-time, allowing timing attacks.',
+      filePath: 'internal/auth/password.go',
+      startLine: 45,
+      endLine: 47,
+      snippet: 'if hash == storedHash {',
+      cweId: 'CWE-208',
+      owasp: 'A02:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-040-timing-attack',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'go.lang.security.audit.net-pprof',
+      severity: 'high',
+      title: 'Profiling Endpoints Exposed',
+      description: 'net/pprof endpoints are exposed, leaking sensitive runtime information.',
+      filePath: 'cmd/server/main.go',
+      startLine: 23,
+      endLine: 25,
+      snippet: 'import _ "net/http/pprof"',
+      cweId: 'CWE-215',
+      owasp: 'A05:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-041-pprof-exposed',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2024-24786',
+      severity: 'high',
+      title: 'protobuf-go Infinite Loop Vulnerability',
+      description: 'google.golang.org/protobuf before 1.33.0 vulnerable to infinite loop parsing.',
+      filePath: 'go.sum',
+      startLine: 234,
+      endLine: 234,
+      snippet: 'google.golang.org/protobuf v1.32.0',
+      cweId: 'CWE-835',
+      cveId: 'CVE-2024-24786',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-042-protobuf-cve',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_AWS_21',
+      severity: 'high',
+      title: 'S3 Bucket Versioning Disabled',
+      description: 'S3 bucket does not have versioning enabled for data protection.',
+      filePath: 'terraform/s3.tf',
+      startLine: 12,
+      endLine: 20,
+      snippet: 'resource "aws_s3_bucket" "payments" {\n  bucket = "acme-payments"\n}',
+      cweId: null,
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-043-s3-versioning',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_AWS_19',
+      severity: 'high',
+      title: 'S3 Bucket Encryption Disabled',
+      description: 'S3 bucket does not have server-side encryption enabled.',
+      filePath: 'terraform/s3.tf',
+      startLine: 12,
+      endLine: 20,
+      snippet: 'resource "aws_s3_bucket" "payments" {\n  bucket = "acme-payments"\n}',
+      cweId: 'CWE-311',
+      owasp: 'A02:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-044-s3-encryption',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[0],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_AWS_18',
+      severity: 'medium',
+      title: 'S3 Bucket Logging Disabled',
+      description: 'S3 bucket access logging is not enabled.',
+      filePath: 'terraform/s3.tf',
+      startLine: 12,
+      endLine: 20,
+      snippet: 'resource "aws_s3_bucket" "payments" {\n  bucket = "acme-payments"\n}',
+      cweId: 'CWE-778',
+      owasp: 'A09:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-045-s3-logging',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[1],
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      scanner: 'checkov',
+      ruleId: 'CKV_AWS_23',
+      severity: 'medium',
+      title: 'Security Group Allows All Outbound Traffic',
+      description: 'Security group allows unrestricted egress to all destinations.',
+      filePath: 'terraform/security_groups.tf',
+      startLine: 34,
+      endLine: 45,
+      snippet: 'egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = "-1"\n    cidr_blocks = ["0.0.0.0/0"]\n  }',
+      cweId: null,
+      owasp: null,
+      confidence: 'high',
+      status: 'accepted',
+      dismissReason: 'Required for external API calls',
+      dismissedAt: new Date(),
+      fingerprint: 'fp-046-sg-egress',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[2],
+      repositoryId: IDS.repoPaymentUI,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.security.audit.local-storage-sensitive-data',
+      severity: 'medium',
+      title: 'Sensitive Data in localStorage',
+      description: 'Sensitive data stored in localStorage is accessible to XSS attacks.',
+      filePath: 'src/utils/auth.ts',
+      startLine: 45,
+      endLine: 48,
+      snippet: 'localStorage.setItem("auth_token", token)',
+      cweId: 'CWE-922',
+      owasp: 'A05:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-047-localstorage-sensitive',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[4],
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      scanner: 'trivy',
+      ruleId: 'CVE-2024-45590',
+      severity: 'high',
+      title: 'body-parser ReDoS Vulnerability',
+      description: 'body-parser before 1.20.3 has ReDoS in URL encoding parser.',
+      filePath: 'package-lock.json',
+      startLine: 789,
+      endLine: 789,
+      snippet: '"body-parser": "1.20.2"',
+      cweId: 'CWE-1333',
+      cveId: 'CVE-2024-45590',
+      owasp: null,
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-048-body-parser-cve',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[4],
+      repositoryId: IDS.repoPortalWeb,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'javascript.lang.security.detect-non-literal-regexp',
+      severity: 'low',
+      title: 'Dynamic Regular Expression',
+      description: 'Regular expression created from variable input may cause ReDoS.',
+      filePath: 'src/utils/search.ts',
+      startLine: 23,
+      endLine: 25,
+      snippet: 'const regex = new RegExp(searchTerm)',
+      cweId: 'CWE-1333',
+      owasp: null,
+      confidence: 'low',
+      status: 'open',
+      fingerprint: 'fp-049-dynamic-regexp',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'semgrep',
+      ruleId: 'go.lang.correctness.permissions.file_permission',
+      severity: 'medium',
+      title: 'Overly Permissive File Permissions',
+      description: 'File created with world-readable permissions.',
+      filePath: 'internal/storage/file.go',
+      startLine: 56,
+      endLine: 58,
+      snippet: 'os.WriteFile(path, data, 0777)',
+      cweId: 'CWE-732',
+      owasp: 'A01:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-050-file-permissions',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[5],
+      repositoryId: IDS.repoPortalApi,
+      projectId: customerPortalProject.id,
+      scanner: 'gitleaks',
+      ruleId: 'generic-api-key',
+      severity: 'high',
+      title: 'Generic API Key Detected',
+      description: 'API key pattern detected in source code.',
+      filePath: 'internal/integrations/sendgrid.go',
+      startLine: 12,
+      endLine: 12,
+      snippet: 'var sendgridKey = "SG.xxxxxxxxxxxxxxxxxxxx"',
+      cweId: 'CWE-798',
+      owasp: 'A07:2021',
+      confidence: 'medium',
+      status: 'open',
+      fingerprint: 'fp-051-sendgrid-key',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'python.lang.security.audit.insecure-yaml-load',
+      severity: 'critical',
+      title: 'Insecure YAML Deserialization',
+      description: 'yaml.load() without SafeLoader allows arbitrary code execution.',
+      filePath: 'workers/config.py',
+      startLine: 23,
+      endLine: 25,
+      snippet: 'config = yaml.load(config_file)',
+      cweId: 'CWE-502',
+      owasp: 'A08:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-052-yaml-unsafe-load',
+    },
+    {
+      tenantId: tenant.id,
+      scanId: IDS.scans[3],
+      repositoryId: IDS.repoPaymentWorker,
+      projectId: paymentGatewayProject.id,
+      scanner: 'semgrep',
+      ruleId: 'python.lang.security.audit.pickle-load',
+      severity: 'critical',
+      title: 'Insecure Pickle Deserialization',
+      description: 'pickle.load() on untrusted data allows arbitrary code execution.',
+      filePath: 'workers/cache.py',
+      startLine: 45,
+      endLine: 47,
+      snippet: 'data = pickle.load(cache_file)',
+      cweId: 'CWE-502',
+      owasp: 'A08:2021',
+      confidence: 'high',
+      status: 'open',
+      fingerprint: 'fp-053-pickle-unsafe-load',
+    },
+  ];
+
+  const findings = await Promise.all(
+    findingsData.map((finding) => prisma.finding.create({ data: finding })),
+  );
+  console.log(`  Created ${findings.length} findings`);
+
+  // ============================================
+  // 9. THREAT MODEL
+  // ============================================
+  console.log('Creating threat model...');
+
+  // Delete existing threat model data
+  await prisma.threatMitigationMapping.deleteMany({});
+  await prisma.threatDataFlowMapping.deleteMany({});
+  await prisma.threatComponentMapping.deleteMany({});
+  await prisma.threatMitigation.deleteMany({});
+  await prisma.threat.deleteMany({});
+  await prisma.threatModelDataFlow.deleteMany({});
+  await prisma.threatModelComponent.deleteMany({});
+  await prisma.threatModel.deleteMany({
+    where: { tenantId: tenant.id },
+  });
+
+  const threatModel = await prisma.threatModel.create({
+    data: {
+      id: IDS.threatModel,
+      tenantId: tenant.id,
+      projectId: paymentGatewayProject.id,
+      name: 'Payment Gateway Architecture',
+      description: 'Threat model for the payment gateway system including API, UI, and worker components',
+      methodology: 'stride',
+      status: 'in_progress',
+      createdBy: IDS.adminUser,
+      version: 1,
+    },
+  });
+  console.log(`  Created threat model: ${threatModel.name}`);
+
+  // Create threat model components
+  const components = await Promise.all([
+    prisma.threatModelComponent.create({
+      data: {
+        id: IDS.components[0],
+        threatModelId: threatModel.id,
+        name: 'Web Browser',
+        description: 'Customer web browser accessing payment UI',
+        type: 'external_entity',
+        technology: 'Web Browser',
+        criticality: 'high',
+        dataClassification: 'public',
+        positionX: 100,
+        positionY: 200,
+      },
+    }),
+    prisma.threatModelComponent.create({
+      data: {
+        id: IDS.components[1],
+        threatModelId: threatModel.id,
+        name: 'Payment UI',
+        description: 'React-based payment form and dashboard',
+        type: 'process',
+        technology: 'React SPA',
+        criticality: 'high',
+        dataClassification: 'confidential',
+        positionX: 300,
+        positionY: 200,
+      },
+    }),
+    prisma.threatModelComponent.create({
+      data: {
+        id: IDS.components[2],
+        threatModelId: threatModel.id,
+        name: 'Payment API',
+        description: 'Node.js REST API handling payment processing',
+        type: 'process',
+        technology: 'Node.js Express',
+        criticality: 'critical',
+        dataClassification: 'restricted',
+        positionX: 500,
+        positionY: 200,
+      },
+    }),
+    prisma.threatModelComponent.create({
+      data: {
+        id: IDS.components[3],
+        threatModelId: threatModel.id,
+        name: 'Payment Database',
+        description: 'PostgreSQL database storing transaction data',
+        type: 'datastore',
+        technology: 'PostgreSQL',
+        criticality: 'critical',
+        dataClassification: 'restricted',
+        positionX: 700,
+        positionY: 200,
+      },
+    }),
+    prisma.threatModelComponent.create({
+      data: {
+        id: IDS.components[4],
+        threatModelId: threatModel.id,
+        name: 'Payment Processor',
+        description: 'External payment processor (Stripe)',
+        type: 'external_entity',
+        technology: 'Stripe API',
+        criticality: 'critical',
+        dataClassification: 'restricted',
+        positionX: 500,
+        positionY: 400,
+      },
+    }),
+  ]);
+  console.log(`  Created ${components.length} threat model components`);
+
+  // Create data flows
+  const dataFlows = await Promise.all([
+    prisma.threatModelDataFlow.create({
+      data: {
+        threatModelId: threatModel.id,
+        sourceId: IDS.components[0],
+        targetId: IDS.components[1],
+        label: 'User Input',
+        dataType: 'user_credentials',
+        protocol: 'HTTPS',
+        authentication: true,
+        encryption: true,
+      },
+    }),
+    prisma.threatModelDataFlow.create({
+      data: {
+        threatModelId: threatModel.id,
+        sourceId: IDS.components[1],
+        targetId: IDS.components[2],
+        label: 'API Requests',
+        dataType: 'payment_data',
+        protocol: 'HTTPS',
+        authentication: true,
+        encryption: true,
+      },
+    }),
+    prisma.threatModelDataFlow.create({
+      data: {
+        threatModelId: threatModel.id,
+        sourceId: IDS.components[2],
+        targetId: IDS.components[3],
+        label: 'Database Queries',
+        dataType: 'transaction_data',
+        protocol: 'SQL/TLS',
+        authentication: true,
+        encryption: true,
+      },
+    }),
+    prisma.threatModelDataFlow.create({
+      data: {
+        threatModelId: threatModel.id,
+        sourceId: IDS.components[2],
+        targetId: IDS.components[4],
+        label: 'Payment Requests',
+        dataType: 'card_data',
+        protocol: 'HTTPS',
+        authentication: true,
+        encryption: true,
+      },
+    }),
+  ]);
+  console.log(`  Created ${dataFlows.length} data flows`);
+
+  // Create threats
+  const threats = await Promise.all([
+    prisma.threat.create({
+      data: {
+        id: IDS.threats[0],
+        threatModelId: threatModel.id,
+        title: 'Session Hijacking via XSS',
+        description: 'An attacker could inject malicious scripts to steal session tokens and impersonate users.',
+        category: 'S',
+        strideCategory: 'spoofing',
+        attackVector: 'Reflected XSS through URL parameters or stored XSS in user-generated content',
+        likelihood: 'medium',
+        impact: 'high',
+        riskScore: 6.0,
+        status: 'identified',
+        cweIds: ['CWE-79', 'CWE-384'],
+        attackTechniqueIds: ['T1185'],
+        capecIds: ['CAPEC-86'],
+        priority: 1,
+        identifiedBy: IDS.adminUser,
+      },
+    }),
+    prisma.threat.create({
+      data: {
+        id: IDS.threats[1],
+        threatModelId: threatModel.id,
+        title: 'SQL Injection on Transaction Query',
+        description: 'An attacker could manipulate SQL queries to access or modify transaction data.',
+        category: 'T',
+        strideCategory: 'tampering',
+        attackVector: 'Malformed input in transaction search or filter parameters',
+        likelihood: 'medium',
+        impact: 'very_high',
+        riskScore: 8.0,
+        status: 'analyzed',
+        cweIds: ['CWE-89'],
+        attackTechniqueIds: ['T1190'],
+        capecIds: ['CAPEC-66'],
+        priority: 1,
+        identifiedBy: IDS.adminUser,
+        analyzedBy: IDS.adminUser,
+        analyzedAt: new Date(),
+      },
+    }),
+    prisma.threat.create({
+      data: {
+        id: IDS.threats[2],
+        threatModelId: threatModel.id,
+        title: 'Credit Card Data Exfiltration',
+        description: 'Attackers could intercept or exfiltrate credit card numbers during payment processing.',
+        category: 'I',
+        strideCategory: 'information_disclosure',
+        attackVector: 'Man-in-the-middle attack, memory scraping, or database breach',
+        likelihood: 'low',
+        impact: 'very_high',
+        riskScore: 6.0,
+        status: 'mitigated',
+        cweIds: ['CWE-311', 'CWE-319'],
+        attackTechniqueIds: ['T1020', 'T1557'],
+        capecIds: ['CAPEC-117'],
+        priority: 1,
+        identifiedBy: IDS.adminUser,
+      },
+    }),
+    prisma.threat.create({
+      data: {
+        id: IDS.threats[3],
+        threatModelId: threatModel.id,
+        title: 'Payment API Denial of Service',
+        description: 'An attacker could overwhelm the payment API with requests, causing service unavailability.',
+        category: 'D',
+        strideCategory: 'denial_of_service',
+        attackVector: 'High volume of requests, resource exhaustion, or algorithmic complexity attacks',
+        likelihood: 'medium',
+        impact: 'high',
+        riskScore: 6.0,
+        status: 'identified',
+        cweIds: ['CWE-400', 'CWE-770'],
+        attackTechniqueIds: ['T1498', 'T1499'],
+        capecIds: ['CAPEC-125'],
+        priority: 2,
+        identifiedBy: IDS.adminUser,
+      },
+    }),
+  ]);
+  console.log(`  Created ${threats.length} threats`);
+
+  // Create mitigations
+  const mitigations = await Promise.all([
+    prisma.threatMitigation.create({
+      data: {
+        threatModelId: threatModel.id,
+        title: 'Implement Content Security Policy',
+        description: 'Configure strict CSP headers to prevent XSS attacks by controlling script sources.',
+        type: 'preventive',
+        implementationStatus: 'implemented',
+        priority: 1,
+        effort: 'low',
+        cost: 'low',
+        owner: 'Security Team',
+        implementedAt: new Date(),
+      },
+    }),
+    prisma.threatMitigation.create({
+      data: {
+        threatModelId: threatModel.id,
+        title: 'Use Parameterized Queries',
+        description: 'Replace string concatenation with parameterized queries for all database operations.',
+        type: 'preventive',
+        implementationStatus: 'in_progress',
+        priority: 1,
+        effort: 'medium',
+        cost: 'low',
+        owner: 'Backend Team',
+        dueDate: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.threatMitigation.create({
+      data: {
+        threatModelId: threatModel.id,
+        title: 'Tokenize Credit Card Data',
+        description: 'Use payment processor tokenization to avoid storing raw card numbers.',
+        type: 'preventive',
+        implementationStatus: 'implemented',
+        priority: 1,
+        effort: 'high',
+        cost: 'medium',
+        owner: 'Payment Team',
+        implementedAt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+        verifiedAt: new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000),
+      },
+    }),
+    prisma.threatMitigation.create({
+      data: {
+        threatModelId: threatModel.id,
+        title: 'Implement Rate Limiting',
+        description: 'Add rate limiting at API gateway and application levels to prevent DoS attacks.',
+        type: 'preventive',
+        implementationStatus: 'planned',
+        priority: 2,
+        effort: 'medium',
+        cost: 'low',
+        owner: 'Platform Team',
+        dueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
+      },
+    }),
+  ]);
+  console.log(`  Created ${mitigations.length} mitigations`);
+
+  // Link threats to components
+  await Promise.all([
+    prisma.threatComponentMapping.create({
+      data: { threatId: IDS.threats[0], componentId: IDS.components[1] },
+    }),
+    prisma.threatComponentMapping.create({
+      data: { threatId: IDS.threats[1], componentId: IDS.components[2] },
+    }),
+    prisma.threatComponentMapping.create({
+      data: { threatId: IDS.threats[1], componentId: IDS.components[3] },
+    }),
+    prisma.threatComponentMapping.create({
+      data: { threatId: IDS.threats[2], componentId: IDS.components[2] },
+    }),
+    prisma.threatComponentMapping.create({
+      data: { threatId: IDS.threats[2], componentId: IDS.components[4] },
+    }),
+    prisma.threatComponentMapping.create({
+      data: { threatId: IDS.threats[3], componentId: IDS.components[2] },
+    }),
+  ]);
+
+  // Link threats to mitigations
+  await Promise.all([
+    prisma.threatMitigationMapping.create({
+      data: { threatId: IDS.threats[0], mitigationId: mitigations[0].id, effectiveness: 'full' },
+    }),
+    prisma.threatMitigationMapping.create({
+      data: { threatId: IDS.threats[1], mitigationId: mitigations[1].id, effectiveness: 'full' },
+    }),
+    prisma.threatMitigationMapping.create({
+      data: { threatId: IDS.threats[2], mitigationId: mitigations[2].id, effectiveness: 'full' },
+    }),
+    prisma.threatMitigationMapping.create({
+      data: { threatId: IDS.threats[3], mitigationId: mitigations[3].id, effectiveness: 'partial' },
+    }),
+  ]);
+
+  // ============================================
+  // 10. ENVIRONMENTS AND DEPLOYMENTS
+  // ============================================
+  console.log('Creating environments and deployments...');
+
+  // Delete existing deployments and environments
+  await prisma.deployment.deleteMany({
+    where: { tenantId: tenant.id },
+  });
+  await prisma.environment.deleteMany({
+    where: { tenantId: tenant.id },
+  });
+
+  const environments = await Promise.all([
+    prisma.environment.create({
+      data: {
+        id: IDS.envDevelopment,
+        tenantId: tenant.id,
+        projectId: paymentGatewayProject.id,
+        name: 'development',
+        type: 'kubernetes',
+        description: 'Development environment for testing and integration',
+        kubeContext: 'dev-cluster',
+        namespace: 'payment-dev',
+        cloudProvider: 'aws',
+        cloudRegion: 'us-west-2',
+        isActive: true,
+        lastSyncAt: new Date(),
+      },
+    }),
+    prisma.environment.create({
+      data: {
+        id: IDS.envProduction,
+        tenantId: tenant.id,
+        projectId: paymentGatewayProject.id,
+        name: 'production',
+        type: 'kubernetes',
+        description: 'Production environment for live traffic',
+        kubeContext: 'prod-cluster',
+        namespace: 'payment-prod',
+        cloudProvider: 'aws',
+        cloudRegion: 'us-east-1',
+        isActive: true,
+        lastSyncAt: new Date(),
+      },
+    }),
+  ]);
+  console.log(`  Created ${environments.length} environments`);
+
+  const deployments = await Promise.all([
+    prisma.deployment.create({
+      data: {
+        id: IDS.deployments[0],
+        environmentId: IDS.envDevelopment,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPaymentApi,
+        name: 'payment-api',
+        version: '1.5.2-dev',
+        image: 'acme/payment-api:1.5.2-dev',
+        imageDigest: 'sha256:abc123def456...',
+        replicas: 2,
+        status: 'healthy',
+        vulnCount: 12,
+        criticalCount: 2,
+        labels: { app: 'payment-api', env: 'development' },
+        exposedPorts: [8080],
+        hasIngress: true,
+        ingressHosts: ['api.dev.payment.acme.local'],
+        deployedAt: new Date(now.getTime() - 86400000),
+        deployedBy: IDS.adminUser,
+      },
+    }),
+    prisma.deployment.create({
+      data: {
+        id: IDS.deployments[1],
+        environmentId: IDS.envDevelopment,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPaymentUI,
+        name: 'payment-ui',
+        version: '1.4.0-dev',
+        image: 'acme/payment-ui:1.4.0-dev',
+        imageDigest: 'sha256:def789ghi012...',
+        replicas: 1,
+        status: 'healthy',
+        vulnCount: 5,
+        criticalCount: 0,
+        labels: { app: 'payment-ui', env: 'development' },
+        exposedPorts: [3000],
+        hasIngress: true,
+        ingressHosts: ['dev.payment.acme.local'],
+        deployedAt: new Date(now.getTime() - 172800000),
+        deployedBy: IDS.adminUser,
+      },
+    }),
+    prisma.deployment.create({
+      data: {
+        id: IDS.deployments[2],
+        environmentId: IDS.envProduction,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPaymentApi,
+        name: 'payment-api',
+        version: '1.5.0',
+        image: 'acme/payment-api:1.5.0',
+        imageDigest: 'sha256:prod123abc456...',
+        replicas: 5,
+        status: 'healthy',
+        vulnCount: 8,
+        criticalCount: 1,
+        labels: { app: 'payment-api', env: 'production' },
+        exposedPorts: [8080],
+        hasIngress: true,
+        ingressHosts: ['api.payment.acme.com'],
+        deployedAt: new Date(now.getTime() - 604800000),
+        deployedBy: IDS.adminUser,
+      },
+    }),
+    prisma.deployment.create({
+      data: {
+        id: IDS.deployments[3],
+        environmentId: IDS.envProduction,
+        tenantId: tenant.id,
+        repositoryId: IDS.repoPaymentUI,
+        name: 'payment-ui',
+        version: '1.3.5',
+        image: 'acme/payment-ui:1.3.5',
+        imageDigest: 'sha256:produi789xyz...',
+        replicas: 3,
+        status: 'healthy',
+        vulnCount: 3,
+        criticalCount: 0,
+        labels: { app: 'payment-ui', env: 'production' },
+        exposedPorts: [3000],
+        hasIngress: true,
+        ingressHosts: ['payment.acme.com'],
+        deployedAt: new Date(now.getTime() - 1209600000),
+        deployedBy: IDS.adminUser,
+      },
+    }),
+  ]);
+  console.log(`  Created ${deployments.length} deployments`);
+
+  // ============================================
+  // 11. SBOM
+  // ============================================
+  console.log('Creating SBOM...');
+
+  // Delete existing SBOM data
+  await prisma.sbomComponentVuln.deleteMany({});
+  await prisma.sbomVulnerability.deleteMany({});
+  await prisma.sbomComponent.deleteMany({});
+  await prisma.sbom.deleteMany({
+    where: { tenantId: tenant.id },
+  });
+
+  const sbom = await prisma.sbom.create({
+    data: {
+      id: IDS.sbom,
+      tenantId: tenant.id,
+      repositoryId: IDS.repoPaymentApi,
+      projectId: paymentGatewayProject.id,
+      name: 'payment-api-sbom',
+      version: '1.5.2',
+      format: 'cyclonedx',
+      formatVersion: '1.5',
+      source: 'scan',
+      componentCount: 145,
+      vulnCount: 18,
+      criticalCount: 3,
+      highCount: 7,
+      mediumCount: 6,
+      lowCount: 2,
+      createdBy: IDS.adminUser,
+    },
+  });
+  console.log(`  Created SBOM: ${sbom.name}`);
+
+  // Create SBOM components
+  const sbomComponents = await Promise.all([
+    prisma.sbomComponent.create({
+      data: {
+        sbomId: sbom.id,
+        purl: 'pkg:npm/express@4.18.2',
+        name: 'express',
+        version: '4.18.2',
+        type: 'library',
+        supplier: 'Express.js',
+        license: 'MIT',
+        licenseSpdxId: 'MIT',
+        description: 'Fast, unopinionated, minimalist web framework',
+        isDirect: true,
+        depth: 0,
+        scope: 'runtime',
+      },
+    }),
+    prisma.sbomComponent.create({
+      data: {
+        sbomId: sbom.id,
+        purl: 'pkg:npm/lodash@4.17.21',
+        name: 'lodash',
+        version: '4.17.21',
+        type: 'library',
+        supplier: 'Lodash',
+        license: 'MIT',
+        licenseSpdxId: 'MIT',
+        description: 'Lodash modular utilities',
+        isDirect: true,
+        depth: 0,
+        scope: 'runtime',
+      },
+    }),
+    prisma.sbomComponent.create({
+      data: {
+        sbomId: sbom.id,
+        purl: 'pkg:npm/axios@1.6.2',
+        name: 'axios',
+        version: '1.6.2',
+        type: 'library',
+        supplier: 'axios',
+        license: 'MIT',
+        licenseSpdxId: 'MIT',
+        description: 'Promise based HTTP client for the browser and node.js',
+        isDirect: true,
+        depth: 0,
+        scope: 'runtime',
+      },
+    }),
+    prisma.sbomComponent.create({
+      data: {
+        sbomId: sbom.id,
+        purl: 'pkg:npm/follow-redirects@1.15.4',
+        name: 'follow-redirects',
+        version: '1.15.4',
+        type: 'library',
+        supplier: 'follow-redirects',
+        license: 'MIT',
+        licenseSpdxId: 'MIT',
+        description: 'HTTP and HTTPS modules that follow redirects',
+        isDirect: false,
+        depth: 1,
+        scope: 'runtime',
+      },
+    }),
+    prisma.sbomComponent.create({
+      data: {
+        sbomId: sbom.id,
+        purl: 'pkg:npm/jsonwebtoken@9.0.2',
+        name: 'jsonwebtoken',
+        version: '9.0.2',
+        type: 'library',
+        supplier: 'Auth0',
+        license: 'MIT',
+        licenseSpdxId: 'MIT',
+        description: 'JSON Web Token implementation',
+        isDirect: true,
+        depth: 0,
+        scope: 'runtime',
+      },
+    }),
+    prisma.sbomComponent.create({
+      data: {
+        sbomId: sbom.id,
+        purl: 'pkg:npm/pg@8.11.3',
+        name: 'pg',
+        version: '8.11.3',
+        type: 'library',
+        supplier: 'brianc',
+        license: 'MIT',
+        licenseSpdxId: 'MIT',
+        description: 'PostgreSQL client',
+        isDirect: true,
+        depth: 0,
+        scope: 'runtime',
+      },
+    }),
+    prisma.sbomComponent.create({
+      data: {
+        sbomId: sbom.id,
+        purl: 'pkg:npm/stripe@14.9.0',
+        name: 'stripe',
+        version: '14.9.0',
+        type: 'library',
+        supplier: 'Stripe',
+        license: 'MIT',
+        licenseSpdxId: 'MIT',
+        description: 'Stripe API wrapper',
+        isDirect: true,
+        depth: 0,
+        scope: 'runtime',
+      },
+    }),
+    prisma.sbomComponent.create({
+      data: {
+        sbomId: sbom.id,
+        purl: 'pkg:npm/body-parser@1.20.2',
+        name: 'body-parser',
+        version: '1.20.2',
+        type: 'library',
+        supplier: 'expressjs',
+        license: 'MIT',
+        licenseSpdxId: 'MIT',
+        description: 'Node.js body parsing middleware',
+        isDirect: false,
+        depth: 1,
+        scope: 'runtime',
+      },
+    }),
+  ]);
+  console.log(`  Created ${sbomComponents.length} SBOM components`);
+
+  // Create SBOM vulnerabilities
+  const sbomVulns = await Promise.all([
+    prisma.sbomVulnerability.create({
+      data: {
+        sbomId: sbom.id,
+        cveId: 'CVE-2024-29041',
+        severity: 'medium',
+        cvssScore: 5.3,
+        cvssVector: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L',
+        title: 'Regular Expression Denial of Service in Express',
+        description: 'Express.js before 4.19.2 has a Regular Expression Denial of Service vulnerability.',
+        fixedVersion: '4.19.2',
+        epssScore: 0.15,
+        isKev: false,
+        status: 'open',
+      },
+    }),
+    prisma.sbomVulnerability.create({
+      data: {
+        sbomId: sbom.id,
+        cveId: 'CVE-2024-28849',
+        severity: 'high',
+        cvssScore: 7.5,
+        cvssVector: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N',
+        title: 'Prototype Pollution in follow-redirects',
+        description: 'follow-redirects before 1.15.6 is vulnerable to prototype pollution.',
+        fixedVersion: '1.15.6',
+        epssScore: 0.35,
+        isKev: false,
+        status: 'open',
+      },
+    }),
+    prisma.sbomVulnerability.create({
+      data: {
+        sbomId: sbom.id,
+        cveId: 'CVE-2024-45590',
+        severity: 'high',
+        cvssScore: 7.5,
+        cvssVector: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H',
+        title: 'body-parser ReDoS Vulnerability',
+        description: 'body-parser before 1.20.3 has ReDoS in URL encoding parser.',
+        fixedVersion: '1.20.3',
+        epssScore: 0.25,
+        isKev: false,
+        status: 'open',
+      },
+    }),
+  ]);
+  console.log(`  Created ${sbomVulns.length} SBOM vulnerabilities`);
+
+  // Link vulnerabilities to components
+  await Promise.all([
+    prisma.sbomComponentVuln.create({
+      data: { componentId: sbomComponents[0].id, vulnId: sbomVulns[0].id },
+    }),
+    prisma.sbomComponentVuln.create({
+      data: { componentId: sbomComponents[3].id, vulnId: sbomVulns[1].id },
+    }),
+    prisma.sbomComponentVuln.create({
+      data: { componentId: sbomComponents[7].id, vulnId: sbomVulns[2].id },
+    }),
+  ]);
+
+  // ============================================
+  // SUMMARY
+  // ============================================
+  console.log('\n========================================');
+  console.log('Database seeding complete!');
+  console.log('========================================');
+  console.log(`
+Summary:
+  - 1 Tenant: ${tenant.name}
+  - 1 User: ${user.email} (password: admin123)
+  - 2 Projects: Payment Gateway, Customer Portal
+  - 5 Repositories
+  - 5 Scan Configs
+  - ${scans.length} Scans (various statuses)
+  - ${findings.length} Findings (various severities)
+  - 1 Threat Model with ${components.length} components and ${threats.length} threats
+  - 2 Environments with ${deployments.length} deployments
+  - 1 SBOM with ${sbomComponents.length} components and ${sbomVulns.length} vulnerabilities
+`);
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('Error during seeding:', e);
     process.exit(1);
   })
   .finally(async () => {

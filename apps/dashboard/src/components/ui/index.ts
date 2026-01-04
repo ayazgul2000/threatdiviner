@@ -1,4 +1,6 @@
 export { Button } from './button';
+export { Breadcrumb } from './breadcrumb';
+export { PageHeader } from './page-header';
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './card';
 export { Badge, SeverityBadge, StatusBadge } from './badge';
 export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from './table';
@@ -38,6 +40,11 @@ export {
   FormActions,
 } from './form';
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs';
+export { Pagination } from './pagination';
+export { TableToolbar } from './table-toolbar';
+export { SortableHeader, useSort } from './sortable-header';
+export { ApiError } from './api-error';
+export { PageSkeleton, DashboardSkeleton, TablePageSkeleton, CardGridSkeleton, DetailPageSkeleton, InlineLoadingState } from './page-skeleton';
 
 // Skeleton exports from new directory
 export * from './skeletons';

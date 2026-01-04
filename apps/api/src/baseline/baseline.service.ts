@@ -159,15 +159,20 @@ export class BaselineService {
   }
 
   /**
-   * List baselines for a repository
+   * List baselines for a project/repository
    */
   async listBaselines(
     tenantId: string,
+    projectId?: string,
     repositoryId?: string,
     page = 1,
     limit = 50,
   ): Promise<{ baselines: any[]; total: number }> {
     const where: any = { tenantId };
+    if (projectId) {
+      // Filter by repositories that belong to this project
+      where.repository = { projectId };
+    }
     if (repositoryId) {
       where.repositoryId = repositoryId;
     }

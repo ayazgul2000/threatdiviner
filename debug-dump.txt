@@ -1,0 +1,2880 @@
+﻿=== PROJECTS CONTROLLER ===
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ProjectsService } from './projects.service';
+import { JwtAuthGuard } from '../libs/auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../libs/auth/decorators/current-user.decorator';
+
+interface AuthenticatedUser {
+  id: string;
+  tenantId: string;
+}
+
+@ApiTags('projects')
+@ApiBearerAuth()
+@Controller('projects')
+@UseGuards(JwtAuthGuard)
+export class ProjectsController {
+  constructor(private projectsService: ProjectsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Get all projects for tenant' })
+  findAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.projectsService.findAll(user.tenantId);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get project by ID' })
+  findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.projectsService.findOne(user.tenantId, id);
+  }
+
+  @Get(':id/stats')
+  @ApiOperation({ summary: 'Get project statistics' })
+  getStats(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.projectsService.getStats(user.tenantId, id);
+  }
+
+  @Get(':id/hierarchy')
+  @ApiOperation({ summary: 'Get project with full hierarchy (repos, threat models, environments, gates)' })
+  getHierarchy(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.projectsService.getProjectHierarchy(user.tenantId, id);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new project' })
+  create(@CurrentUser() user: AuthenticatedUser, @Body() data: { name: string; description?: string }) {
+    return this.projectsService.create(user.tenantId, data);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update project' })
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() data: { name?: string; description?: string },
+  ) {
+    return this.projectsService.update(user.tenantId, id, data);
+  }
+
+  @Post(':id/archive')
+  @ApiOperation({ summary: 'Archive project' })
+  archive(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.projectsService.archive(user.tenantId, id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete project' })
+  delete(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.projectsService.delete(user.tenantId, id);
+  }
+
+  @Post(':id/repositories/:repositoryId')
+  @ApiOperation({ summary: 'Link repository to project' })
+  linkRepository(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') projectId: string,
+    @Param('repositoryId') repositoryId: string,
+  ) {
+    return this.projectsService.linkRepository(user.tenantId, projectId, repositoryId);
+  }
+
+  @Delete(':id/repositories/:repositoryId')
+  @ApiOperation({ summary: 'Unlink repository from project' })
+  unlinkRepository(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') projectId: string,
+    @Param('repositoryId') repositoryId: string,
+  ) {
+    return this.projectsService.unlinkRepository(user.tenantId, projectId, repositoryId);
+  }
+
+  // ========== SCM Access Management ==========
+
+  @Get(':id/scm-access')
+  @ApiOperation({ summary: 'Get SCM connections available to project' })
+  getScmAccess(@CurrentUser() user: AuthenticatedUser, @Param('id') projectId: string) {
+    return this.projectsService.getScmAccess(user.tenantId, projectId);
+  }
+
+  @Post(':id/scm-access')
+  @ApiOperation({ summary: 'Grant project access to an SCM connection' })
+  grantScmAccess(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') projectId: string,
+    @Body() data: { connectionId: string },
+  ) {
+    return this.projectsService.grantScmAccess(user.tenantId, projectId, data.connectionId);
+  }
+
+  @Delete(':id/scm-access/:connectionId')
+  @ApiOperation({ summary: 'Revoke project access to an SCM connection' })
+  revokeScmAccess(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') projectId: string,
+    @Param('connectionId') connectionId: string,
+  ) {
+    return this.projectsService.revokeScmAccess(user.tenantId, projectId, connectionId);
+  }
+
+  @Get(':id/scm-access/:connectionId/repos')
+  @ApiOperation({ summary: 'Get allowed repositories for project from connection' })
+  getRepoAccess(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') projectId: string,
+    @Param('connectionId') connectionId: string,
+  ) {
+    return this.projectsService.getRepoAccess(user.tenantId, projectId, connectionId);
+  }
+
+  @Post(':id/scm-access/:connectionId/repos')
+  @ApiOperation({ summary: 'Grant project access to specific repositories' })
+  grantRepoAccess(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') projectId: string,
+    @Param('connectionId') connectionId: string,
+    @Body() data: { repos: { externalRepoId: string; fullName: string }[] },
+  ) {
+    return this.projectsService.grantRepoAccess(user.tenantId, projectId, connectionId, data.repos);
+  }
+
+  @Delete(':id/scm-access/:connectionId/repos')
+  @ApiOperation({ summary: 'Revoke project access to specific repositories' })
+  revokeRepoAccess(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') projectId: string,
+    @Param('connectionId') connectionId: string,
+    @Body() data: { externalRepoIds: string[] },
+  ) {
+    return this.projectsService.revokeRepoAccess(user.tenantId, projectId, connectionId, data.externalRepoIds);
+  }
+}
+
+
+=== PROJECTS SERVICE ===
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class ProjectsService {
+  constructor(private prisma: PrismaService) {}
+
+  async findAll(tenantId: string) {
+    const projects = await this.prisma.project.findMany({
+      where: { tenantId, status: { not: 'DELETED' } },
+      include: {
+        _count: {
+          select: {
+            repositories: true,
+            scans: true,
+            findings: true,
+            threatModels: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    // Add findings breakdown by status for each project
+    const projectsWithStats = await Promise.all(
+      projects.map(async (project) => {
+        const findingStats = await this.prisma.finding.groupBy({
+          by: ['status'],
+          where: { projectId: project.id, tenantId },
+          _count: { status: true },
+        });
+
+        const openCount = findingStats.find((f) => f.status === 'open')?._count?.status || 0;
+        const resolvedCount = findingStats.find((f) => f.status === 'fixed')?._count?.status || 0;
+        const acceptedCount = findingStats.find((f) => f.status === 'false_positive')?._count?.status || 0;
+
+        return {
+          ...project,
+          findingStats: {
+            open: openCount,
+            resolved: resolvedCount,
+            accepted: acceptedCount,
+            total: project._count.findings,
+          },
+        };
+      }),
+    );
+
+    return projectsWithStats;
+  }
+
+  async findOne(tenantId: string, id: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id, tenantId, status: { not: 'DELETED' } },
+      include: {
+        repositories: {
+          take: 10,
+          orderBy: { updatedAt: 'desc' },
+        },
+        _count: {
+          select: {
+            repositories: true,
+            scans: true,
+            findings: true,
+            threatModels: true,
+            sboms: true,
+            environments: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    return project;
+  }
+
+  async create(tenantId: string, data: { name: string; description?: string }) {
+    // Check for duplicate name
+    const existing = await this.prisma.project.findFirst({
+      where: { tenantId, name: data.name, status: { not: 'DELETED' } },
+    });
+
+    if (existing) {
+      throw new ConflictException('Project with this name already exists');
+    }
+
+    return this.prisma.project.create({
+      data: {
+        tenantId,
+        name: data.name,
+        description: data.description,
+      },
+    });
+  }
+
+  async update(tenantId: string, id: string, data: { name?: string; description?: string }) {
+    const project = await this.findOne(tenantId, id);
+
+    if (data.name && data.name !== project.name) {
+      const existing = await this.prisma.project.findFirst({
+        where: { tenantId, name: data.name, status: { not: 'DELETED' }, id: { not: id } },
+      });
+      if (existing) {
+        throw new ConflictException('Project with this name already exists');
+      }
+    }
+
+    return this.prisma.project.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async archive(tenantId: string, id: string) {
+    await this.findOne(tenantId, id);
+    return this.prisma.project.update({
+      where: { id },
+      data: { status: 'ARCHIVED' },
+    });
+  }
+
+  async delete(tenantId: string, id: string) {
+    await this.findOne(tenantId, id);
+    return this.prisma.project.update({
+      where: { id },
+      data: { status: 'DELETED' },
+    });
+  }
+
+  async getStats(tenantId: string, id: string) {
+    const project = await this.findOne(tenantId, id);
+
+    const [openFindings, recentScans, criticalFindings] = await Promise.all([
+      this.prisma.finding.count({
+        where: { projectId: id, tenantId, status: 'open' },
+      }),
+      this.prisma.scan.count({
+        where: { projectId: id, tenantId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+      }),
+      this.prisma.finding.count({
+        where: { projectId: id, tenantId, status: 'open', severity: 'critical' },
+      }),
+    ]);
+
+    return {
+      project,
+      stats: {
+        openFindings,
+        criticalFindings,
+        recentScans,
+        repositories: project._count.repositories,
+        threatModels: project._count.threatModels,
+      },
+    };
+  }
+
+  async linkRepository(tenantId: string, projectId: string, repositoryId: string) {
+    await this.findOne(tenantId, projectId);
+    return this.prisma.repository.update({
+      where: { id: repositoryId },
+      data: { projectId },
+    });
+  }
+
+  async unlinkRepository(tenantId: string, projectId: string, repositoryId: string) {
+    await this.findOne(tenantId, projectId);
+    return this.prisma.repository.update({
+      where: { id: repositoryId },
+      data: { projectId: null },
+    });
+  }
+
+  // ========== SCM Access Management ==========
+
+  /**
+   * Get all SCM connections available to a project
+   */
+  async getScmAccess(tenantId: string, projectId: string) {
+    await this.findOne(tenantId, projectId);
+
+    const access = await this.prisma.projectScmAccess.findMany({
+      where: { projectId },
+      include: {
+        connection: {
+          select: {
+            id: true,
+            provider: true,
+            externalName: true,
+            isActive: true,
+          },
+        },
+        repoAccess: true,
+      },
+    });
+
+    return access;
+  }
+
+  /**
+   * Grant a project access to an SCM connection
+   */
+  async grantScmAccess(tenantId: string, projectId: string, connectionId: string) {
+    await this.findOne(tenantId, projectId);
+
+    // Verify connection belongs to tenant
+    const connection = await this.prisma.scmConnection.findFirst({
+      where: { id: connectionId, tenantId },
+    });
+    if (!connection) {
+      throw new NotFoundException('SCM connection not found');
+    }
+
+    // Check if already exists
+    const existing = await this.prisma.projectScmAccess.findFirst({
+      where: { projectId, connectionId },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    return this.prisma.projectScmAccess.create({
+      data: { projectId, connectionId },
+      include: {
+        connection: {
+          select: {
+            id: true,
+            provider: true,
+            externalName: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Revoke a project's access to an SCM connection
+   */
+  async revokeScmAccess(tenantId: string, projectId: string, connectionId: string) {
+    await this.findOne(tenantId, projectId);
+
+    const access = await this.prisma.projectScmAccess.findFirst({
+      where: { projectId, connectionId },
+    });
+    if (!access) {
+      throw new NotFoundException('SCM access not found');
+    }
+
+    await this.prisma.projectScmAccess.delete({
+      where: { id: access.id },
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Get allowed repositories for a project from a connection
+   */
+  async getRepoAccess(tenantId: string, projectId: string, connectionId: string) {
+    await this.findOne(tenantId, projectId);
+
+    const access = await this.prisma.projectScmAccess.findFirst({
+      where: { projectId, connectionId },
+      include: { repoAccess: true },
+    });
+
+    if (!access) {
+      throw new NotFoundException('Project does not have access to this connection');
+    }
+
+    return access.repoAccess;
+  }
+
+  /**
+   * Grant a project access to specific repositories from a connection
+   */
+  async grantRepoAccess(
+    tenantId: string,
+    projectId: string,
+    connectionId: string,
+    repos: { externalRepoId: string; fullName: string }[],
+  ) {
+    await this.findOne(tenantId, projectId);
+
+    const access = await this.prisma.projectScmAccess.findFirst({
+      where: { projectId, connectionId },
+    });
+
+    if (!access) {
+      throw new NotFoundException('Project does not have access to this connection. Grant connection access first.');
+    }
+
+    // Create repo access entries
+    const created = await Promise.all(
+      repos.map(async (repo) => {
+        const existing = await this.prisma.projectRepoAccess.findFirst({
+          where: { projectAccessId: access.id, externalRepoId: repo.externalRepoId },
+        });
+        if (existing) return existing;
+
+        return this.prisma.projectRepoAccess.create({
+          data: {
+            projectAccessId: access.id,
+            externalRepoId: repo.externalRepoId,
+            fullName: repo.fullName,
+          },
+        });
+      }),
+    );
+
+    return created;
+  }
+
+  /**
+   * Revoke a project's access to specific repositories
+   */
+  async revokeRepoAccess(tenantId: string, projectId: string, connectionId: string, externalRepoIds: string[]) {
+    await this.findOne(tenantId, projectId);
+
+    const access = await this.prisma.projectScmAccess.findFirst({
+      where: { projectId, connectionId },
+    });
+
+    if (!access) {
+      throw new NotFoundException('Project does not have access to this connection');
+    }
+
+    await this.prisma.projectRepoAccess.deleteMany({
+      where: {
+        projectAccessId: access.id,
+        externalRepoId: { in: externalRepoIds },
+      },
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Check if a project can access a specific repository
+   */
+  async canAccessRepo(_tenantId: string, projectId: string, connectionId: string, externalRepoId: string): Promise<boolean> {
+    const access = await this.prisma.projectScmAccess.findFirst({
+      where: { projectId, connectionId },
+      include: {
+        repoAccess: {
+          where: { externalRepoId },
+        },
+      },
+    });
+
+    if (!access) return false;
+
+    // If no repo restrictions (repoAccess is empty for this connection), allow all repos
+    const totalRepoAccess = await this.prisma.projectRepoAccess.count({
+      where: { projectAccessId: access.id },
+    });
+
+    if (totalRepoAccess === 0) return true; // No restrictions, allow all
+
+    return access.repoAccess.length > 0; // Has specific access
+  }
+
+  /**
+   * Get project with full hierarchy including repositories, threat models,
+   * environments, and pipeline gates with nested data
+   */
+  async getProjectHierarchy(tenantId: string, projectId: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, tenantId, status: { not: 'DELETED' } },
+      include: {
+        repositories: {
+          where: { isActive: true },
+          include: {
+            scans: {
+              take: 5,
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                status: true,
+                branch: true,
+                createdAt: true,
+                completedAt: true,
+              },
+            },
+            _count: {
+              select: {
+                scans: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+        },
+        threatModels: {
+          where: { status: { not: 'DELETED' } },
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            methodology: true,
+            createdAt: true,
+            updatedAt: true,
+            _count: {
+              select: {
+                components: true,
+                threats: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+        },
+        environments: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            cloudProvider: true,
+            isActive: true,
+            deployments: {
+              take: 5,
+              orderBy: { deployedAt: 'desc' },
+              select: {
+                id: true,
+                name: true,
+                version: true,
+                status: true,
+                deployedAt: true,
+              },
+            },
+          },
+          orderBy: { name: 'asc' },
+        },
+        pipelineGates: {
+          select: {
+            id: true,
+            stage: true,
+            enabled: true,
+            blockSeverity: true,
+          },
+          orderBy: { stage: 'asc' },
+        },
+        _count: {
+          select: {
+            repositories: true,
+            threatModels: true,
+            environments: true,
+            pipelineGates: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    return project;
+  }
+}
+
+
+=== PROJECTS MODULE ===
+import { Module } from '@nestjs/common';
+import { ProjectsService } from './projects.service';
+import { ProjectsController } from './projects.controller';
+import { PrismaModule } from '../prisma/prisma.module';
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [ProjectsController],
+  providers: [ProjectsService],
+  exports: [ProjectsService],
+})
+export class ProjectsModule {}
+
+
+=== SCM SERVICE ===
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CryptoService } from './crypto.service';
+import { GitHubProvider, GitLabProvider, ScmProvider, ScmRepository } from '../providers';
+import { QueueService } from '../../queue/services/queue.service';
+import { ScanJobData } from '../../queue/jobs';
+import * as crypto from 'crypto';
+
+@Injectable()
+export class ScmService {
+  private readonly logger = new Logger(ScmService.name);
+  private readonly providers: Map<string, ScmProvider> = new Map();
+  private readonly oauthStates: Map<string, { tenantId: string; expiresAt: number; provider: string }> = new Map();
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cryptoService: CryptoService,
+    private readonly configService: ConfigService,
+    private readonly queueService: QueueService,
+    githubProvider: GitHubProvider,
+    gitlabProvider: GitLabProvider,
+  ) {
+    this.providers.set('github', githubProvider);
+    this.providers.set('gitlab', gitlabProvider);
+  }
+
+  private getProvider(provider: string): ScmProvider {
+    const p = this.providers.get(provider);
+    if (!p) {
+      throw new BadRequestException(`Unknown provider: ${provider}`);
+    }
+    return p;
+  }
+
+  // OAuth flow
+  initiateOAuth(tenantId: string, provider: string): string {
+    const scmProvider = this.getProvider(provider);
+    const state = crypto.randomBytes(32).toString('hex');
+
+    // Store state for verification (expires in 10 minutes)
+    this.oauthStates.set(state, {
+      tenantId,
+      provider,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+
+    const redirectUri = `${this.configService.get('API_BASE_URL')}/scm/oauth/callback`;
+    return scmProvider.getOAuthUrl(state, redirectUri);
+  }
+
+  async handleOAuthCallback(code: string, state: string): Promise<{ tenantId: string; connectionId: string }> {
+    const stateData = this.oauthStates.get(state);
+    if (!stateData || stateData.expiresAt < Date.now()) {
+      this.oauthStates.delete(state);
+      throw new BadRequestException('Invalid or expired OAuth state');
+    }
+
+    this.oauthStates.delete(state);
+    const { tenantId, provider: providerName } = stateData;
+
+    // Get the provider from the stored state
+    const provider = this.getProvider(providerName);
+    const redirectUri = `${this.configService.get('API_BASE_URL')}/scm/oauth/callback`;
+
+    const tokenResponse = await provider.exchangeCodeForToken(code, redirectUri);
+    const user = await provider.getCurrentUser(tokenResponse.accessToken);
+
+    // Encrypt tokens before storing
+    const encryptedAccessToken = this.cryptoService.encrypt(tokenResponse.accessToken);
+    const encryptedRefreshToken = tokenResponse.refreshToken
+      ? this.cryptoService.encrypt(tokenResponse.refreshToken)
+      : null;
+
+    // Create or update connection
+    const connection = await this.prisma.scmConnection.upsert({
+      where: {
+        tenantId_provider_externalId: {
+          tenantId,
+          provider: providerName,
+          externalId: user.id,
+        },
+      },
+      update: {
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
+        tokenExpiresAt: tokenResponse.expiresAt,
+        scope: tokenResponse.scope,
+        isActive: true,
+        updatedAt: new Date(),
+      },
+      create: {
+        tenantId,
+        provider: providerName,
+        authMethod: 'oauth',
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
+        tokenExpiresAt: tokenResponse.expiresAt,
+        externalId: user.id,
+        externalName: user.login,
+        scope: tokenResponse.scope,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { tenantId, connectionId: connection.id };
+  }
+
+  async connectWithPat(tenantId: string, provider: string, token: string): Promise<string> {
+    const scmProvider = this.getProvider(provider);
+
+    // Verify token works
+    const user = await scmProvider.getCurrentUser(token);
+
+    // Encrypt token
+    const encryptedToken = this.cryptoService.encrypt(token);
+
+    // Create connection
+    const connection = await this.prisma.scmConnection.upsert({
+      where: {
+        tenantId_provider_externalId: {
+          tenantId,
+          provider,
+          externalId: user.id,
+        },
+      },
+      update: {
+        accessToken: encryptedToken,
+        isActive: true,
+        updatedAt: new Date(),
+      },
+      create: {
+        tenantId,
+        provider,
+        authMethod: 'pat',
+        accessToken: encryptedToken,
+        externalId: user.id,
+        externalName: user.login,
+        scope: ['repo', 'read:user'],
+        updatedAt: new Date(),
+      },
+    });
+
+    return connection.id;
+  }
+
+  // Connection management
+  async listConnections(tenantId: string) {
+    const connections = await this.prisma.scmConnection.findMany({
+      where: { tenantId, isActive: true },
+      select: {
+        id: true,
+        provider: true,
+        authMethod: true,
+        externalId: true,
+        externalName: true,
+        scope: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        repositories: {
+          select: { id: true },
+        },
+      },
+    });
+
+    // Map to frontend expected format
+    return connections.map((conn) => ({
+      id: conn.id,
+      provider: conn.provider,
+      authMethod: conn.authMethod,
+      accountName: conn.externalName || 'Unknown',
+      accountId: conn.externalId || '',
+      status: conn.isActive ? 'active' : 'revoked',
+      scopes: conn.scope || [],
+      createdAt: conn.createdAt,
+      updatedAt: conn.updatedAt,
+      repositoryCount: conn.repositories.length,
+    }));
+  }
+
+  async deleteConnection(tenantId: string, connectionId: string): Promise<void> {
+    const connection = await this.prisma.scmConnection.findFirst({
+      where: { id: connectionId, tenantId },
+    });
+
+    if (!connection) {
+      throw new NotFoundException('Connection not found');
+    }
+
+    await this.prisma.scmConnection.update({
+      where: { id: connectionId },
+      data: { isActive: false },
+    });
+  }
+
+  // Repository management
+  async listAvailableRepositories(tenantId: string, connectionId: string): Promise<ScmRepository[]> {
+    const connection = await this.getConnection(tenantId, connectionId);
+    const provider = this.getProvider(connection.provider);
+    const token = this.cryptoService.decrypt(connection.accessToken);
+
+    return provider.listRepositories(token);
+  }
+
+  async addRepository(tenantId: string, connectionId: string, fullName: string, projectId?: string): Promise<string> {
+    // Check if repository already exists
+    const existing = await this.prisma.repository.findFirst({
+      where: { tenantId, fullName, isActive: true },
+    });
+    if (existing) {
+      return existing.id; // Return existing repository ID
+    }
+
+    const connection = await this.getConnection(tenantId, connectionId);
+    const provider = this.getProvider(connection.provider);
+    const token = this.cryptoService.decrypt(connection.accessToken);
+
+    const [owner, repoName] = fullName.split('/');
+    const repoData = await provider.getRepository(token, owner, repoName);
+
+    // Create webhook
+    const webhookSecret = this.cryptoService.generateWebhookSecret();
+    const webhookUrl = `${this.configService.get('API_BASE_URL')}/webhooks/${connection.provider}`;
+
+    try {
+      const webhookId = await provider.createWebhook(token, owner, repoName, webhookUrl, webhookSecret);
+      this.logger.log(`Created webhook ${webhookId} for ${fullName}`);
+    } catch (error) {
+      this.logger.warn(`Failed to create webhook for ${fullName}: ${error}`);
+      // Continue without webhook - can be added later
+    }
+
+    // Create repository
+    const repository = await this.prisma.repository.create({
+      data: {
+        tenantId,
+        connectionId,
+        projectId,
+        name: repoData.name,
+        fullName: repoData.fullName,
+        cloneUrl: repoData.cloneUrl,
+        htmlUrl: repoData.htmlUrl,
+        defaultBranch: repoData.defaultBranch,
+        language: repoData.language,
+        isPrivate: repoData.isPrivate,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Create default scan config
+    await this.prisma.scanConfig.create({
+      data: {
+        tenantId,
+        repositoryId: repository.id,
+        updatedAt: new Date(),
+      },
+    });
+
+    return repository.id;
+  }
+
+  async listRepositories(tenantId: string, projectId?: string, connectionId?: string) {
+    return this.prisma.repository.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        ...(projectId && { projectId }),
+        ...(connectionId && { connectionId }),
+      },
+      include: {
+        connection: {
+          select: {
+            provider: true,
+            externalName: true,
+          },
+        },
+        scanConfig: true,
+        _count: {
+          select: { scans: true },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  async getRepository(tenantId: string, repositoryId: string) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: {
+        connection: {
+          select: {
+            provider: true,
+            externalName: true,
+          },
+        },
+        scanConfig: true,
+        scans: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            _count: {
+              select: { findings: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    return repository;
+  }
+
+  async getBranches(tenantId: string, repositoryId: string) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { connection: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    const provider = this.getProvider(repository.connection.provider);
+    const token = this.cryptoService.decrypt(repository.connection.accessToken);
+    const [owner, repoName] = repository.fullName.split('/');
+
+    return provider.getBranches(token, owner, repoName);
+  }
+
+  async getLanguages(tenantId: string, repositoryId: string) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { connection: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    const provider = this.getProvider(repository.connection.provider);
+    const token = this.cryptoService.decrypt(repository.connection.accessToken);
+    const [owner, repoName] = repository.fullName.split('/');
+
+    return provider.getLanguages(token, owner, repoName);
+  }
+
+  async updateScanConfig(tenantId: string, repositoryId: string, config: Partial<{
+    enableSast: boolean;
+    enableSca: boolean;
+    enableSecrets: boolean;
+    enableIac: boolean;
+    enableDast: boolean;
+    branches: string[];
+    skipPaths: string[];
+    scanners: string[];
+    enabled: boolean;
+    scanOnPush: boolean;
+    scanOnPr: boolean;
+    scanOnSchedule: boolean;
+    schedulePattern: string | null;
+  }>) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { scanConfig: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    // Build update data, converting scanners array to individual fields
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+
+    // Handle scanners array -> individual enable fields
+    if (config.scanners) {
+      updateData.enableSast = config.scanners.includes('semgrep');
+      updateData.enableSca = config.scanners.includes('trivy');
+      updateData.enableSecrets = config.scanners.includes('gitleaks') || config.scanners.includes('trufflehog');
+      updateData.enableIac = config.scanners.includes('checkov');
+      updateData.enableDast = config.scanners.includes('nuclei') || config.scanners.includes('zap');
+    }
+
+    // Handle individual enable fields (if passed directly)
+    if (config.enableSast !== undefined) updateData.enableSast = config.enableSast;
+    if (config.enableSca !== undefined) updateData.enableSca = config.enableSca;
+    if (config.enableSecrets !== undefined) updateData.enableSecrets = config.enableSecrets;
+    if (config.enableIac !== undefined) updateData.enableIac = config.enableIac;
+    if (config.enableDast !== undefined) updateData.enableDast = config.enableDast;
+
+    // Handle scan triggers
+    if (config.scanOnPush !== undefined) updateData.autoScanOnPush = config.scanOnPush;
+    if (config.scanOnPr !== undefined) updateData.autoScanOnPR = config.scanOnPr;
+    if (config.scanOnSchedule !== undefined) updateData.scheduleEnabled = config.scanOnSchedule;
+    if (config.schedulePattern !== undefined) updateData.scheduleCron = config.schedulePattern;
+
+    // Handle other fields
+    if (config.branches !== undefined) updateData.branches = config.branches;
+    if (config.skipPaths !== undefined) updateData.skipPaths = config.skipPaths;
+
+    return this.prisma.scanConfig.update({
+      where: { repositoryId },
+      data: updateData,
+    });
+  }
+
+  async removeRepository(tenantId: string, repositoryId: string): Promise<void> {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    await this.prisma.repository.update({
+      where: { id: repositoryId },
+      data: { isActive: false },
+    });
+  }
+
+  // Scan operations
+  async triggerScan(tenantId: string, repositoryId: string, branch?: string): Promise<string> {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { connection: true, scanConfig: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    const provider = this.getProvider(repository.connection.provider);
+    const token = this.cryptoService.decrypt(repository.connection.accessToken);
+    const targetBranch = branch || repository.defaultBranch;
+
+    const [owner, repoName] = repository.fullName.split('/');
+    const commit = await provider.getLatestCommit(token, owner, repoName, targetBranch);
+
+    const scan = await this.prisma.scan.create({
+      data: {
+        tenantId,
+        repositoryId,
+        commitSha: commit.sha,
+        branch: targetBranch,
+        triggeredBy: 'manual',
+        status: 'queued',
+      },
+    });
+
+    // Get scan config (use defaults if not configured)
+    const scanConfig = repository.scanConfig || {
+      enableSast: true,
+      enableSca: true,
+      enableSecrets: true,
+      enableIac: true,
+      enableDast: false,
+      enableContainerScan: false,
+      targetUrls: [] as string[],
+      containerImages: [] as string[],
+      skipPaths: ['node_modules', 'vendor', '.git'] as string[],
+      branches: [repository.defaultBranch] as string[],
+    };
+
+    // Build job data
+    const jobData: ScanJobData = {
+      scanId: scan.id,
+      tenantId,
+      repositoryId,
+      connectionId: repository.connectionId,
+      commitSha: commit.sha,
+      branch: targetBranch,
+      cloneUrl: repository.cloneUrl,
+      fullName: repository.fullName,
+      config: {
+        enableSast: scanConfig.enableSast,
+        enableSca: scanConfig.enableSca,
+        enableSecrets: scanConfig.enableSecrets,
+        enableIac: scanConfig.enableIac,
+        enableDast: 'enableDast' in scanConfig ? scanConfig.enableDast : false,
+        enableContainerScan: 'enableContainerScan' in scanConfig ? scanConfig.enableContainerScan : false,
+        targetUrls: 'targetUrls' in scanConfig ? (scanConfig.targetUrls as string[]) : [],
+        containerImages: 'containerImages' in scanConfig ? (scanConfig.containerImages as string[]) : [],
+        skipPaths: (scanConfig.skipPaths as string[]) || [],
+        branches: (scanConfig.branches as string[]) || [repository.defaultBranch],
+      },
+    };
+
+    // Queue scan job
+    await this.queueService.enqueueScan(jobData);
+    this.logger.log(`Scan ${scan.id} queued for ${repository.fullName}@${targetBranch}`);
+
+    return scan.id;
+  }
+
+  async getScan(tenantId: string, scanId: string) {
+    const scan = await this.prisma.scan.findFirst({
+      where: { id: scanId, tenantId },
+      include: {
+        repository: {
+          select: {
+            fullName: true,
+            htmlUrl: true,
+          },
+        },
+        findings: {
+          orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
+        },
+      },
+    });
+
+    if (!scan) {
+      throw new NotFoundException('Scan not found');
+    }
+
+    return scan;
+  }
+
+  async listScans(tenantId: string, repositoryId?: string, limit = 50, projectId?: string) {
+    const scans = await this.prisma.scan.findMany({
+      where: {
+        tenantId,
+        ...(repositoryId && { repositoryId }),
+        ...(projectId && { projectId }),
+      },
+      include: {
+        repository: {
+          select: {
+            fullName: true,
+            htmlUrl: true,
+          },
+        },
+        _count: {
+          select: { findings: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    // Add findings breakdown by severity for each scan
+    const scansWithStats = await Promise.all(
+      scans.map(async (scan) => {
+        const severityStats = await this.prisma.finding.groupBy({
+          by: ['severity'],
+          where: { scanId: scan.id },
+          _count: { severity: true },
+        });
+
+        const stats = {
+          total: scan._count.findings,
+          critical: severityStats.find((s) => s.severity === 'critical')?._count?.severity || 0,
+          high: severityStats.find((s) => s.severity === 'high')?._count?.severity || 0,
+          medium: severityStats.find((s) => s.severity === 'medium')?._count?.severity || 0,
+          low: severityStats.find((s) => s.severity === 'low')?._count?.severity || 0,
+          info: severityStats.find((s) => s.severity === 'info')?._count?.severity || 0,
+        };
+
+        return {
+          ...scan,
+          findingsCount: stats.total,
+          stats,
+        };
+      }),
+    );
+
+    return scansWithStats;
+  }
+
+  async listFindings(
+    tenantId: string,
+    filters: {
+      scanId?: string;
+      repositoryId?: string;
+      projectId?: string;
+      severity?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) {
+    const { scanId, repositoryId, projectId, severity, status, limit = 50, offset = 0 } = filters;
+
+    const where: any = { tenantId };
+    if (scanId) where.scanId = scanId;
+    if (severity) where.severity = severity;
+    if (status) where.status = status;
+    if (projectId) where.projectId = projectId;
+    if (repositoryId) {
+      where.scan = { repositoryId };
+    }
+
+    const [findings, total] = await Promise.all([
+      this.prisma.finding.findMany({
+        where,
+        include: {
+          scan: {
+            select: {
+              repository: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.finding.count({ where }),
+    ]);
+
+    return { findings, total };
+  }
+
+  async getFinding(tenantId: string, findingId: string) {
+    const finding = await this.prisma.finding.findFirst({
+      where: { id: findingId, tenantId },
+      include: {
+        scan: {
+          select: {
+            repository: {
+              select: {
+                fullName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!finding) {
+      throw new NotFoundException('Finding not found');
+    }
+
+    return finding;
+  }
+
+  async updateFindingStatus(tenantId: string, findingId: string, status: string) {
+    const finding = await this.prisma.finding.findFirst({
+      where: { id: findingId, tenantId },
+    });
+
+    if (!finding) {
+      throw new NotFoundException('Finding not found');
+    }
+
+    return this.prisma.finding.update({
+      where: { id: findingId },
+      data: { status, updatedAt: new Date() },
+    });
+  }
+
+  // Helper methods
+  private async getConnection(tenantId: string, connectionId: string) {
+    const connection = await this.prisma.scmConnection.findFirst({
+      where: { id: connectionId, tenantId, isActive: true },
+    });
+
+    if (!connection) {
+      throw new NotFoundException('Connection not found');
+    }
+
+    return connection;
+  }
+
+  getDecryptedToken(connection: { accessToken: string }): string {
+    return this.cryptoService.decrypt(connection.accessToken);
+  }
+}
+
+
+=== FRONTEND API ===
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+// Types
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  tenantId: string;
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface ScmConnection {
+  id: string;
+  provider: 'github' | 'gitlab' | 'bitbucket';
+  accountName: string;
+  accountId: string;
+  status: 'active' | 'expired' | 'revoked';
+  scopes: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Repository {
+  id: string;
+  connectionId: string;
+  externalId: string;
+  name: string;
+  fullName: string;
+  defaultBranch: string;
+  isPrivate: boolean;
+  webhookId: string | null;
+  lastScanAt: string | null;
+  createdAt: string;
+  scanConfig?: ScanConfig;
+  connection?: ScmConnection;
+}
+
+export interface ScanConfig {
+  id: string;
+  repositoryId: string;
+  enabled: boolean;
+  scanOnPush: boolean;
+  scanOnPr: boolean;
+  scanOnSchedule: boolean;
+  schedulePattern: string | null;
+  scanners: string[];
+  excludePaths: string[];
+}
+
+export interface Scan {
+  id: string;
+  repositoryId: string;
+  commitSha: string;
+  branch: string;
+  trigger: 'push' | 'pull_request' | 'manual' | 'schedule';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  startedAt: string | null;
+  completedAt: string | null;
+  duration: number | null;
+  findingsCount: FindingsCount | null;
+  errorMessage: string | null;
+  createdAt: string;
+  repository?: Repository;
+}
+
+export interface FindingsCount {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  total: number;
+}
+
+export interface Finding {
+  id: string;
+  scanId: string;
+  scanner: string;
+  ruleId: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  title: string;
+  message: string;
+  filePath: string;
+  startLine: number;
+  endLine: number | null;
+  snippet: string | null;
+  cwe: string[];
+  fingerprint: string;
+  status: 'open' | 'fixed' | 'ignored' | 'false_positive';
+  firstSeenAt?: string;
+  lastSeenAt?: string;
+  createdAt?: string;
+  scan?: Scan;
+  // AI Triage fields
+  aiAnalysis?: string | null;
+  aiConfidence?: number | null;
+  aiSeverity?: string | null;
+  aiFalsePositive?: boolean | null;
+  aiExploitability?: string | null;
+  aiRemediation?: string | null;
+  aiTriagedAt?: string | null;
+}
+
+export interface AiTriageResult {
+  id: string;
+  aiAnalysis: string | null;
+  aiConfidence: number | null;
+  aiSeverity: string | null;
+  aiFalsePositive: boolean | null;
+  aiExploitability: string | null;
+  aiRemediation: string | null;
+  aiTriagedAt: string | null;
+}
+
+export interface DashboardStats {
+  totalRepositories: number;
+  activeConnections: number;
+  totalScans: number;
+  openFindings: number;
+  findingsBySeverity: FindingsCount;
+  recentScans: Scan[];
+  recentFindings: Finding[];
+}
+
+// API Error
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Fetch wrapper
+async function fetchApi<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${API_URL}${endpoint}`;
+
+  const response = await fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    let message = 'An error occurred';
+    let code: string | undefined;
+
+    try {
+      const error = await response.json();
+      message = error.message || message;
+      code = error.code;
+    } catch {
+      message = response.statusText;
+    }
+
+    throw new ApiError(message, response.status, code);
+  }
+
+  // Handle 204 No Content
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json();
+}
+
+// Auth API
+export const authApi = {
+  login: (tenantSlug: string, email: string, password: string) =>
+    fetchApi<{ user: User }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ tenantSlug, email, password }),
+    }),
+
+  logout: () =>
+    fetchApi<void>('/auth/logout', { method: 'POST' }),
+
+  getProfile: () =>
+    fetchApi<User>('/auth/profile'),
+
+  refresh: () =>
+    fetchApi<void>('/auth/refresh', { method: 'POST' }),
+};
+
+// SCM Connections API
+export const connectionsApi = {
+  list: () =>
+    fetchApi<ScmConnection[]>('/scm/connections'),
+
+  initiateOAuth: (provider: string) =>
+    fetchApi<{ authUrl: string }>('/scm/oauth/initiate', {
+      method: 'POST',
+      body: JSON.stringify({ provider }),
+    }),
+
+  connectWithPat: (provider: string, token: string) =>
+    fetchApi<ScmConnection>('/scm/connect/pat', {
+      method: 'POST',
+      body: JSON.stringify({ provider, token }),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<void>(`/scm/connections/${id}`, { method: 'DELETE' }),
+
+  getAvailableRepos: (connectionId: string) =>
+    fetchApi<{ id: string; name: string; fullName: string; isPrivate: boolean }[]>(
+      `/scm/connections/${connectionId}/available-repos`
+    ),
+};
+
+// Repositories API
+export const repositoriesApi = {
+  list: () =>
+    fetchApi<Repository[]>('/scm/repositories'),
+
+  get: (id: string) =>
+    fetchApi<Repository>(`/scm/repositories/${id}`),
+
+  add: (connectionId: string, externalId: string, fullName: string) =>
+    fetchApi<Repository>('/scm/repositories', {
+      method: 'POST',
+      body: JSON.stringify({ connectionId, externalId, fullName }),
+    }),
+
+  updateConfig: (id: string, config: Partial<ScanConfig>) =>
+    fetchApi<ScanConfig>(`/scm/repositories/${id}/config`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<void>(`/scm/repositories/${id}`, { method: 'DELETE' }),
+};
+
+// Scans API
+export const scansApi = {
+  list: (repositoryId?: string) => {
+    const query = repositoryId ? `?repositoryId=${repositoryId}` : '';
+    return fetchApi<Scan[]>(`/scm/scans${query}`);
+  },
+
+  get: (id: string) =>
+    fetchApi<Scan>(`/scm/scans/${id}`),
+
+  trigger: (repositoryId: string, branch?: string) =>
+    fetchApi<Scan>('/scm/scans', {
+      method: 'POST',
+      body: JSON.stringify({ repositoryId, branch }),
+    }),
+
+  cancel: (id: string) =>
+    fetchApi<void>(`/scm/scans/${id}/cancel`, { method: 'POST' }),
+};
+
+// Findings API
+export const findingsApi = {
+  list: (filters?: {
+    scanId?: string;
+    repositoryId?: string;
+    projectId?: string;
+    severity?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) {
+          params.append(key, String(value));
+        }
+      });
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return fetchApi<{ findings: Finding[]; total: number }>(`/scm/findings${query}`);
+  },
+
+  get: (id: string) =>
+    fetchApi<Finding>(`/scm/findings/${id}`),
+
+  updateStatus: (id: string, status: Finding['status']) =>
+    fetchApi<Finding>(`/scm/findings/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+};
+
+// Dashboard API
+export const dashboardApi = {
+  getStats: () =>
+    fetchApi<DashboardStats>('/dashboard/stats'),
+};
+
+// Notifications API
+export interface NotificationConfig {
+  id?: string;
+  slackEnabled: boolean;
+  slackWebhookUrl: string | null;
+  slackChannel: string | null;
+  notifyOnScanStart: boolean;
+  notifyOnScanComplete: boolean;
+  notifyOnCritical: boolean;
+  notifyOnHigh: boolean;
+}
+
+export const notificationsApi = {
+  getConfig: () =>
+    fetchApi<NotificationConfig>('/notifications/config'),
+
+  updateConfig: (config: Partial<NotificationConfig>) =>
+    fetchApi<NotificationConfig>('/notifications/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
+
+  testSlack: () =>
+    fetchApi<{ success: boolean; message: string }>('/notifications/test-slack', {
+      method: 'POST',
+    }),
+};
+
+// Reports API
+export const reportsApi = {
+  getScanReport: (scanId: string) =>
+    `${API_URL}/reports/scan/${scanId}/pdf`,
+
+  getRepositoryReport: (repositoryId: string) =>
+    `${API_URL}/reports/repository/${repositoryId}/pdf`,
+
+  getSummaryReport: () =>
+    `${API_URL}/reports/summary/pdf`,
+};
+
+// AI Triage API
+export const aiApi = {
+  getStatus: () =>
+    fetchApi<{ available: boolean; model: string }>('/ai/status'),
+
+  triageFinding: (findingId: string) =>
+    fetchApi<AiTriageResult>(`/ai/triage/${findingId}`, {
+      method: 'POST',
+    }),
+
+  batchTriage: (findingIds: string[]) =>
+    fetchApi<{ processed: number; results: AiTriageResult[] }>('/ai/triage/batch', {
+      method: 'POST',
+      body: JSON.stringify({ findingIds }),
+    }),
+
+  getTriageResult: (findingId: string) =>
+    fetchApi<AiTriageResult>(`/ai/triage/${findingId}`),
+};
+
+// Analytics API
+export interface AnalyticsData {
+  totalScans: number;
+  totalFindings: number;
+  openFindings: number;
+  fixedFindings: number;
+  mttr: number;
+  fixRate: number;
+  findingsBySeverity: Record<string, number>;
+  findingsByScanner: Record<string, number>;
+  scansOverTime: Array<{ date: string; count: number }>;
+  findingsTrend: Array<{ date: string; introduced: number; fixed: number }>;
+  topVulnerableRepos: Array<{ name: string; count: number }>;
+  topRecurringRules: Array<{ ruleId: string; count: number }>;
+  complianceScores: Record<string, number>;
+}
+
+export const analyticsApi = {
+  get: (range: '7d' | '30d' | '90d' = '30d') =>
+    fetchApi<AnalyticsData>(`/analytics?range=${range}`),
+
+  getScannerStats: (range: '7d' | '30d' | '90d' = '30d') =>
+    fetchApi<Record<string, {
+      total: number;
+      bySeverity: Record<string, number>;
+      openCount: number;
+      fixedCount: number;
+    }>>(`/analytics/scanners?range=${range}`),
+};
+
+// Branch and Language API (for repositories)
+export interface ScmBranch {
+  name: string;
+  sha: string;
+  isDefault: boolean;
+  isProtected: boolean;
+}
+
+export interface ScmLanguages {
+  [language: string]: number;
+}
+
+export const branchesApi = {
+  list: (repositoryId: string) =>
+    fetchApi<ScmBranch[]>(`/scm/repositories/${repositoryId}/branches`),
+
+  getLanguages: (repositoryId: string) =>
+    fetchApi<ScmLanguages>(`/scm/repositories/${repositoryId}/languages`),
+};
+
+// ==================== VulnDB API ====================
+export const vulndbApi = {
+  stats: () => fetchApi<any>('/vulndb/stats'),
+
+  // CVE
+  cve: {
+    search: (params: { keyword?: string; severity?: string; isKev?: boolean; minEpss?: number; page?: number; limit?: number }) => {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => v !== undefined && searchParams.append(k, String(v)));
+      return fetchApi<any>(`/vulndb/cve?${searchParams}`);
+    },
+    get: (id: string) => fetchApi<any>(`/vulndb/cve/${id}`),
+    recent: (limit = 20) => fetchApi<any[]>(`/vulndb/cve/recent?limit=${limit}`),
+    kev: () => fetchApi<any[]>('/vulndb/cve/kev'),
+    highEpss: (threshold = 0.5) => fetchApi<any[]>(`/vulndb/cve/high-epss?threshold=${threshold}`),
+  },
+
+  // CWE
+  cwe: {
+    search: (keyword: string) => fetchApi<any[]>(`/vulndb/cwe?keyword=${encodeURIComponent(keyword)}`),
+    get: (id: string) => fetchApi<any>(`/vulndb/cwe/${id}`),
+  },
+
+  // OWASP
+  owasp: {
+    list: (year = 2021) => fetchApi<any[]>(`/vulndb/owasp?year=${year}`),
+    get: (id: string) => fetchApi<any>(`/vulndb/owasp/${id}`),
+  },
+
+  // ATT&CK
+  attack: {
+    tactics: () => fetchApi<any[]>('/vulndb/attack/tactics'),
+    techniques: (tacticId?: string) =>
+      fetchApi<any[]>(tacticId ? `/vulndb/attack/techniques?tacticId=${tacticId}` : '/vulndb/attack/techniques'),
+    getTechnique: (id: string) => fetchApi<any>(`/vulndb/attack/techniques/${id}`),
+    surface: (repositoryId?: string) =>
+      fetchApi<any>(repositoryId ? `/vulndb/attack/surface/${repositoryId}` : '/vulndb/attack/surface'),
+    killchain: () => fetchApi<any>('/vulndb/attack/killchain'),
+    groups: () => fetchApi<any[]>('/vulndb/attack/groups/relevant'),
+  },
+
+  // Sync
+  sync: {
+    status: () => fetchApi<any>('/vulndb/sync/status'),
+    trigger: (source: string) => fetchApi<any>(`/vulndb/sync/${source}`, { method: 'POST' }),
+  },
+};
+
+// ==================== SLA API ====================
+export const slaApi = {
+  summary: () => fetchApi<any>('/vulndb/sla/summary'),
+  policies: () => fetchApi<any[]>('/vulndb/sla/policies'),
+  bySeverity: () => fetchApi<any>('/vulndb/sla/summary/by-severity'),
+  atRisk: (limit = 20) => fetchApi<any[]>(`/vulndb/sla/at-risk?limit=${limit}`),
+  breached: (limit = 20) => fetchApi<any[]>(`/vulndb/sla/breached?limit=${limit}`),
+  mttr: () => fetchApi<any>('/vulndb/sla/mttr'),
+};
+
+// ==================== Threat Modeling API ====================
+export const threatModelingApi = {
+  list: (status?: string) => {
+    const params = status ? `?status=${status}` : '';
+    return fetchApi<any[]>(`/threat-modeling${params}`);
+  },
+  get: (id: string) => fetchApi<any>(`/threat-modeling/${id}`),
+  create: (data: any) =>
+    fetchApi<any>('/threat-modeling', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    fetchApi<void>(`/threat-modeling/${id}`, { method: 'DELETE' }),
+  duplicate: (id: string) =>
+    fetchApi<any>(`/threat-modeling/${id}/duplicate`, { method: 'POST' }),
+  stats: (id: string) => fetchApi<any>(`/threat-modeling/${id}/stats`),
+  diagram: (id: string) => fetchApi<any>(`/threat-modeling/${id}/diagram`),
+
+  // STRIDE Analysis
+  analyze: (id: string, methodology = 'stride') =>
+    fetchApi<any>(`/threat-modeling/${id}/analyze`, {
+      method: 'POST',
+      body: JSON.stringify({ methodology }),
+    }),
+
+  // Components
+  addComponent: (modelId: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${modelId}/components`, { method: 'POST', body: JSON.stringify(data) }),
+  updateComponent: (modelId: string, componentId: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${modelId}/components/${componentId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteComponent: (modelId: string, componentId: string) =>
+    fetchApi<void>(`/threat-modeling/${modelId}/components/${componentId}`, { method: 'DELETE' }),
+
+  // Data Flows
+  addDataFlow: (modelId: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${modelId}/data-flows`, { method: 'POST', body: JSON.stringify(data) }),
+  updateDataFlow: (modelId: string, flowId: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${modelId}/data-flows/${flowId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteDataFlow: (modelId: string, flowId: string) =>
+    fetchApi<void>(`/threat-modeling/${modelId}/data-flows/${flowId}`, { method: 'DELETE' }),
+
+  // Threats
+  addThreat: (modelId: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${modelId}/threats`, { method: 'POST', body: JSON.stringify(data) }),
+  updateThreat: (modelId: string, threatId: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${modelId}/threats/${threatId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteThreat: (modelId: string, threatId: string) =>
+    fetchApi<void>(`/threat-modeling/${modelId}/threats/${threatId}`, { method: 'DELETE' }),
+
+  // Mitigations
+  addMitigation: (modelId: string, threatId: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${modelId}/threats/${threatId}/mitigations`, { method: 'POST', body: JSON.stringify(data) }),
+  updateMitigation: (modelId: string, mitigationId: string, data: any) =>
+    fetchApi<any>(`/threat-modeling/${modelId}/mitigations/${mitigationId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteMitigation: (modelId: string, mitigationId: string) =>
+    fetchApi<void>(`/threat-modeling/${modelId}/mitigations/${mitigationId}`, { method: 'DELETE' }),
+};
+
+// ==================== SBOM API ====================
+export const sbomApi = {
+  list: () => fetchApi<any[]>('/sbom'),
+  get: (id: string) => fetchApi<any>(`/sbom/${id}`),
+  delete: (id: string) => fetchApi<void>(`/sbom/${id}`, { method: 'DELETE' }),
+  stats: (id: string) => fetchApi<any>(`/sbom/${id}/stats`),
+  tree: (id: string) => fetchApi<any>(`/sbom/${id}/tree`),
+  matchCves: (id: string) => fetchApi<any>(`/sbom/${id}/match-cves`, { method: 'POST' }),
+
+  // Upload - using FormData
+  uploadSpdx: async (repositoryId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('repositoryId', repositoryId);
+
+    const response = await fetch(`${API_URL}/sbom/upload/spdx`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new ApiError(error.message, response.status);
+    }
+
+    return response.json();
+  },
+
+  uploadCyclonedx: async (repositoryId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('repositoryId', repositoryId);
+
+    const response = await fetch(`${API_URL}/sbom/upload/cyclonedx`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new ApiError(error.message, response.status);
+    }
+
+    return response.json();
+  },
+
+  // Components
+  addComponent: (sbomId: string, data: any) =>
+    fetchApi<any>(`/sbom/${sbomId}/components`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteComponent: (componentId: string) =>
+    fetchApi<void>(`/sbom/components/${componentId}`, { method: 'DELETE' }),
+
+  // Vulnerabilities
+  updateVulnStatus: (vulnId: string, status: string) =>
+    fetchApi<any>(`/sbom/vulnerabilities/${vulnId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+};
+
+// ==================== Environments API ====================
+export const environmentsApi = {
+  list: () => fetchApi<any[]>('/environments'),
+  get: (id: string) => fetchApi<any>(`/environments/${id}`),
+  create: (data: any) =>
+    fetchApi<any>('/environments', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) =>
+    fetchApi<any>(`/environments/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    fetchApi<void>(`/environments/${id}`, { method: 'DELETE' }),
+  summary: () => fetchApi<any>('/environments/summary'),
+
+  // Deployments
+  deployments: {
+    list: (environmentId?: string) => {
+      const params = environmentId ? `?environmentId=${environmentId}` : '';
+      return fetchApi<any[]>(`/environments/deployments/all${params}`);
+    },
+    get: (id: string) => fetchApi<any>(`/environments/deployments/${id}`),
+    create: (environmentId: string, data: any) =>
+      fetchApi<any>(`/environments/${environmentId}/deployments`, { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) =>
+      fetchApi<any>(`/environments/deployments/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      fetchApi<void>(`/environments/deployments/${id}`, { method: 'DELETE' }),
+  },
+};
+
+// ==================== Compliance API ====================
+export const complianceApi = {
+  frameworks: () => fetchApi<any[]>('/compliance/frameworks'),
+  score: (repositoryId?: string) =>
+    fetchApi<any>(repositoryId ? `/compliance/score/${repositoryId}` : '/compliance/score'),
+  violations: (frameworkId: string) => fetchApi<any>(`/compliance/violations/${frameworkId}`),
+  trend: (frameworkId: string) => fetchApi<any>(`/compliance/trend/${frameworkId}`),
+  report: (frameworkId: string) => fetchApi<any>(`/compliance/report/${frameworkId}`),
+};
+
+// ==================== Pipeline API ====================
+export const pipelineApi = {
+  gates: () => fetchApi<any[]>('/pipeline/gates'),
+  getGate: (id: string) => fetchApi<any>(`/pipeline/gates/${id}`),
+  createGate: (data: any) =>
+    fetchApi<any>('/pipeline/gates', { method: 'POST', body: JSON.stringify(data) }),
+  updateGate: (id: string, data: any) =>
+    fetchApi<any>(`/pipeline/gates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteGate: (id: string) =>
+    fetchApi<void>(`/pipeline/gates/${id}`, { method: 'DELETE' }),
+  status: () => fetchApi<any>('/pipeline/status'),
+  runs: (limit = 20) => fetchApi<any[]>(`/pipeline/runs?limit=${limit}`),
+  evaluate: (scanId: string) =>
+    fetchApi<any>(`/pipeline/evaluate/${scanId}`, { method: 'POST' }),
+};
+
+// ==================== Team API ====================
+export const teamApi = {
+  members: () => fetchApi<any[]>('/team/members'),
+  invite: (email: string, role: string) =>
+    fetchApi<any>('/team/invite', { method: 'POST', body: JSON.stringify({ email, role }) }),
+  updateRole: (userId: string, role: string) =>
+    fetchApi<any>(`/team/members/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  remove: (userId: string) =>
+    fetchApi<void>(`/team/members/${userId}`, { method: 'DELETE' }),
+  pendingInvites: () => fetchApi<any[]>('/team/invites'),
+  cancelInvite: (inviteId: string) =>
+    fetchApi<void>(`/team/invites/${inviteId}`, { method: 'DELETE' }),
+};
+
+// ==================== API Keys API ====================
+export const apiKeysApi = {
+  list: () => fetchApi<any[]>('/api-keys'),
+  create: (data: { name: string; permissions: string[]; expiresAt?: string }) =>
+    fetchApi<any>('/api-keys', { method: 'POST', body: JSON.stringify(data) }),
+  revoke: (id: string) =>
+    fetchApi<void>(`/api-keys/${id}`, { method: 'DELETE' }),
+};
+
+// ==================== RAG API ====================
+export const ragApi = {
+  status: () => fetchApi<any>('/rag/status'),
+  indexAll: () => fetchApi<any>('/rag/index/all', { method: 'POST' }),
+  searchRemediation: (query: string) =>
+    fetchApi<any[]>(`/rag/search/remediation?q=${encodeURIComponent(query)}`),
+  searchAttack: (query: string) =>
+    fetchApi<any[]>(`/rag/search/attack?q=${encodeURIComponent(query)}`),
+  searchCompliance: (query: string) =>
+    fetchApi<any[]>(`/rag/search/compliance?q=${encodeURIComponent(query)}`),
+  getRemediation: (findingId: string) => fetchApi<any>(`/rag/remediation/${findingId}`),
+};
+
+// ==================== Export API ====================
+export const exportApi = {
+  findings: (format: 'json' | 'csv' = 'json', filters?: Record<string, any>) => {
+    const params = new URLSearchParams({ format });
+    if (filters) {
+      Object.entries(filters).forEach(([k, v]) => v && params.append(k, String(v)));
+    }
+    return `${API_URL}/export/findings?${params}`;
+  },
+  scans: (format: 'json' | 'csv' = 'json') =>
+    `${API_URL}/export/scans?format=${format}`,
+  sarif: (scanId: string) => `${API_URL}/export/sarif/${scanId}`,
+  sbom: (repositoryId: string) => `${API_URL}/export/sbom/${repositoryId}`,
+};
+
+// ==================== CSPM API ====================
+export const cspmApi = {
+  accounts: () => fetchApi<any[]>('/cspm/accounts'),
+  getAccount: (id: string) => fetchApi<any>(`/cspm/accounts/${id}`),
+  addAccount: (data: any) =>
+    fetchApi<any>('/cspm/accounts', { method: 'POST', body: JSON.stringify(data) }),
+  deleteAccount: (id: string) =>
+    fetchApi<void>(`/cspm/accounts/${id}`, { method: 'DELETE' }),
+  scanAccount: (id: string) =>
+    fetchApi<any>(`/cspm/accounts/${id}/scan`, { method: 'POST' }),
+  findings: (accountId?: string) => {
+    const params = accountId ? `?accountId=${accountId}` : '';
+    return fetchApi<any[]>(`/cspm/findings${params}`);
+  },
+};
+
+// ==================== SIEM API ====================
+export const siemApi = {
+  events: (filters?: Record<string, any>) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([k, v]) => v && params.append(k, String(v)));
+    }
+    return fetchApi<any[]>(`/siem/events?${params}`);
+  },
+  alerts: (status?: string) => {
+    const params = status ? `?status=${status}` : '';
+    return fetchApi<any[]>(`/siem/alerts${params}`);
+  },
+  acknowledgeAlert: (id: string) =>
+    fetchApi<any>(`/siem/alerts/${id}/acknowledge`, { method: 'POST' }),
+  resolveAlert: (id: string) =>
+    fetchApi<any>(`/siem/alerts/${id}/resolve`, { method: 'POST' }),
+  rules: () => fetchApi<any[]>('/siem/rules'),
+  createRule: (data: any) =>
+    fetchApi<any>('/siem/rules', { method: 'POST', body: JSON.stringify(data) }),
+  updateRule: (id: string, data: any) =>
+    fetchApi<any>(`/siem/rules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRule: (id: string) =>
+    fetchApi<void>(`/siem/rules/${id}`, { method: 'DELETE' }),
+};
+
+// ==================== Containers API ====================
+export const containersApi = {
+  registries: () => fetchApi<any[]>('/containers/registries'),
+  getRegistry: (id: string) => fetchApi<any>(`/containers/registries/${id}`),
+  createRegistry: (data: any) =>
+    fetchApi<any>('/containers/registries', { method: 'POST', body: JSON.stringify(data) }),
+  deleteRegistry: (id: string) =>
+    fetchApi<void>(`/containers/registries/${id}`, { method: 'DELETE' }),
+
+  images: (registryId?: string) => {
+    const params = registryId ? `?registryId=${registryId}` : '';
+    return fetchApi<any[]>(`/containers/images${params}`);
+  },
+  getImage: (id: string) => fetchApi<any>(`/containers/images/${id}`),
+
+  scans: (imageId?: string) => {
+    const params = imageId ? `?imageId=${imageId}` : '';
+    return fetchApi<any[]>(`/containers/scans${params}`);
+  },
+  scanImage: (imageId: string) =>
+    fetchApi<any>(`/containers/images/${imageId}/scan`, { method: 'POST' }),
+};
+
+// ==================== Settings API ====================
+export const settingsApi = {
+  tenant: () => fetchApi<any>('/settings/tenant'),
+  updateTenant: (data: any) =>
+    fetchApi<any>('/settings/tenant', { method: 'PUT', body: JSON.stringify(data) }),
+  notifications: () => fetchApi<any>('/settings/notifications'),
+  updateNotifications: (data: any) =>
+    fetchApi<any>('/settings/notifications', { method: 'PUT', body: JSON.stringify(data) }),
+  threatIntel: () => fetchApi<any>('/settings/threat-intel'),
+  updateThreatIntel: (data: any) =>
+    fetchApi<any>('/settings/threat-intel', { method: 'PUT', body: JSON.stringify(data) }),
+};
+
+// ==================== Projects API ====================
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectScmAccess {
+  id: string;
+  projectId: string;
+  connectionId: string;
+  createdAt: string;
+  connection?: {
+    id: string;
+    provider: string;
+    externalName: string;
+  };
+  repoAccess?: ProjectRepoAccess[];
+}
+
+export interface ProjectRepoAccess {
+  id: string;
+  projectAccessId: string;
+  externalRepoId: string;
+  fullName: string;
+  createdAt: string;
+}
+
+export const projectsApi = {
+  list: () => fetchApi<Project[]>('/projects'),
+  get: (id: string) => fetchApi<Project>(`/projects/${id}`),
+  create: (data: { name: string; description?: string }) =>
+    fetchApi<Project>('/projects', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: { name?: string; description?: string }) =>
+    fetchApi<Project>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    fetchApi<void>(`/projects/${id}`, { method: 'DELETE' }),
+
+  // SCM Access Management
+  scmAccess: {
+    list: (projectId: string) =>
+      fetchApi<ProjectScmAccess[]>(`/projects/${projectId}/scm-access`),
+    grant: (projectId: string, connectionId: string) =>
+      fetchApi<ProjectScmAccess>(`/projects/${projectId}/scm-access`, {
+        method: 'POST',
+        body: JSON.stringify({ connectionId }),
+      }),
+    revoke: (projectId: string, connectionId: string) =>
+      fetchApi<void>(`/projects/${projectId}/scm-access/${connectionId}`, { method: 'DELETE' }),
+
+    // Repo access within a connection
+    getRepos: (projectId: string, connectionId: string) =>
+      fetchApi<ProjectRepoAccess[]>(`/projects/${projectId}/scm-access/${connectionId}/repos`),
+    grantRepos: (projectId: string, connectionId: string, repos: { externalRepoId: string; fullName: string }[]) =>
+      fetchApi<ProjectRepoAccess[]>(`/projects/${projectId}/scm-access/${connectionId}/repos`, {
+        method: 'POST',
+        body: JSON.stringify({ repos }),
+      }),
+    revokeRepos: (projectId: string, connectionId: string, externalRepoIds: string[]) =>
+      fetchApi<void>(`/projects/${projectId}/scm-access/${connectionId}/repos`, {
+        method: 'DELETE',
+        body: JSON.stringify({ externalRepoIds }),
+      }),
+  },
+};
+
+
+
+=== CONNECTIONS PAGE ===
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import {
+  Button,
+  Card,
+  CardContent,
+  Badge,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  NoConnectionsEmpty,
+  PageHeader,
+  useToast,
+  useConfirmDialog,
+} from '@/components/ui';
+import { TableSkeleton } from '@/components/ui/skeletons';
+import { connectionsApi, projectsApi, type ScmConnection, type Project, type ProjectRepoAccess } from '@/lib/api';
+
+type Provider = 'github' | 'gitlab' | 'bitbucket' | 'azure-devops';
+
+interface ProviderConfig {
+  name: string;
+  icon: React.ReactNode;
+  bgColor: string;
+  patScopes: string;
+  available: boolean;
+}
+
+const providerConfigs: Record<Provider, ProviderConfig> = {
+  github: {
+    name: 'GitHub',
+    icon: (
+      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
+      </svg>
+    ),
+    bgColor: 'bg-gray-900',
+    patScopes: 'repo, read:org',
+    available: true,
+  },
+  gitlab: {
+    name: 'GitLab',
+    icon: (
+      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z" />
+      </svg>
+    ),
+    bgColor: 'bg-orange-600',
+    patScopes: 'api, read_user',
+    available: true,
+  },
+  bitbucket: {
+    name: 'Bitbucket',
+    icon: (
+      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M.778 1.211a.768.768 0 00-.768.892l3.263 19.81c.084.5.515.868 1.022.873H19.95a.772.772 0 00.77-.646l3.27-20.03a.768.768 0 00-.768-.9H.778zM14.52 15.53H9.522L8.17 8.466h7.561l-1.211 7.064z" />
+      </svg>
+    ),
+    bgColor: 'bg-blue-600',
+    patScopes: 'repository, pullrequest',
+    available: true,
+  },
+  'azure-devops': {
+    name: 'Azure DevOps',
+    icon: (
+      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M0 8.877L2.247 5.91l8.405-3.416V.022l7.37 5.393L2.966 8.338v8.225L0 15.707zm24-4.45v14.651l-5.753 4.9-9.303-3.057v3.056l-5.978-7.416 15.057 1.798V5.415z" />
+      </svg>
+    ),
+    bgColor: 'bg-blue-500',
+    patScopes: 'Code (Read), Project and Team (Read)',
+    available: true,
+  },
+};
+
+interface AvailableRepo {
+  id: string;
+  name: string;
+  fullName: string;
+  isPrivate: boolean;
+}
+
+interface ProjectAccess {
+  projectId: string;
+  projectName: string;
+  hasAccess: boolean;
+  assignedRepos: ProjectRepoAccess[];
+}
+
+export default function ConnectionsPage() {
+  const [connections, setConnections] = useState<ScmConnection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showPatModal, setShowPatModal] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<Provider>('github');
+  const [patToken, setPatToken] = useState('');
+  const [patLoading, setPatLoading] = useState(false);
+
+  // Manage Access Modal state
+  const [showManageAccessModal, setShowManageAccessModal] = useState(false);
+  const [selectedConnection, setSelectedConnection] = useState<ScmConnection | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectAccessList, setProjectAccessList] = useState<ProjectAccess[]>([]);
+  const [availableRepos, setAvailableRepos] = useState<AvailableRepo[]>([]);
+  const [accessLoading, setAccessLoading] = useState(false);
+  const [selectedProjectForRepos, setSelectedProjectForRepos] = useState<string | null>(null);
+  const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set());
+  const [savingAccess, setSavingAccess] = useState(false);
+
+  const toastCtx = useToast();
+  const { confirm } = useConfirmDialog();
+
+  const fetchConnections = async () => {
+    try {
+      const data = await connectionsApi.list();
+      setConnections(data);
+    } catch (err) {
+      toastCtx.error('Error', 'Failed to fetch connections');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConnections();
+  }, []);
+
+  const handleOAuthConnect = async (provider: Provider) => {
+    try {
+      setShowAddModal(false);
+      const { authUrl } = await connectionsApi.initiateOAuth(provider);
+      window.location.href = authUrl;
+    } catch (err) {
+      toastCtx.error('OAuth Error', err instanceof Error ? err.message : 'Failed to initiate OAuth');
+    }
+  };
+
+  const handlePatConnect = async () => {
+    if (!patToken.trim()) return;
+
+    setPatLoading(true);
+
+    try {
+      await connectionsApi.connectWithPat(selectedProvider, patToken);
+      setShowPatModal(false);
+      setPatToken('');
+      toastCtx.success('Connected', `Successfully connected to ${providerConfigs[selectedProvider].name}`);
+      fetchConnections();
+    } catch (err) {
+      toastCtx.error('Connection Failed', err instanceof Error ? err.message : 'Failed to connect with PAT');
+    } finally {
+      setPatLoading(false);
+    }
+  };
+
+  const handleDeleteConnection = async (connection: ScmConnection) => {
+    const confirmed = await confirm({
+      title: 'Remove Connection',
+      message: `Are you sure you want to remove the connection to ${connection.accountName}? This will not delete any imported repositories.`,
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await connectionsApi.delete(connection.id);
+      setConnections(connections.filter(c => c.id !== connection.id));
+      toastCtx.success('Connection Removed', `Successfully removed connection to ${connection.accountName}`);
+    } catch (err) {
+      toastCtx.error('Error', err instanceof Error ? err.message : 'Failed to delete connection');
+    }
+  };
+
+  const openPatModal = (provider: Provider) => {
+    setSelectedProvider(provider);
+    setShowAddModal(false);
+    setShowPatModal(true);
+  };
+
+  const getStatusVariant = (status: string): 'success' | 'warning' | 'danger' | 'default' => {
+    switch (status) {
+      case 'active':
+        return 'success';
+      case 'expired':
+        return 'warning';
+      case 'revoked':
+        return 'danger';
+      default:
+        return 'default';
+    }
+  };
+
+  const getProviderConfig = (provider: string): ProviderConfig => {
+    return providerConfigs[provider as Provider] || providerConfigs.github;
+  };
+
+  // Load project access data for a connection
+  const loadProjectAccess = useCallback(async (connection: ScmConnection) => {
+    setAccessLoading(true);
+    try {
+      // Fetch all projects and available repos in parallel
+      const [projectsList, reposList] = await Promise.all([
+        projectsApi.list(),
+        connectionsApi.getAvailableRepos(connection.id),
+      ]);
+
+      setProjects(projectsList);
+      setAvailableRepos(reposList);
+
+      // For each project, check if it has access to this connection
+      const accessPromises = projectsList.map(async (project) => {
+        try {
+          const scmAccess = await projectsApi.scmAccess.list(project.id);
+          const connectionAccess = scmAccess.find((a) => a.connectionId === connection.id);
+
+          return {
+            projectId: project.id,
+            projectName: project.name,
+            hasAccess: !!connectionAccess,
+            assignedRepos: connectionAccess?.repoAccess || [],
+          };
+        } catch {
+          return {
+            projectId: project.id,
+            projectName: project.name,
+            hasAccess: false,
+            assignedRepos: [],
+          };
+        }
+      });
+
+      const accessList = await Promise.all(accessPromises);
+      setProjectAccessList(accessList);
+    } catch (err) {
+      toastCtx.error('Error', 'Failed to load project access');
+    } finally {
+      setAccessLoading(false);
+    }
+  }, [toastCtx]);
+
+  const handleOpenManageAccess = async (connection: ScmConnection) => {
+    setSelectedConnection(connection);
+    setShowManageAccessModal(true);
+    setSelectedProjectForRepos(null);
+    setSelectedRepos(new Set());
+    await loadProjectAccess(connection);
+  };
+
+  const handleToggleProjectAccess = async (projectId: string, currentHasAccess: boolean) => {
+    if (!selectedConnection) return;
+
+    setSavingAccess(true);
+    try {
+      if (currentHasAccess) {
+        await projectsApi.scmAccess.revoke(projectId, selectedConnection.id);
+        toastCtx.success('Access Revoked', 'Project no longer has access to this connection');
+      } else {
+        await projectsApi.scmAccess.grant(projectId, selectedConnection.id);
+        toastCtx.success('Access Granted', 'Project can now use this connection');
+      }
+      // Reload access list
+      await loadProjectAccess(selectedConnection);
+    } catch (err) {
+      toastCtx.error('Error', err instanceof Error ? err.message : 'Failed to update access');
+    } finally {
+      setSavingAccess(false);
+    }
+  };
+
+  const handleSelectProjectForRepos = (projectId: string) => {
+    const projectAccess = projectAccessList.find((p) => p.projectId === projectId);
+    setSelectedProjectForRepos(projectId);
+    // Pre-select already assigned repos
+    const assignedRepoIds = new Set(projectAccess?.assignedRepos.map((r) => r.externalRepoId) || []);
+    setSelectedRepos(assignedRepoIds);
+  };
+
+  const handleToggleRepo = (repoId: string) => {
+    setSelectedRepos((prev) => {
+      const next = new Set(prev);
+      if (next.has(repoId)) {
+        next.delete(repoId);
+      } else {
+        next.add(repoId);
+      }
+      return next;
+    });
+  };
+
+  const handleSaveRepoAssignments = async () => {
+    if (!selectedConnection || !selectedProjectForRepos) return;
+
+    setSavingAccess(true);
+    try {
+      const projectAccess = projectAccessList.find((p) => p.projectId === selectedProjectForRepos);
+      const currentRepoIds = new Set(projectAccess?.assignedRepos.map((r) => r.externalRepoId) || []);
+
+      // Find repos to add
+      const reposToAdd = availableRepos
+        .filter((r) => selectedRepos.has(r.id) && !currentRepoIds.has(r.id))
+        .map((r) => ({ externalRepoId: r.id, fullName: r.fullName }));
+
+      // Find repos to remove
+      const reposToRemove = Array.from(currentRepoIds).filter((id) => !selectedRepos.has(id));
+
+      // Apply changes
+      if (reposToAdd.length > 0) {
+        await projectsApi.scmAccess.grantRepos(selectedProjectForRepos, selectedConnection.id, reposToAdd);
+      }
+      if (reposToRemove.length > 0) {
+        await projectsApi.scmAccess.revokeRepos(selectedProjectForRepos, selectedConnection.id, reposToRemove);
+      }
+
+      toastCtx.success('Saved', 'Repository assignments updated');
+      setSelectedProjectForRepos(null);
+      await loadProjectAccess(selectedConnection);
+    } catch (err) {
+      toastCtx.error('Error', err instanceof Error ? err.message : 'Failed to save assignments');
+    } finally {
+      setSavingAccess(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-2" />
+          </div>
+          <div className="h-10 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        </div>
+        <TableSkeleton rows={4} columns={6} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Connections"
+        description="Connect your source code management providers to import and scan repositories"
+        breadcrumbs={[{ label: 'Connections' }]}
+        actions={
+          <Button onClick={() => setShowAddModal(true)}>
+            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Connection
+          </Button>
+        }
+      />
+
+      {/* Connections Table */}
+      {connections.length === 0 ? (
+        <NoConnectionsEmpty
+          onConnect={() => setShowAddModal(true)}
+        />
+      ) : (
+        <Card variant="bordered">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow hoverable={false}>
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Scopes</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {connections.map((connection) => {
+                  const config = getProviderConfig(connection.provider);
+                  return (
+                    <TableRow key={connection.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 ${config.bgColor} text-white rounded-lg`}>
+                            {config.icon}
+                          </div>
+                          <span className="font-medium">{config.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">{connection.accountName}</span>
+                        <span className="text-gray-500 text-sm block">ID: {connection.accountId}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(connection.status)}>
+                          {connection.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {connection.scopes?.slice(0, 3).map((scope) => (
+                            <Badge key={scope} variant="default" size="sm">
+                              {scope}
+                            </Badge>
+                          ))}
+                          {connection.scopes?.length > 3 && (
+                            <Badge variant="default" size="sm">
+                              +{connection.scopes.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {new Date(connection.createdAt).toLocaleDateString()}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleOpenManageAccess(connection)}
+                          >
+                            Manage Access
+                          </Button>
+                          {connection.status === 'expired' && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleOAuthConnect(connection.provider as Provider)}
+                            >
+                              Reconnect
+                            </Button>
+                          )}
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDeleteConnection(connection)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add Connection Modal */}
+      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} size="lg">
+        <ModalHeader onClose={() => setShowAddModal(false)}>Add Connection</ModalHeader>
+        <ModalBody>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Choose a source code provider to connect. You can use OAuth for quick setup or a Personal Access Token for more control.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(Object.entries(providerConfigs) as [Provider, ProviderConfig][]).map(([key, config]) => (
+              <div
+                key={key}
+                className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${
+                  !config.available ? 'opacity-50' : ''
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`p-2 ${config.bgColor} text-white rounded-lg`}>
+                    {config.icon}
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-white">{config.name}</h3>
+                    <p className="text-xs text-gray-500">
+                      {config.available ? 'OAuth or PAT' : 'Coming soon'}
+                    </p>
+                  </div>
+                </div>
+                {config.available && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleOAuthConnect(key)}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      OAuth
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => openPatModal(key)}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      PAT
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </ModalBody>
+      </Modal>
+
+      {/* PAT Modal */}
+      <Modal isOpen={showPatModal} onClose={() => setShowPatModal(false)}>
+        <ModalHeader onClose={() => setShowPatModal(false)}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 ${providerConfigs[selectedProvider].bgColor} text-white rounded-lg`}>
+              {providerConfigs[selectedProvider].icon}
+            </div>
+            Connect with Personal Access Token
+          </div>
+        </ModalHeader>
+        <ModalBody>
+          <div className="space-y-4">
+            <p className="text-gray-600 dark:text-gray-400">
+              Enter your {providerConfigs[selectedProvider].name} Personal Access Token.
+            </p>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                <strong>Required scopes:</strong>{' '}
+                <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">
+                  {providerConfigs[selectedProvider].patScopes}
+                </code>
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Personal Access Token
+              </label>
+              <input
+                type="password"
+                value={patToken}
+                onChange={(e) => setPatToken(e.target.value)}
+                placeholder={selectedProvider === 'github' ? 'ghp_xxxxxxxxxxxx' : 'Enter token...'}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+                autoFocus
+              />
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setShowPatModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handlePatConnect} loading={patLoading} disabled={!patToken.trim()}>
+            Connect
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Manage Access Modal */}
+      <Modal
+        isOpen={showManageAccessModal}
+        onClose={() => {
+          setShowManageAccessModal(false);
+          setSelectedProjectForRepos(null);
+        }}
+        size="xl"
+      >
+        <ModalHeader
+          onClose={() => {
+            setShowManageAccessModal(false);
+            setSelectedProjectForRepos(null);
+          }}
+        >
+          <div className="flex items-center gap-3">
+            {selectedConnection && (
+              <div className={`p-2 ${getProviderConfig(selectedConnection.provider).bgColor} text-white rounded-lg`}>
+                {getProviderConfig(selectedConnection.provider).icon}
+              </div>
+            )}
+            Manage Project Access - {selectedConnection?.accountName}
+          </div>
+        </ModalHeader>
+        <ModalBody>
+          {accessLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : selectedProjectForRepos ? (
+            // Repository assignment view
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Button variant="secondary" size="sm" onClick={() => setSelectedProjectForRepos(null)}>
+                  <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back
+                </Button>
+                <span className="text-gray-600 dark:text-gray-400">
+                  Assign repositories to{' '}
+                  <strong>{projectAccessList.find((p) => p.projectId === selectedProjectForRepos)?.projectName}</strong>
+                </span>
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Select which repositories this project can access. If no repositories are selected, the project will
+                  have access to all repositories from this connection.
+                </p>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+                {availableRepos.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500">No repositories found in this connection</div>
+                ) : (
+                  availableRepos.map((repo) => (
+                    <label
+                      key={repo.id}
+                      className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRepos.has(repo.id)}
+                        onChange={() => handleToggleRepo(repo.id)}
+                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <span className="font-medium text-gray-900 dark:text-white">{repo.fullName}</span>
+                        {repo.isPrivate && (
+                          <Badge variant="default" size="sm" className="ml-2">
+                            Private
+                          </Badge>
+                        )}
+                      </div>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
+            // Project list view
+            <div className="space-y-4">
+              <p className="text-gray-600 dark:text-gray-400">
+                Select which projects can use this SCM connection, then assign specific repositories to each project.
+              </p>
+
+              {projectAccessList.length === 0 ? (
+                <div className="p-8 text-center border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <p className="text-gray-500">No projects found. Create a project first.</p>
+                </div>
+              ) : (
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-200 dark:divide-gray-700">
+                  {projectAccessList.map((project) => (
+                    <div
+                      key={project.projectId}
+                      className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={project.hasAccess}
+                          onChange={() => handleToggleProjectAccess(project.projectId, project.hasAccess)}
+                          disabled={savingAccess}
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                        <div>
+                          <span className="font-medium text-gray-900 dark:text-white">{project.projectName}</span>
+                          {project.hasAccess && (
+                            <span className="text-sm text-gray-500 ml-2">
+                              {project.assignedRepos.length === 0
+                                ? '(All repositories)'
+                                : `(${project.assignedRepos.length} repo${project.assignedRepos.length !== 1 ? 's' : ''})`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {project.hasAccess && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleSelectProjectForRepos(project.projectId)}
+                        >
+                          Assign Repos
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          {selectedProjectForRepos ? (
+            <>
+              <Button variant="secondary" onClick={() => setSelectedProjectForRepos(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveRepoAssignments} loading={savingAccess}>
+                Save Assignments
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowManageAccessModal(false);
+                setSelectedProjectForRepos(null);
+              }}
+            >
+              Close
+            </Button>
+          )}
+        </ModalFooter>
+      </Modal>
+    </div>
+  );
+}
+
+
+=== ORG CONNECTIONS PAGE ===

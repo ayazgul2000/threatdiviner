@@ -2,27 +2,35 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardContent, Badge, SeverityBadge, StatusBadge } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge, SeverityBadge, StatusBadge, Button } from '@/components/ui';
 import { StatsSkeleton, ListSkeleton, CardSkeleton } from '@/components/ui/skeletons';
 import { useAuth } from '@/lib/auth-context';
+import { useProject } from '@/contexts/project-context';
 import type { DashboardStats, Scan, Finding } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function OverviewPage() {
   const { user } = useAuth();
+  const { currentProject } = useProject();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!currentProject) {
+      setLoading(false);
+      return;
+    }
+
     const fetchStats = async () => {
       try {
+        const projectQuery = `projectId=${currentProject.id}`;
         // For now, fetch individual endpoints since /dashboard/stats may not exist yet
         const [reposRes, scansRes, findingsRes] = await Promise.all([
-          fetch(`${API_URL}/scm/repositories`, { credentials: 'include' }),
-          fetch(`${API_URL}/scm/scans?limit=5`, { credentials: 'include' }),
-          fetch(`${API_URL}/scm/findings?limit=5`, { credentials: 'include' }),
+          fetch(`${API_URL}/scm/repositories?${projectQuery}`, { credentials: 'include' }),
+          fetch(`${API_URL}/scm/scans?limit=5&${projectQuery}`, { credentials: 'include' }),
+          fetch(`${API_URL}/scm/findings?limit=5&status=open&${projectQuery}`, { credentials: 'include' }),
         ]);
 
         const repos = reposRes.ok ? await reposRes.json() : [];
@@ -74,7 +82,7 @@ export default function OverviewPage() {
     };
 
     fetchStats();
-  }, []);
+  }, [currentProject]);
 
   if (loading) {
     return (
@@ -103,15 +111,50 @@ export default function OverviewPage() {
     );
   }
 
+  if (!currentProject) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Welcome back, {user?.name || user?.email}
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Select a project to view your security posture
+          </p>
+        </div>
+
+        <Card variant="bordered">
+          <CardContent className="p-12 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">No project selected</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              Select a project from the sidebar or create a new one to get started
+            </p>
+            <Link href="/dashboard/projects">
+              <Button>
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                Go to Projects
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Welcome back, {user?.name || user?.email}
+          {currentProject.name}
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Here&apos;s an overview of your security posture
+          Security overview for {currentProject.name}
         </p>
       </div>
 

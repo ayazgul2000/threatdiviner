@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 interface CreateThreatModelDto {
   name: string;
+  projectId: string;
   description?: string;
   methodology?: string;
   repositoryId?: string;
@@ -80,6 +81,7 @@ export class ThreatModelingService {
   // ===== THREAT MODELS =====
 
   async listThreatModels(tenantId: string, options?: {
+    projectId?: string;
     status?: string;
     repositoryId?: string;
     limit?: number;
@@ -87,6 +89,7 @@ export class ThreatModelingService {
   }) {
     const where: Record<string, unknown> = { tenantId };
 
+    if (options?.projectId) where.projectId = options.projectId;
     if (options?.status) where.status = options.status;
     if (options?.repositoryId) where.repositoryId = options.repositoryId;
 
@@ -150,6 +153,7 @@ export class ThreatModelingService {
     return this.prisma.threatModel.create({
       data: {
         tenantId,
+        projectId: dto.projectId,
         name: dto.name,
         description: dto.description,
         methodology: dto.methodology || 'stride',

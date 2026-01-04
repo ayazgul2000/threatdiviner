@@ -25,11 +25,13 @@ export class ComplianceController {
   @Get('score')
   @ApiOperation({ summary: 'Get tenant-wide compliance score' })
   @ApiQuery({ name: 'framework', required: false, description: 'Filter by framework ID' })
+  @ApiQuery({ name: 'projectId', required: false, description: 'Filter by project ID' })
   async getTenantScore(
     @CurrentUser() user: AuthenticatedUser,
     @Query('framework') frameworkId?: string,
+    @Query('projectId') projectId?: string,
   ) {
-    return this.complianceService.getTenantComplianceScore(user.tenantId, frameworkId);
+    return this.complianceService.getTenantComplianceScore(user.tenantId, frameworkId, projectId);
   }
 
   @Get('score/:repositoryId')
@@ -51,17 +53,20 @@ export class ComplianceController {
   @ApiOperation({ summary: 'Get control violations for a framework' })
   @ApiQuery({ name: 'control', required: false, description: 'Filter by control ID' })
   @ApiQuery({ name: 'repository', required: false, description: 'Filter by repository ID' })
+  @ApiQuery({ name: 'projectId', required: false, description: 'Filter by project ID' })
   async getViolations(
     @CurrentUser() user: AuthenticatedUser,
     @Param('frameworkId') frameworkId: string,
     @Query('control') controlId?: string,
     @Query('repository') repositoryId?: string,
+    @Query('projectId') projectId?: string,
   ) {
     return this.complianceService.getControlViolations(
       user.tenantId,
       frameworkId,
       controlId,
       repositoryId,
+      projectId,
     );
   }
 
@@ -69,32 +74,38 @@ export class ComplianceController {
   @ApiOperation({ summary: 'Get compliance trend over time' })
   @ApiQuery({ name: 'days', required: false, description: 'Number of days (default: 30)' })
   @ApiQuery({ name: 'repository', required: false, description: 'Filter by repository ID' })
+  @ApiQuery({ name: 'projectId', required: false, description: 'Filter by project ID' })
   async getComplianceTrend(
     @CurrentUser() user: AuthenticatedUser,
     @Param('frameworkId') frameworkId: string,
     @Query('days') days?: string,
     @Query('repository') repositoryId?: string,
+    @Query('projectId') projectId?: string,
   ) {
     return this.complianceService.getComplianceTrend(
       user.tenantId,
       frameworkId,
       days ? parseInt(days, 10) : 30,
       repositoryId,
+      projectId,
     );
   }
 
   @Get('report/:frameworkId')
   @ApiOperation({ summary: 'Generate compliance report' })
   @ApiQuery({ name: 'repository', required: false, description: 'Filter by repository ID' })
+  @ApiQuery({ name: 'projectId', required: false, description: 'Filter by project ID' })
   async generateReport(
     @CurrentUser() user: AuthenticatedUser,
     @Param('frameworkId') frameworkId: string,
     @Query('repository') repositoryId?: string,
+    @Query('projectId') projectId?: string,
   ) {
     return this.complianceService.generateComplianceReport(
       user.tenantId,
       frameworkId,
       repositoryId,
+      projectId,
     );
   }
 }

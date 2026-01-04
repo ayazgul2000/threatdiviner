@@ -8,8 +8,12 @@ import {
   Query,
   UseGuards,
   Req,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { SbomService } from './sbom.service';
+import { SbomCveMatcherService, SbomPackage, SbomAnalysisResult } from './sbom-cve-matcher.service';
 import { JwtAuthGuard } from '../libs/auth/guards/jwt-auth.guard';
 
 interface AuthRequest {
@@ -22,19 +26,27 @@ interface AuthRequest {
 @Controller('sbom')
 @UseGuards(JwtAuthGuard)
 export class SbomController {
-  constructor(private readonly service: SbomService) {}
+  constructor(
+    private readonly service: SbomService,
+    private readonly cveMatcherService: SbomCveMatcherService,
+  ) {}
 
   // ===== SBOM CRUD =====
 
   @Get()
   async listSboms(
     @Req() req: AuthRequest,
+    @Query('projectId') projectId: string,
     @Query('repositoryId') repositoryId?: string,
     @Query('format') format?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
+    if (!projectId) {
+      throw new BadRequestException('projectId query parameter is required');
+    }
     return this.service.listSboms(req.user.tenantId, {
+      projectId,
       repositoryId,
       format,
       limit: limit ? parseInt(limit) : undefined,
@@ -152,5 +164,71 @@ export class SbomController {
       req.user.userId,
       body.reason,
     );
+  }
+
+  // ===== CVE MATCHING =====
+
+  @Post('analyze')
+  @HttpCode(HttpStatus.OK)
+  async analyzeSbomForCves(
+    @Body() body: { packages: SbomPackage[] },
+  ): Promise<SbomAnalysisResult> {
+    if (!body.packages || body.packages.length === 0) {
+      throw new BadRequestException('No packages provided');
+    }
+    return this.cveMatcherService.analyzeSbom(body.packages);
+  }
+
+  @Post('analyze/content')
+  @HttpCode(HttpStatus.OK)
+  async analyzeContent(
+    @Body() body: { content: string; format?: 'cyclonedx' | 'spdx' | 'auto' },
+  ): Promise<SbomAnalysisResult> {
+    if (!body.content) {
+      throw new BadRequestException('No SBOM content provided');
+    }
+
+    try {
+      const packages = this.cveMatcherService.parseSBOM(body.content, body.format);
+      return this.cveMatcherService.analyzeSbom(packages);
+    } catch (error: any) {
+      throw new BadRequestException(`Failed to parse SBOM: ${error.message}`);
+    }
+  }
+
+  @Post('check-package')
+  @HttpCode(HttpStatus.OK)
+  async checkPackage(@Body() pkg: SbomPackage) {
+    return this.cveMatcherService.findVulnerabilitiesForPackage(pkg);
+  }
+
+  @Get('supported-formats')
+  getSupportedFormats() {
+    return {
+      supported: [
+        {
+          name: 'CycloneDX',
+          versions: ['1.4', '1.5'],
+          formats: ['json', 'xml'],
+          description: 'OWASP CycloneDX Software Bill of Materials format',
+        },
+        {
+          name: 'SPDX',
+          versions: ['2.2', '2.3'],
+          formats: ['json'],
+          description: 'Software Package Data Exchange format',
+        },
+      ],
+      ecosystems: [
+        { type: 'npm', description: 'Node.js/JavaScript packages' },
+        { type: 'pypi', description: 'Python packages' },
+        { type: 'maven', description: 'Java/Maven packages' },
+        { type: 'nuget', description: '.NET/NuGet packages' },
+        { type: 'go', description: 'Go modules' },
+        { type: 'cargo', description: 'Rust crates' },
+        { type: 'gem', description: 'Ruby gems' },
+        { type: 'composer', description: 'PHP Composer packages' },
+      ],
+    };
   }
 }

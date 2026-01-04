@@ -36,6 +36,12 @@ import { RagModule } from './rag/rag.module';
 import { ThreatModelingModule } from './threat-modeling/threat-modeling.module';
 import { SbomModule } from './sbom/sbom.module';
 import { EnvironmentsModule } from './environments/environments.module';
+import { ThreatIntelModule } from './threat-intel/threat-intel.module';
+import { ContainersModule } from './containers/containers.module';
+import { ProjectsModule } from './projects/projects.module';
+import { AlertsModule } from './alerts/alerts.module';
+import { SettingsModule } from './settings/settings.module';
+import { PenTestModule } from './pentest/pentest.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -100,6 +106,12 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     ThreatModelingModule,
     SbomModule,
     EnvironmentsModule,
+    ThreatIntelModule,
+    ContainersModule,
+    ProjectsModule,
+    AlertsModule,
+    SettingsModule,
+    PenTestModule,
   ],
   controllers: [HealthController],
   providers: [

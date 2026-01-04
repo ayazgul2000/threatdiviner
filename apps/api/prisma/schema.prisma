@@ -8,104 +8,192 @@ datasource db {
 }
 
 model Tenant {
-  id               String   @id @default(uuid())
-  name             String
-  slug             String   @unique
-  plan             String   @default("free") // free, pro, enterprise
-  maxUsers         Int      @default(5) @map("max_users")
-  maxRepositories  Int      @default(10) @map("max_repositories")
-  aiTriageEnabled  Boolean  @default(false) @map("ai_triage_enabled")
-  isActive         Boolean  @default(true) @map("is_active")
-  // Retention policies
-  scanRetentionDays     Int @default(90) @map("scan_retention_days")
-  findingRetentionDays  Int @default(365) @map("finding_retention_days")
-  auditRetentionDays    Int @default(90) @map("audit_retention_days")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  users              User[]
-  scmConnections     ScmConnection[]
-  repositories       Repository[]
-  scanConfigs        ScanConfig[]
-  scans              Scan[]
-  findings           Finding[]
-  notificationConfig NotificationConfig?
-  jiraConfig         JiraConfig?
-  findingBaselines   FindingBaseline[]
-  apiKeys            ApiKey[]
+  id                      String              @id @default(uuid())
+  name                    String
+  slug                    String              @unique
+  plan                    String              @default("free")
+  createdAt               DateTime            @default(now()) @map("created_at")
+  updatedAt               DateTime            @updatedAt @map("updated_at")
+  aiTriageEnabled         Boolean             @default(false) @map("ai_triage_enabled")
+  auditRetentionDays      Int                 @default(90) @map("audit_retention_days")
+  findingRetentionDays    Int                 @default(365) @map("finding_retention_days")
+  isActive                Boolean             @default(true) @map("is_active")
+  maxRepositories         Int                 @default(10) @map("max_repositories")
+  maxUsers                Int                 @default(5) @map("max_users")
+  scanRetentionDays       Int                 @default(90) @map("scan_retention_days")
+  allowProjectConnections Boolean             @default(false) @map("allow_project_connections")
+  apiKeys              ApiKey[]
+  findingBaselines     FindingBaseline[]
+  findings             Finding[]
+  jiraConfig           JiraConfig?
+  notificationConfig   NotificationConfig?
+  orgMembers           OrgMember[]
+  projects             Project[]
+  repositories         Repository[]
+  scanConfigs          ScanConfig[]
+  scans                Scan[]
+  scmConnections       ScmConnection[]
+  users                User[]
 
   @@map("tenants")
 }
 
-model User {
-  id           String    @id @default(uuid())
-  tenantId     String    @map("tenant_id")
-  email        String
-  name         String?
-  passwordHash String?   @map("password_hash")
-  role         String    @default("member")
-  status       String    @default("active") // active, invited, disabled
-  inviteToken  String?   @unique @map("invite_token")
-  invitedBy    String?   @map("invited_by")
-  invitedAt    DateTime? @map("invited_at")
-  lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+model Project {
+  id                String                    @id @default(cuid())
+  tenantId          String                    @map("tenant_id")
+  name              String
+  description       String?
+  status            ProjectStatus             @default(ACTIVE)
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+  environments      Environment[]
+  findings          Finding[]
+  pipelineGates     PipelineGate[]
+  complianceConfigs ProjectComplianceConfig[]
+  members           ProjectMember[]
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  repositories      Repository[]
+  sboms             Sbom[]
+  scans             Scan[]
+  threatModels      ThreatModel[]
+  scmAccess         ProjectScmAccess[]
 
-  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  apiKeys ApiKey[]
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("projects")
+}
+
+model User {
+  id                 String          @id @default(uuid())
+  tenantId           String          @map("tenant_id")
+  email              String
+  passwordHash       String?         @map("password_hash")
+  role               String          @default("member")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  inviteToken        String?         @unique @map("invite_token")
+  invitedAt          DateTime?       @map("invited_at")
+  invitedBy          String?         @map("invited_by")
+  lastLoginAt        DateTime?       @map("last_login_at")
+  name               String?
+  status             String          @default("active")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  apiKeys            ApiKey[]
+  orgMemberships     OrgMember[]
+  projectMemberships ProjectMember[]
+  tenant             Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, email])
   @@map("users")
 }
 
-// SCM provider connection (OAuth or PAT)
-model ScmConnection {
-  id             String    @id @default(uuid())
-  tenantId       String    @map("tenant_id")
-  provider       String // github, gitlab, bitbucket
-  authMethod     String    @map("auth_method") // oauth, pat, github_app
-  accessToken    String    @map("access_token") // encrypted at rest
-  refreshToken   String?   @map("refresh_token") // encrypted, for OAuth refresh
-  tokenExpiresAt DateTime? @map("token_expires_at")
-  installationId String?   @map("installation_id") // GitHub App installation ID
-  externalId     String    @map("external_id") // provider's user/org ID
-  externalName   String    @map("external_name") // username or org name
-  scope          String[] // permissions granted
-  isActive       Boolean   @default(true) @map("is_active")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+model OrgMember {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tenantId  String   @map("tenant_id")
+  role      String   @default("member")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  repositories Repository[]
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("org_members")
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  projectId String   @map("project_id")
+  role      String   @default("developer")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+model ScmConnection {
+  id             String       @id @default(uuid())
+  tenantId       String       @map("tenant_id")
+  provider       String
+  authMethod     String       @map("auth_method")
+  accessToken    String       @map("access_token")
+  refreshToken   String?      @map("refresh_token")
+  tokenExpiresAt DateTime?    @map("token_expires_at")
+  installationId String?      @map("installation_id")
+  externalId     String       @map("external_id")
+  externalName   String       @map("external_name")
+  scope          String[]
+  isActive       Boolean      @default(true) @map("is_active")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  repositories   Repository[]
+  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectAccess       ProjectScmAccess[]
 
   @@unique([tenantId, provider, externalId])
   @@index([tenantId])
   @@map("scm_connections")
 }
 
-// Repository to scan
-model Repository {
-  id            String    @id @default(uuid())
-  tenantId      String    @map("tenant_id")
-  connectionId  String    @map("connection_id")
-  name          String // repo name
-  fullName      String    @map("full_name") // owner/repo
-  cloneUrl      String    @map("clone_url")
-  htmlUrl       String    @map("html_url") // web URL
-  defaultBranch String    @default("main") @map("default_branch")
-  language      String? // primary language
-  isPrivate     Boolean   @default(true) @map("is_private")
-  isActive      Boolean   @default(true) @map("is_active")
-  lastScanAt    DateTime? @map("last_scan_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+// Project-level access to SCM connections
+model ProjectScmAccess {
+  id           String        @id @default(uuid())
+  projectId    String        @map("project_id")
+  connectionId String        @map("connection_id")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection   ScmConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  repoAccess   ProjectRepoAccess[]
 
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([projectId, connectionId])
+  @@index([projectId])
+  @@index([connectionId])
+  @@map("project_scm_access")
+}
+
+// Project-level access to specific repositories from a connection
+model ProjectRepoAccess {
+  id              String           @id @default(uuid())
+  projectAccessId String           @map("project_access_id")
+  externalRepoId  String           @map("external_repo_id")
+  fullName        String           @map("full_name")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  projectAccess   ProjectScmAccess @relation(fields: [projectAccessId], references: [id], onDelete: Cascade)
+
+  @@unique([projectAccessId, externalRepoId])
+  @@index([projectAccessId])
+  @@map("project_repo_access")
+}
+
+model Repository {
+  id               String            @id @default(uuid())
+  tenantId         String            @map("tenant_id")
+  connectionId     String            @map("connection_id")
+  name             String
+  fullName         String            @map("full_name")
+  cloneUrl         String            @map("clone_url")
+  htmlUrl          String            @map("html_url")
+  defaultBranch    String            @default("main") @map("default_branch")
+  language         String?
+  isPrivate        Boolean           @default(true) @map("is_private")
+  isActive         Boolean           @default(true) @map("is_active")
+  lastScanAt       DateTime?         @map("last_scan_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  projectId        String?           @map("project_id")
+  findingBaselines FindingBaseline[]
   connection       ScmConnection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  project          Project?          @relation(fields: [projectId], references: [id])
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   scanConfig       ScanConfig?
   scans            Scan[]
-  findingBaselines FindingBaseline[]
 
   @@unique([tenantId, fullName])
   @@index([tenantId])
@@ -113,153 +201,146 @@ model Repository {
   @@map("repositories")
 }
 
-// Per-repo scan settings
 model ScanConfig {
-  id            String   @id @default(uuid())
-  tenantId      String   @map("tenant_id")
-  repositoryId  String   @unique @map("repository_id")
-  enableSast    Boolean  @default(true) @map("enable_sast")
-  enableSca     Boolean  @default(true) @map("enable_sca")
-  enableSecrets Boolean  @default(true) @map("enable_secrets")
-  enableIac     Boolean  @default(true) @map("enable_iac")
-  enableDast          Boolean  @default(false) @map("enable_dast") // requires URL
-  enableContainerScan Boolean  @default(false) @map("enable_container_scan")
-  targetUrls          String[] @default([]) @map("target_urls") // DAST target URLs
-  containerImages     String[] @default([]) @map("container_images") // Container images to scan
-  branches            String[] @default(["main", "master"])
-  autoScanOnPush      Boolean  @default(true) @map("auto_scan_on_push")
-  autoScanOnPR        Boolean  @default(true) @map("auto_scan_on_pr")
-  skipPaths     String[] @default(["node_modules", "vendor", ".git"]) @map("skip_paths")
-  customRules   Json?    @map("custom_rules") // Semgrep custom rules etc
-  // Scheduled scanning
-  scheduleEnabled     Boolean  @default(false) @map("schedule_enabled")
-  scheduleCron        String?  @map("schedule_cron") // e.g., "0 2 * * *" (2am daily)
-  scheduleTimezone    String   @default("UTC") @map("schedule_timezone")
-  lastScheduledScan   DateTime? @map("last_scheduled_scan")
-  nextScheduledScan   DateTime? @map("next_scheduled_scan")
-  // PR comment settings
-  prCommentsEnabled   Boolean  @default(true) @map("pr_comments_enabled")
-  prCommentMaxFindings Int     @default(20) @map("pr_comment_max_findings")
-  prCommentSeverities String[] @default(["critical", "high", "medium"]) @map("pr_comment_severities")
-  prDiffOnly          Boolean  @default(true) @map("pr_diff_only") // Only post findings on changed lines
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  id                   String     @id @default(uuid())
+  tenantId             String     @map("tenant_id")
+  repositoryId         String     @unique @map("repository_id")
+  enableSast           Boolean    @default(true) @map("enable_sast")
+  enableSca            Boolean    @default(true) @map("enable_sca")
+  enableSecrets        Boolean    @default(true) @map("enable_secrets")
+  enableIac            Boolean    @default(true) @map("enable_iac")
+  enableDast           Boolean    @default(false) @map("enable_dast")
+  enableContainerScan  Boolean    @default(false) @map("enable_container_scan")
+  targetUrls           String[]   @default([]) @map("target_urls")
+  containerImages      String[]   @default([]) @map("container_images")
+  branches             String[]   @default(["main", "master"])
+  autoScanOnPush       Boolean    @default(true) @map("auto_scan_on_push")
+  autoScanOnPR         Boolean    @default(true) @map("auto_scan_on_pr")
+  skipPaths            String[]   @default(["node_modules", "vendor", ".git"]) @map("skip_paths")
+  customRules          Json?      @map("custom_rules")
+  scheduleEnabled      Boolean    @default(false) @map("schedule_enabled")
+  scheduleCron         String?    @map("schedule_cron")
+  scheduleTimezone     String     @default("UTC") @map("schedule_timezone")
+  lastScheduledScan    DateTime?  @map("last_scheduled_scan")
+  nextScheduledScan    DateTime?  @map("next_scheduled_scan")
+  prCommentsEnabled    Boolean    @default(true) @map("pr_comments_enabled")
+  prCommentMaxFindings Int        @default(20) @map("pr_comment_max_findings")
+  prCommentSeverities  String[]   @default(["critical", "high", "medium"]) @map("pr_comment_severities")
+  prDiffOnly           Boolean    @default(true) @map("pr_diff_only")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt @map("updated_at")
+  repository           Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  tenant               Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@map("scan_configs")
 }
 
-// Individual scan run
 model Scan {
-  id             String    @id @default(uuid())
-  tenantId       String    @map("tenant_id")
-  repositoryId   String    @map("repository_id")
-  commitSha      String    @map("commit_sha")
+  id             String     @id @default(uuid())
+  tenantId       String     @map("tenant_id")
+  repositoryId   String     @map("repository_id")
+  commitSha      String     @map("commit_sha")
   branch         String
-  status         String    @default("pending") // pending, cloning, scanning, analyzing, completed, failed
-  triggeredBy    String    @map("triggered_by") // webhook, manual, scheduled
-  triggerEvent   String?   @map("trigger_event") // push, pull_request, workflow_dispatch
-  pullRequestId  String?   @map("pull_request_id") // PR number if triggered by PR
-  pullRequestUrl String?   @map("pull_request_url")
-  checkRunId     String?   @map("check_run_id") // GitHub check run ID for status updates
-  sarifUploadId  String?   @map("sarif_upload_id") // SARIF upload ID for native security integration
-  sarifUploadUrl String?   @map("sarif_upload_url") // URL to view in native security tab
-  startedAt      DateTime? @map("started_at")
-  completedAt    DateTime? @map("completed_at")
-  duration       Int? // seconds
-  errorMessage   String?   @map("error_message")
-  createdAt      DateTime  @default(now()) @map("created_at")
-
-  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  findings   Finding[]
+  status         String     @default("pending")
+  triggeredBy    String     @map("triggered_by")
+  triggerEvent   String?    @map("trigger_event")
+  pullRequestId  String?    @map("pull_request_id")
+  pullRequestUrl String?    @map("pull_request_url")
+  checkRunId     String?    @map("check_run_id")
+  sarifUploadId  String?    @map("sarif_upload_id")
+  sarifUploadUrl String?    @map("sarif_upload_url")
+  startedAt      DateTime?  @map("started_at")
+  completedAt    DateTime?  @map("completed_at")
+  duration       Int?
+  errorMessage   String?    @map("error_message")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  projectId      String?    @map("project_id")
+  findings       Finding[]
+  project        Project?   @relation(fields: [projectId], references: [id])
+  repository     Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([repositoryId])
+  @@index([projectId])
   @@index([status])
   @@map("scans")
 }
 
-// Vulnerability/issue found by scanner
 model Finding {
-  id            String    @id @default(uuid())
-  tenantId      String    @map("tenant_id")
-  scanId        String    @map("scan_id")
-  repositoryId  String    @map("repository_id")
-  scanner       String // semgrep, trivy, gitleaks, checkov, etc
-  ruleId        String    @map("rule_id") // scanner's rule identifier
-  severity      String // critical, high, medium, low, info
-  title         String
-  description   String?
-  filePath      String    @map("file_path")
-  startLine     Int?      @map("start_line")
-  endLine       Int?      @map("end_line")
-  snippet       String? // code snippet
-  cweId         String?   @map("cwe_id") // CWE-79, etc
-  cveId         String?   @map("cve_id") // CVE-2024-xxxx
-  owasp         String? // A01:2021, etc
-  confidence    String? // high, medium, low
-  autoFix       String?   @map("auto_fix") // Suggested auto-fix code
-  remediation   String?   // Remediation guidance
-  status        String    @default("open") // open, triaged, fixed, false_positive, accepted, baselined
-  dismissReason String?   @map("dismiss_reason") // Reason for dismissal
-  dismissedAt   DateTime? @map("dismissed_at")
-  prCommentId   String?   @map("pr_comment_id") // PR comment ID for resolving
-  triagedBy     String?   @map("triaged_by") // user ID who triaged
-  triagedAt     DateTime? @map("triaged_at")
-  fixedInCommit String?   @map("fixed_in_commit")
-  // Fingerprint for deduplication and baseline matching
-  fingerprint   String?   // Unique identifier: hash of (ruleId + filePath + snippet)
-  // Jira integration
-  jiraIssueKey  String?   @map("jira_issue_key") // e.g., SEC-123
-  jiraIssueUrl  String?   @map("jira_issue_url")
-  // AI triage fields
-  aiAnalysis       String?   @map("ai_analysis") // Claude's assessment
-  aiConfidence     Float?    @map("ai_confidence") // AI confidence score 0-1
-  aiSeverity       String?   @map("ai_severity") // AI-suggested severity
-  aiFalsePositive  Boolean?  @map("ai_false_positive") // AI thinks it's a false positive
-  aiExploitability String?   @map("ai_exploitability") // high, medium, low, none
-  aiRemediation    String?   @map("ai_remediation") // AI-suggested fix
-  aiTriagedAt      DateTime? @map("ai_triaged_at") // When AI triaged
-  firstSeenAt      DateTime  @default(now()) @map("first_seen_at") // First occurrence
-  // VulnDB enrichment fields
-  cveData          Json?     @map("cve_data") // Cached CVE details
-  cweData          Json?     @map("cwe_data") // Cached CWE details
-  owaspCategory    String?   @map("owasp_category") // A01:2021
-  complianceControls Json?   @map("compliance_controls") // Mapped compliance controls
-  attackTechniques Json?     @map("attack_techniques") // MITRE ATT&CK techniques
-  capecPatterns    Json?     @map("capec_patterns") // CAPEC attack patterns
-  riskScore        Float?    @map("risk_score") // Calculated risk score
-  isKev            Boolean   @default(false) @map("is_kev") // Known Exploited Vulnerability
-  epssScore        Float?    @map("epss_score") // EPSS score from CVE
-  enrichedAt       DateTime? @map("enriched_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  scan   Scan   @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(uuid())
+  tenantId           String    @map("tenant_id")
+  scanId             String    @map("scan_id")
+  repositoryId       String    @map("repository_id")
+  scanner            String
+  ruleId             String    @map("rule_id")
+  severity           String
+  title              String
+  description        String?
+  filePath           String    @map("file_path")
+  startLine          Int?      @map("start_line")
+  endLine            Int?      @map("end_line")
+  snippet            String?
+  cweId              String?   @map("cwe_id")
+  cveId              String?   @map("cve_id")
+  owasp              String?
+  confidence         String?
+  autoFix            String?   @map("auto_fix")
+  remediation        String?
+  status             String    @default("open")
+  dismissReason      String?   @map("dismiss_reason")
+  dismissedAt        DateTime? @map("dismissed_at")
+  prCommentId        String?   @map("pr_comment_id")
+  triagedBy          String?   @map("triaged_by")
+  triagedAt          DateTime? @map("triaged_at")
+  fixedInCommit      String?   @map("fixed_in_commit")
+  fingerprint        String?
+  jiraIssueKey       String?   @map("jira_issue_key")
+  jiraIssueUrl       String?   @map("jira_issue_url")
+  aiAnalysis         String?   @map("ai_analysis")
+  aiConfidence       Float?    @map("ai_confidence")
+  aiSeverity         String?   @map("ai_severity")
+  aiFalsePositive    Boolean?  @map("ai_false_positive")
+  aiExploitability   String?   @map("ai_exploitability")
+  aiRemediation      String?   @map("ai_remediation")
+  aiTriagedAt        DateTime? @map("ai_triaged_at")
+  firstSeenAt        DateTime  @default(now()) @map("first_seen_at")
+  cveData            Json?     @map("cve_data")
+  cweData            Json?     @map("cwe_data")
+  owaspCategory      String?   @map("owasp_category")
+  complianceControls Json?     @map("compliance_controls")
+  attackTechniques   Json?     @map("attack_techniques")
+  capecPatterns      Json?     @map("capec_patterns")
+  riskScore          Float?    @map("risk_score")
+  isKev              Boolean   @default(false) @map("is_kev")
+  epssScore          Float?    @map("epss_score")
+  enrichedAt         DateTime? @map("enriched_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  projectId          String?   @map("project_id")
+  project            Project?  @relation(fields: [projectId], references: [id])
+  scan               Scan      @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([scanId])
   @@index([repositoryId])
+  @@index([projectId])
   @@index([severity])
   @@index([status])
   @@index([fingerprint])
   @@map("findings")
 }
 
-// Webhook audit log
 model WebhookEvent {
   id          String    @id @default(uuid())
-  tenantId    String?   @map("tenant_id") // nullable - may not know tenant yet
-  provider    String // github, gitlab, bitbucket
-  eventType   String    @map("event_type") // push, pull_request, installation
-  deliveryId  String?   @map("delivery_id") // provider's delivery ID
-  signature   String // for verification
-  payload     Json // raw webhook body (sanitized)
+  tenantId    String?   @map("tenant_id")
+  provider    String
+  eventType   String    @map("event_type")
+  deliveryId  String?   @map("delivery_id")
+  signature   String
+  payload     Json
   processed   Boolean   @default(false)
   processedAt DateTime? @map("processed_at")
   error       String?
@@ -270,18 +351,14 @@ model WebhookEvent {
   @@map("webhook_events")
 }
 
-// Notification settings per tenant
 model NotificationConfig {
   id                   String   @id @default(uuid())
   tenantId             String   @unique @map("tenant_id")
-  // Slack settings
-  slackWebhookUrl      String?  @map("slack_webhook_url") // Encrypted
+  slackWebhookUrl      String?  @map("slack_webhook_url")
   slackChannel         String?  @map("slack_channel")
   slackEnabled         Boolean  @default(false) @map("slack_enabled")
-  // Email settings
   emailEnabled         Boolean  @default(false) @map("email_enabled")
   emailRecipients      String[] @default([]) @map("email_recipients")
-  // Notification triggers
   notifyOnScanStart    Boolean  @default(false) @map("notify_on_scan_start")
   notifyOnScanComplete Boolean  @default(true) @map("notify_on_scan_complete")
   notifyOnCritical     Boolean  @default(true) @map("notify_on_critical")
@@ -289,18 +366,16 @@ model NotificationConfig {
   weeklyDigestEnabled  Boolean  @default(false) @map("weekly_digest_enabled")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("notification_configs")
 }
 
-// Platform-wide configuration (for admin portal)
 model PlatformConfig {
   id                     String   @id @default(uuid())
   aiProvider             String   @default("anthropic") @map("ai_provider")
   aiModel                String   @default("claude-sonnet-4-20250514") @map("ai_model")
-  aiApiKey               String?  @map("ai_api_key") // Encrypted
+  aiApiKey               String?  @map("ai_api_key")
   defaultPlan            String   @default("free") @map("default_plan")
   defaultMaxUsers        Int      @default(5) @map("default_max_users")
   defaultMaxRepositories Int      @default(10) @map("default_max_repositories")
@@ -311,19 +386,18 @@ model PlatformConfig {
   @@map("platform_config")
 }
 
-// Audit log for tracking important actions
 model AuditLog {
-  id          String    @id @default(uuid())
-  tenantId    String?   @map("tenant_id")
-  userId      String?   @map("user_id")
-  userEmail   String?   @map("user_email")
-  action      String    // e.g., 'scan.trigger', 'finding.status_change', 'user.invite'
-  resource    String    // e.g., 'scan', 'finding', 'user', 'repository'
-  resourceId  String?   @map("resource_id")
-  details     Json?     // Additional context about the action
-  ipAddress   String?   @map("ip_address")
-  userAgent   String?   @map("user_agent")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id         String   @id @default(uuid())
+  tenantId   String?  @map("tenant_id")
+  userId     String?  @map("user_id")
+  userEmail  String?  @map("user_email")
+  action     String
+  resource   String
+  resourceId String?  @map("resource_id")
+  details    Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([tenantId])
   @@index([userId])
@@ -333,7 +407,6 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// Platform administrator accounts
 model PlatformAdmin {
   id           String    @id @default(uuid())
   email        String    @unique
@@ -347,39 +420,35 @@ model PlatformAdmin {
   @@map("platform_admins")
 }
 
-// Jira integration configuration per tenant
 model JiraConfig {
   id                   String   @id @default(uuid())
   tenantId             String   @unique @map("tenant_id")
-  jiraUrl              String   @map("jira_url") // e.g., https://company.atlassian.net
-  email                String   // Jira account email
-  apiToken             String   @map("api_token") // Encrypted API token
-  projectKey           String   @map("project_key") // Default project key (e.g., SEC)
+  jiraUrl              String   @map("jira_url")
+  email                String
+  apiToken             String   @map("api_token")
+  projectKey           String   @map("project_key")
   issueType            String   @default("Bug") @map("issue_type")
   enabled              Boolean  @default(false)
-  autoCreate           Boolean  @default(false) @map("auto_create") // Auto-create for critical/high
+  autoCreate           Boolean  @default(false) @map("auto_create")
   autoCreateSeverities String[] @default(["critical", "high"]) @map("auto_create_severities")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("jira_configs")
 }
 
-// Baseline for suppressing known/accepted findings
 model FindingBaseline {
-  id           String    @id @default(uuid())
-  tenantId     String    @map("tenant_id")
-  repositoryId String    @map("repository_id")
-  fingerprint  String    // Unique finding identifier
-  reason       String    // Why it's baselined
-  baselinedBy  String    @map("baselined_by") // User ID
-  expiresAt    DateTime? @map("expires_at") // Optional expiry
-  createdAt    DateTime  @default(now()) @map("created_at")
-
-  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  id           String     @id @default(uuid())
+  tenantId     String     @map("tenant_id")
+  repositoryId String     @map("repository_id")
+  fingerprint  String
+  reason       String
+  baselinedBy  String     @map("baselined_by")
+  expiresAt    DateTime?  @map("expires_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, repositoryId, fingerprint])
   @@index([tenantId])
@@ -387,21 +456,19 @@ model FindingBaseline {
   @@map("finding_baselines")
 }
 
-// API keys for programmatic access
 model ApiKey {
   id         String    @id @default(uuid())
   tenantId   String    @map("tenant_id")
   userId     String    @map("user_id")
-  name       String    // "CI/CD Key", "Jenkins", etc.
-  keyHash    String    @map("key_hash") // SHA256 hash of the key
-  keyPrefix  String    @map("key_prefix") // First 8 chars for display: "td_abc123..."
-  scopes     String[]  // ["scans:trigger", "findings:read"]
+  name       String
+  keyHash    String    @map("key_hash")
+  keyPrefix  String    @map("key_prefix")
+  scopes     String[]
   expiresAt  DateTime? @map("expires_at")
   lastUsedAt DateTime? @map("last_used_at")
   createdAt  DateTime  @default(now()) @map("created_at")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([keyHash])
   @@index([tenantId])
@@ -409,48 +476,44 @@ model ApiKey {
   @@map("api_keys")
 }
 
-// Cloud account for CSPM scanning
 model CloudAccount {
-  id           String    @id @default(uuid())
-  tenantId     String    @map("tenant_id")
-  provider     String    // aws, azure, gcp
-  name         String
-  accountId    String    @map("account_id") // AWS account ID, Azure subscription, GCP project
-  credentials  Json      // Encrypted credentials
-  regions      String[]  @default([])
-  enabled      Boolean   @default(true)
-  lastScanAt   DateTime? @map("last_scan_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-
-  findings CspmFinding[]
+  id          String        @id @default(uuid())
+  tenantId    String        @map("tenant_id")
+  provider    String
+  name        String
+  accountId   String        @map("account_id")
+  credentials Json
+  regions     String[]      @default([])
+  enabled     Boolean       @default(true)
+  lastScanAt  DateTime?     @map("last_scan_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  findings    CspmFinding[]
 
   @@unique([tenantId, provider, accountId])
   @@index([tenantId])
   @@map("cloud_accounts")
 }
 
-// CSPM finding from cloud security scan
 model CspmFinding {
-  id           String   @id @default(uuid())
-  accountId    String   @map("account_id")
-  provider     String   // aws, azure, gcp
-  service      String   // s3, ec2, iam, etc
+  id           String       @id @default(uuid())
+  accountId    String       @map("account_id")
+  provider     String
+  service      String
   region       String
-  resourceId   String   @map("resource_id")
-  resourceType String   @map("resource_type")
-  severity     String   // critical, high, medium, low, info
+  resourceId   String       @map("resource_id")
+  resourceType String       @map("resource_type")
+  severity     String
   title        String
   description  String
   remediation  String?
-  compliance   String[] @default([]) // Compliance frameworks affected
-  status       String   @default("open") // open, resolved, suppressed
-  firstSeenAt  DateTime @default(now()) @map("first_seen_at")
-  lastSeenAt   DateTime @default(now()) @map("last_seen_at")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  account CloudAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  compliance   String[]     @default([])
+  status       String       @default("open")
+  firstSeenAt  DateTime     @default(now()) @map("first_seen_at")
+  lastSeenAt   DateTime     @default(now()) @map("last_seen_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  account      CloudAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId])
   @@index([severity])
@@ -459,49 +522,41 @@ model CspmFinding {
   @@map("cspm_findings")
 }
 
-// SIEM alert rule
 model AlertRule {
-  id                 String    @id @default(uuid())
-  tenantId           String    @map("tenant_id")
-  name               String
-  description        String?
-  enabled            Boolean   @default(true)
-  // Conditions
-  eventTypes         String[]  @default([]) @map("event_types")
-  sources            String[]  @default([])
-  severities         String[]  @default([])
-  titlePattern       String?   @map("title_pattern")
-  // Thresholds
-  threshold          Int       @default(1)
-  timeWindowMinutes  Int       @default(5) @map("time_window_minutes")
-  // Actions
-  notifySlack        Boolean   @default(false) @map("notify_slack")
-  notifyEmail        Boolean   @default(true) @map("notify_email")
-  createJiraIssue    Boolean   @default(false) @map("create_jira_issue")
-  // Tracking
-  lastTriggeredAt    DateTime? @map("last_triggered_at")
-  triggerCount       Int       @default(0) @map("trigger_count")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-
-  history AlertHistory[]
+  id                String         @id @default(uuid())
+  tenantId          String         @map("tenant_id")
+  name              String
+  description       String?
+  enabled           Boolean        @default(true)
+  eventTypes        String[]       @default([]) @map("event_types")
+  sources           String[]       @default([])
+  severities        String[]       @default([])
+  titlePattern      String?        @map("title_pattern")
+  threshold         Int            @default(1)
+  timeWindowMinutes Int            @default(5) @map("time_window_minutes")
+  notifySlack       Boolean        @default(false) @map("notify_slack")
+  notifyEmail       Boolean        @default(true) @map("notify_email")
+  createJiraIssue   Boolean        @default(false) @map("create_jira_issue")
+  lastTriggeredAt   DateTime?      @map("last_triggered_at")
+  triggerCount      Int            @default(0) @map("trigger_count")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  history           AlertHistory[]
 
   @@index([tenantId])
   @@index([enabled])
   @@map("alert_rules")
 }
 
-// Alert trigger history
 model AlertHistory {
-  id            String   @id @default(uuid())
-  ruleId        String   @map("rule_id")
-  tenantId      String   @map("tenant_id")
-  matchedEvents Int      @map("matched_events")
-  sampleEvents  Json     @map("sample_events")
-  triggeredAt   DateTime @map("triggered_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  id            String    @id @default(uuid())
+  ruleId        String    @map("rule_id")
+  tenantId      String    @map("tenant_id")
+  matchedEvents Int       @map("matched_events")
+  sampleEvents  Json      @map("sample_events")
+  triggeredAt   DateTime  @map("triggered_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  rule          AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([ruleId])
@@ -509,60 +564,56 @@ model AlertHistory {
   @@map("alert_history")
 }
 
-// Pipeline security gates configuration
 model PipelineGate {
-  id              String    @id @default(uuid())
-  tenantId        String    @map("tenant_id")
-  repositoryId    String?   @map("repository_id") // null = default for tenant
-  stage           String    // code, build, test, deploy, prod
-  enabled         Boolean   @default(true)
-  blockSeverity   String    @default("critical") @map("block_severity") // critical, high, medium, low, none
-  notifyOnFailure Boolean   @default(true) @map("notify_on_failure")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  repositoryId    String?  @map("repository_id")
+  stage           String
+  enabled         Boolean  @default(true)
+  blockSeverity   String   @default("critical") @map("block_severity")
+  notifyOnFailure Boolean  @default(true) @map("notify_on_failure")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  projectId       String?  @map("project_id")
+  project         Project? @relation(fields: [projectId], references: [id])
 
   @@unique([tenantId, repositoryId, stage])
   @@index([tenantId])
   @@index([repositoryId])
+  @@index([projectId])
   @@map("pipeline_gates")
 }
 
-// Diff filter cache for PR scanning
 model DiffCache {
   id            String   @id @default(uuid())
   scanId        String   @unique @map("scan_id")
   pullRequestId String   @map("pull_request_id")
-  diffData      Json     @map("diff_data") // Cached PR diff hunks
+  diffData      Json     @map("diff_data")
   createdAt     DateTime @default(now()) @map("created_at")
 
   @@index([scanId])
   @@map("diff_cache")
 }
 
-// ============================================
-// VULNERABILITY DATABASE (VulnDB)
-// ============================================
-
-// CVE Database - synced from NVD
 model Cve {
-  id                String   @id // CVE-2024-12345
-  description       String
-  publishedDate     DateTime @map("published_date")
-  lastModifiedDate  DateTime @map("last_modified_date")
-  cvssV3Score       Float?   @map("cvss_v3_score")
-  cvssV3Vector      String?  @map("cvss_v3_vector")
-  cvssV3Severity    String?  @map("cvss_v3_severity") // CRITICAL, HIGH, MEDIUM, LOW
-  cvssV2Score       Float?   @map("cvss_v2_score")
-  cweIds            String[] @map("cwe_ids") // CWE-79, CWE-89
-  references        Json     @default("[]") // Array of URLs
-  affectedProducts  Json     @default("[]") @map("affected_products") // CPE data
-  epssScore         Float?   @map("epss_score") // Exploit Prediction Scoring
-  epssPercentile    Float?   @map("epss_percentile")
-  isKev             Boolean  @default(false) @map("is_kev") // Known Exploited Vulnerability
-  kevDateAdded      DateTime? @map("kev_date_added")
-  kevDueDate        DateTime? @map("kev_due_date")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String    @id
+  description      String
+  publishedDate    DateTime  @map("published_date")
+  lastModifiedDate DateTime  @map("last_modified_date")
+  cvssV3Score      Float?    @map("cvss_v3_score")
+  cvssV3Vector     String?   @map("cvss_v3_vector")
+  cvssV3Severity   String?   @map("cvss_v3_severity")
+  cvssV2Score      Float?    @map("cvss_v2_score")
+  cweIds           String[]  @map("cwe_ids")
+  references       Json      @default("[]")
+  affectedProducts Json      @default("[]") @map("affected_products")
+  epssScore        Float?    @map("epss_score")
+  epssPercentile   Float?    @map("epss_percentile")
+  isKev            Boolean   @default(false) @map("is_kev")
+  kevDateAdded     DateTime? @map("kev_date_added")
+  kevDueDate       DateTime? @map("kev_due_date")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   @@index([cvssV3Severity])
   @@index([publishedDate])
@@ -571,36 +622,32 @@ model Cve {
   @@map("cves")
 }
 
-// CWE Database - synced from MITRE
 model Cwe {
-  id                  String   @id // CWE-79
-  name                String   // Cross-site Scripting
-  description         String
-  extendedDescription String?  @map("extended_description")
-  relatedWeaknesses   String[] @map("related_weaknesses") // Parent/child CWEs
-  commonConsequences  Json     @default("[]") @map("common_consequences")
-  potentialMitigations Json    @default("[]") @map("potential_mitigations")
-  detectionMethods    Json     @default("[]") @map("detection_methods")
-  applicablePlatforms Json     @default("[]") @map("applicable_platforms")
-  likelihoodOfExploit String?  @map("likelihood_of_exploit") // High, Medium, Low
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-
-  // Compliance mappings
-  complianceMappings CweComplianceMapping[]
+  id                   String                 @id
+  name                 String
+  description          String
+  extendedDescription  String?                @map("extended_description")
+  relatedWeaknesses    String[]               @map("related_weaknesses")
+  commonConsequences   Json                   @default("[]") @map("common_consequences")
+  potentialMitigations Json                   @default("[]") @map("potential_mitigations")
+  detectionMethods     Json                   @default("[]") @map("detection_methods")
+  applicablePlatforms  Json                   @default("[]") @map("applicable_platforms")
+  likelihoodOfExploit  String?                @map("likelihood_of_exploit")
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+  complianceMappings   CweComplianceMapping[]
 
   @@map("cwes")
 }
 
-// CWE to Compliance Control mapping
 model CweComplianceMapping {
   id                 String  @id @default(uuid())
   cweId              String  @map("cwe_id")
-  cwe                Cwe     @relation(fields: [cweId], references: [id], onDelete: Cascade)
-  frameworkId        String  @map("framework_id") // soc2, pci-dss, hipaa, gdpr, iso27001, nist, cis, owasp
-  controlId          String  @map("control_id") // CC6.1, 6.5.1, etc.
+  frameworkId        String  @map("framework_id")
+  controlId          String  @map("control_id")
   controlName        String  @map("control_name")
   controlDescription String? @map("control_description")
+  cwe                Cwe     @relation(fields: [cweId], references: [id], onDelete: Cascade)
 
   @@unique([cweId, frameworkId, controlId])
   @@index([frameworkId])
@@ -608,48 +655,45 @@ model CweComplianceMapping {
   @@map("cwe_compliance_mappings")
 }
 
-// Compliance Framework definitions
 model ComplianceFramework {
-  id          String   @id // soc2, pci-dss, hipaa, etc.
-  name        String   // SOC 2 Type II
-  version     String   // 2017, 4.0, etc.
+  id          String              @id
+  name        String
+  version     String
   description String
-  sourceUrl   String   @map("source_url") // Official documentation URL
-  lastUpdated DateTime @map("last_updated")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
+  sourceUrl   String              @map("source_url")
+  lastUpdated DateTime            @map("last_updated")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
   controls    ComplianceControl[]
 
   @@map("compliance_frameworks")
 }
 
 model ComplianceControl {
-  id             String   @id @default(uuid())
-  frameworkId    String   @map("framework_id")
-  framework      ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
-  controlId      String   @map("control_id") // CC6.1, 6.5.1
-  category       String   // Access Control, Encryption
+  id             String              @id @default(uuid())
+  frameworkId    String              @map("framework_id")
+  controlId      String              @map("control_id")
+  category       String
   name           String
   description    String
   guidance       String?
-  testProcedures Json?    @map("test_procedures")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  testProcedures Json?               @map("test_procedures")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  framework      ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
 
   @@unique([frameworkId, controlId])
   @@index([frameworkId])
   @@map("compliance_controls")
 }
 
-// OWASP Top 10
 model OwaspTop10 {
-  id               String   @id // A01:2021
-  year             Int      // 2021
-  rank             Int      // 1-10
-  name             String   // Broken Access Control
+  id               String   @id
+  year             Int
+  rank             Int
+  name             String
   description      String
-  cweIds           String[] @map("cwe_ids") // Mapped CWEs
+  cweIds           String[] @map("cwe_ids")
   preventionTips   Json     @default("[]") @map("prevention_tips")
   exampleScenarios Json     @default("[]") @map("example_scenarios")
   references       Json     @default("[]")
@@ -660,13 +704,12 @@ model OwaspTop10 {
   @@map("owasp_top10")
 }
 
-// CIS Benchmarks
 model CisBenchmark {
   id          String   @id @default(uuid())
-  platform    String   // aws, azure, gcp, kubernetes, docker
-  version     String   // 1.5.0
-  controlId   String   @map("control_id") // 1.1.1
-  level       Int      // 1 or 2
+  platform    String
+  version     String
+  controlId   String   @map("control_id")
+  level       Int
   title       String
   description String
   rationale   String?
@@ -683,71 +726,66 @@ model CisBenchmark {
   @@map("cis_benchmarks")
 }
 
-// NIST 800-53 Controls
 model NistControl {
-  id                    String   @id // AC-1, AU-2
-  family                String   // Access Control, Audit
-  name                  String
-  description           String
-  supplementalGuidance  String?  @map("supplemental_guidance")
-  relatedControls       String[] @map("related_controls")
-  baselineImpact        Json     @default("{}") @map("baseline_impact") // low, moderate, high mappings
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                   String   @id
+  family               String
+  name                 String
+  description          String
+  supplementalGuidance String?  @map("supplemental_guidance")
+  relatedControls      String[] @map("related_controls")
+  baselineImpact       Json     @default("{}") @map("baseline_impact")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@index([family])
   @@map("nist_controls")
 }
 
-// MITRE ATT&CK Tactics
 model AttackTactic {
-  id           String   @id // TA0001
-  name         String   // Initial Access
-  description  String
-  shortName    String   @map("short_name") // initial-access
-  url          String   // MITRE URL
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  techniques   AttackTechnique[]
+  id          String            @id
+  name        String
+  description String
+  shortName   String            @map("short_name")
+  url         String
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  techniques  AttackTechnique[]
 
   @@map("attack_tactics")
 }
 
-// MITRE ATT&CK Techniques
 model AttackTechnique {
-  id              String   @id // T1566
-  name            String   // Phishing
-  description     String
-  tacticId        String   @map("tactic_id")
-  tactic          AttackTactic @relation(fields: [tacticId], references: [id], onDelete: Cascade)
-  isSubTechnique  Boolean  @default(false) @map("is_sub_technique")
-  parentId        String?  @map("parent_id") // For sub-techniques like T1566.001
-  platforms       String[] // Windows, Linux, macOS, etc.
-  dataSources     String[] @map("data_sources")
-  detection       String?
-  mitigations     Json     @default("[]")
-  capecIds        String[] @map("capec_ids") // Mapped CAPEC patterns
-  cweIds          String[] @map("cwe_ids") // Mapped CWEs
-  url             String   // MITRE URL
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String       @id
+  name           String
+  description    String
+  tacticId       String       @map("tactic_id")
+  isSubTechnique Boolean      @default(false) @map("is_sub_technique")
+  parentId       String?      @map("parent_id")
+  platforms      String[]
+  dataSources    String[]     @map("data_sources")
+  detection      String?
+  mitigations    Json         @default("[]")
+  capecIds       String[]     @map("capec_ids")
+  cweIds         String[]     @map("cwe_ids")
+  url            String
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  tactic         AttackTactic @relation(fields: [tacticId], references: [id], onDelete: Cascade)
 
   @@index([tacticId])
   @@index([parentId])
   @@map("attack_techniques")
 }
 
-// MITRE ATT&CK Groups (Threat Actors)
 model AttackGroup {
-  id          String   @id // G0001
-  groupId     String   @unique @map("group_id") // G0001
-  name        String   // APT1
+  id          String   @id
+  groupId     String   @unique @map("group_id")
+  name        String
   description String?
-  aliases     Json     @default("[]") // Alternative names
-  techniques  String[] // Technique IDs used by group
-  software    String[] @default([]) // Software/malware used
-  url         String   // MITRE URL
+  aliases     Json     @default("[]")
+  techniques  String[]
+  software    String[] @default([])
+  url         String
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -755,34 +793,32 @@ model AttackGroup {
   @@map("attack_groups")
 }
 
-// MITRE CAPEC Attack Patterns
 model CapecPattern {
-  id              String   @id // CAPEC-66
-  name            String   // SQL Injection
-  description     String
-  likelihood      String?  // High, Medium, Low
-  severity        String?  // High, Medium, Low
-  prerequisites   Json     @default("[]")
-  skillsRequired  Json     @default("[]") @map("skills_required")
-  resourcesRequired Json   @default("[]") @map("resources_required")
-  consequences    Json     @default("[]")
-  mitigations     Json     @default("[]")
-  relatedCwes     String[] @map("related_cwes") // CWE-89, etc.
+  id                    String   @id
+  name                  String
+  description           String
+  likelihood            String?
+  severity              String?
+  prerequisites         Json     @default("[]")
+  skillsRequired        Json     @default("[]") @map("skills_required")
+  resourcesRequired     Json     @default("[]") @map("resources_required")
+  consequences          Json     @default("[]")
+  mitigations           Json     @default("[]")
+  relatedCwes           String[] @map("related_cwes")
   relatedAttackPatterns String[] @map("related_attack_patterns")
-  url             String
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  url                   String
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("capec_patterns")
 }
 
-// Sync status tracking
 model DataSyncStatus {
-  id            String    @id // nvd, cwe, epss, kev, etc.
+  id            String    @id
   lastSyncAt    DateTime? @map("last_sync_at")
   lastSuccessAt DateTime? @map("last_success_at")
   recordCount   Int       @default(0) @map("record_count")
-  status        String    @default("pending") // pending, syncing, success, failed
+  status        String    @default("pending")
   errorMessage  String?   @map("error_message")
   nextSyncAt    DateTime? @map("next_sync_at")
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -791,84 +827,75 @@ model DataSyncStatus {
   @@map("data_sync_status")
 }
 
-// ============================================
-// THREAT MODELING
-// ============================================
-
-// Threat Model project
 model ThreatModel {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  name            String
-  description     String?
-  methodology     String   @default("stride") // stride, pasta, linddun, custom
-  status          String   @default("draft") // draft, in_progress, completed, archived
-  repositoryId    String?  @map("repository_id") // Optional link to repository
-  version         Int      @default(1)
-  createdBy       String   @map("created_by") // User ID
-  lastModifiedBy  String?  @map("last_modified_by")
-  completedAt     DateTime? @map("completed_at")
-  archivedAt      DateTime? @map("archived_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  components      ThreatModelComponent[]
-  dataFlows       ThreatModelDataFlow[]
-  threats         Threat[]
-  mitigations     ThreatMitigation[]
+  id             String                 @id @default(uuid())
+  tenantId       String                 @map("tenant_id")
+  name           String
+  description    String?
+  methodology    String                 @default("stride")
+  status         String                 @default("draft")
+  repositoryId   String?                @map("repository_id")
+  version        Int                    @default(1)
+  createdBy      String                 @map("created_by")
+  lastModifiedBy String?                @map("last_modified_by")
+  completedAt    DateTime?              @map("completed_at")
+  archivedAt     DateTime?              @map("archived_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+  projectId      String?                @map("project_id")
+  mitigations    ThreatMitigation[]
+  components     ThreatModelComponent[]
+  dataFlows      ThreatModelDataFlow[]
+  project        Project?               @relation(fields: [projectId], references: [id])
+  threats        Threat[]
 
   @@index([tenantId])
+  @@index([projectId])
   @@index([repositoryId])
   @@index([status])
   @@map("threat_models")
 }
 
-// System component in the threat model
 model ThreatModelComponent {
-  id              String   @id @default(uuid())
-  threatModelId   String   @map("threat_model_id")
-  name            String
-  description     String?
-  type            String   // process, datastore, external_entity, trust_boundary
-  technology      String?  // e.g., "Node.js API", "PostgreSQL", "React SPA"
-  criticality     String   @default("medium") // low, medium, high, critical
-  dataClassification String? @map("data_classification") // public, internal, confidential, restricted
-  // Position for diagram rendering
-  positionX       Float    @default(0) @map("position_x")
-  positionY       Float    @default(0) @map("position_y")
-  // Additional metadata
-  metadata        Json     @default("{}")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  threatModel     ThreatModel @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
-  outgoingFlows   ThreatModelDataFlow[] @relation("SourceComponent")
-  incomingFlows   ThreatModelDataFlow[] @relation("TargetComponent")
-  threats         ThreatComponentMapping[]
+  id                 String                   @id @default(uuid())
+  threatModelId      String                   @map("threat_model_id")
+  name               String
+  description        String?
+  type               String
+  technology         String?
+  criticality        String                   @default("medium")
+  dataClassification String?                  @map("data_classification")
+  positionX          Float                    @default(0) @map("position_x")
+  positionY          Float                    @default(0) @map("position_y")
+  metadata           Json                     @default("{}")
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  updatedAt          DateTime                 @updatedAt @map("updated_at")
+  threats            ThreatComponentMapping[]
+  threatModel        ThreatModel              @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
+  outgoingFlows      ThreatModelDataFlow[]    @relation("SourceComponent")
+  incomingFlows      ThreatModelDataFlow[]    @relation("TargetComponent")
 
   @@index([threatModelId])
   @@map("threat_model_components")
 }
 
-// Data flow between components
 model ThreatModelDataFlow {
-  id              String   @id @default(uuid())
-  threatModelId   String   @map("threat_model_id")
-  sourceId        String   @map("source_id")
-  targetId        String   @map("target_id")
-  label           String?
-  dataType        String?  @map("data_type") // e.g., "user_credentials", "pii", "api_response"
-  protocol        String?  // e.g., "HTTPS", "gRPC", "SQL"
-  authentication  Boolean  @default(false)
-  encryption      Boolean  @default(false)
-  metadata        Json     @default("{}")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  threatModel     ThreatModel @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
-  source          ThreatModelComponent @relation("SourceComponent", fields: [sourceId], references: [id], onDelete: Cascade)
-  target          ThreatModelComponent @relation("TargetComponent", fields: [targetId], references: [id], onDelete: Cascade)
-  threats         ThreatDataFlowMapping[]
+  id             String                  @id @default(uuid())
+  threatModelId  String                  @map("threat_model_id")
+  sourceId       String                  @map("source_id")
+  targetId       String                  @map("target_id")
+  label          String?
+  dataType       String?                 @map("data_type")
+  protocol       String?
+  authentication Boolean                 @default(false)
+  encryption     Boolean                 @default(false)
+  metadata       Json                    @default("{}")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  threats        ThreatDataFlowMapping[]
+  source         ThreatModelComponent    @relation("SourceComponent", fields: [sourceId], references: [id], onDelete: Cascade)
+  target         ThreatModelComponent    @relation("TargetComponent", fields: [targetId], references: [id], onDelete: Cascade)
+  threatModel    ThreatModel             @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
 
   @@index([threatModelId])
   @@index([sourceId])
@@ -876,36 +903,46 @@ model ThreatModelDataFlow {
   @@map("threat_model_data_flows")
 }
 
-// Identified threat
 model Threat {
-  id              String   @id @default(uuid())
-  threatModelId   String   @map("threat_model_id")
-  title           String
-  description     String
-  category        String   // STRIDE: S, T, R, I, D, E / PASTA: Stage 1-7 / LINDDUN: L, I, N, D1, D2, U, N2
-  attackVector    String?  @map("attack_vector")
-  likelihood      String   @default("medium") // very_low, low, medium, high, very_high
-  impact          String   @default("medium") // very_low, low, medium, high, very_high
-  riskScore       Float?   @map("risk_score") // Calculated: likelihood * impact
-  status          String   @default("identified") // identified, analyzed, mitigated, accepted, transferred
-  priority        Int      @default(0)
-  // Related standards
-  strideCategory  String?  @map("stride_category") // spoofing, tampering, repudiation, information_disclosure, denial_of_service, elevation_of_privilege
-  attackTechniqueIds String[] @map("attack_technique_ids") // MITRE ATT&CK technique IDs
-  cweIds          String[] @map("cwe_ids") // Related CWE IDs
-  capecIds        String[] @map("capec_ids") // Related CAPEC IDs
-  // Tracking
-  identifiedBy    String?  @map("identified_by")
-  analyzedBy      String?  @map("analyzed_by")
-  analyzedAt      DateTime? @map("analyzed_at")
-  metadata        Json     @default("{}")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  threatModel     ThreatModel @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
-  components      ThreatComponentMapping[]
-  dataFlows       ThreatDataFlowMapping[]
-  mitigations     ThreatMitigationMapping[]
+  id                 String                    @id @default(uuid())
+  threatModelId      String                    @map("threat_model_id")
+  title              String
+  description        String
+  category           String
+  attackVector       String?                   @map("attack_vector")
+  likelihood         String                    @default("medium")
+  impact             String                    @default("medium")
+  riskScore          Float?                    @map("risk_score")
+  status             String                    @default("identified")
+  priority           Int                       @default(0)
+  strideCategory     String?                   @map("stride_category")
+  attackTechniqueIds String[]                  @map("attack_technique_ids")
+  cweIds             String[]                  @map("cwe_ids")
+  capecIds           String[]                  @map("capec_ids")
+  identifiedBy       String?                   @map("identified_by")
+  analyzedBy         String?                   @map("analyzed_by")
+  analyzedAt         DateTime?                 @map("analyzed_at")
+  metadata           Json                      @default("{}")
+  createdAt          DateTime                  @default(now()) @map("created_at")
+  updatedAt          DateTime                  @updatedAt @map("updated_at")
+  commentedBy        String?                   @map("commented_by")
+  comments           String?
+  complexity         String?
+  diagramId          String?                   @map("diagram_id")
+  existingControls   String?                   @map("existing_controls")
+  finalRisk          String?                   @map("final_risk")
+  gapRecommendation  String?                   @map("gap_recommendation")
+  impactCIA          String?                   @map("impact_cia")
+  jiraCard           String?                   @map("jira_card")
+  likelihoodPre      String?                   @map("likelihood_pre")
+  riskAfterExisting  String?                   @map("risk_after_existing")
+  skillsRequired     String?                   @map("skills_required")
+  threatActor        String?                   @map("threat_actor")
+  vulnerability      String?
+  components         ThreatComponentMapping[]
+  dataFlows          ThreatDataFlowMapping[]
+  mitigations        ThreatMitigationMapping[]
+  threatModel        ThreatModel               @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
 
   @@index([threatModelId])
   @@index([category])
@@ -914,145 +951,127 @@ model Threat {
   @@map("threats")
 }
 
-// Threat to component mapping
 model ThreatComponentMapping {
-  id              String   @id @default(uuid())
-  threatId        String   @map("threat_id")
-  componentId     String   @map("component_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  threat          Threat @relation(fields: [threatId], references: [id], onDelete: Cascade)
-  component       ThreatModelComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  id          String               @id @default(uuid())
+  threatId    String               @map("threat_id")
+  componentId String               @map("component_id")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  component   ThreatModelComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  threat      Threat               @relation(fields: [threatId], references: [id], onDelete: Cascade)
 
   @@unique([threatId, componentId])
   @@map("threat_component_mappings")
 }
 
-// Threat to data flow mapping
 model ThreatDataFlowMapping {
-  id              String   @id @default(uuid())
-  threatId        String   @map("threat_id")
-  dataFlowId      String   @map("data_flow_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  threat          Threat @relation(fields: [threatId], references: [id], onDelete: Cascade)
-  dataFlow        ThreatModelDataFlow @relation(fields: [dataFlowId], references: [id], onDelete: Cascade)
+  id         String              @id @default(uuid())
+  threatId   String              @map("threat_id")
+  dataFlowId String              @map("data_flow_id")
+  createdAt  DateTime            @default(now()) @map("created_at")
+  dataFlow   ThreatModelDataFlow @relation(fields: [dataFlowId], references: [id], onDelete: Cascade)
+  threat     Threat              @relation(fields: [threatId], references: [id], onDelete: Cascade)
 
   @@unique([threatId, dataFlowId])
   @@map("threat_data_flow_mappings")
 }
 
-// Mitigation / countermeasure
 model ThreatMitigation {
-  id              String   @id @default(uuid())
-  threatModelId   String   @map("threat_model_id")
-  title           String
-  description     String
-  type            String   // preventive, detective, corrective, compensating
-  implementationStatus String @default("planned") @map("implementation_status") // planned, in_progress, implemented, verified
-  priority        Int      @default(0)
-  effort          String?  // low, medium, high
-  cost            String?  // low, medium, high
-  owner           String?  // Responsible person/team
-  dueDate         DateTime? @map("due_date")
-  implementedAt   DateTime? @map("implemented_at")
-  verifiedAt      DateTime? @map("verified_at")
-  // Links to other systems
-  jiraIssueKey    String?  @map("jira_issue_key")
-  findingIds      String[] @map("finding_ids") // Related finding IDs
-  metadata        Json     @default("{}")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  threatModel     ThreatModel @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
-  threats         ThreatMitigationMapping[]
+  id                   String                    @id @default(uuid())
+  threatModelId        String                    @map("threat_model_id")
+  title                String
+  description          String
+  type                 String
+  implementationStatus String                    @default("planned") @map("implementation_status")
+  priority             Int                       @default(0)
+  effort               String?
+  cost                 String?
+  owner                String?
+  dueDate              DateTime?                 @map("due_date")
+  implementedAt        DateTime?                 @map("implemented_at")
+  verifiedAt           DateTime?                 @map("verified_at")
+  jiraIssueKey         String?                   @map("jira_issue_key")
+  findingIds           String[]                  @map("finding_ids")
+  metadata             Json                      @default("{}")
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+  threats              ThreatMitigationMapping[]
+  threatModel          ThreatModel               @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
 
   @@index([threatModelId])
   @@index([implementationStatus])
   @@map("threat_mitigations")
 }
 
-// Threat to mitigation mapping
 model ThreatMitigationMapping {
-  id              String   @id @default(uuid())
-  threatId        String   @map("threat_id")
-  mitigationId    String   @map("mitigation_id")
-  effectiveness   String   @default("partial") // none, partial, full
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  threat          Threat @relation(fields: [threatId], references: [id], onDelete: Cascade)
-  mitigation      ThreatMitigation @relation(fields: [mitigationId], references: [id], onDelete: Cascade)
+  id            String           @id @default(uuid())
+  threatId      String           @map("threat_id")
+  mitigationId  String           @map("mitigation_id")
+  effectiveness String           @default("partial")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  mitigation    ThreatMitigation @relation(fields: [mitigationId], references: [id], onDelete: Cascade)
+  threat        Threat           @relation(fields: [threatId], references: [id], onDelete: Cascade)
 
   @@unique([threatId, mitigationId])
   @@map("threat_mitigation_mappings")
 }
 
-// ============================================
-// SBOM & ENVIRONMENT TRACKING
-// ============================================
-
-// Software Bill of Materials document
 model Sbom {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  repositoryId    String?  @map("repository_id")
+  id              String              @id @default(uuid())
+  tenantId        String              @map("tenant_id")
+  repositoryId    String?             @map("repository_id")
   name            String
-  version         String   @default("1.0.0")
-  format          String   // spdx, cyclonedx
-  formatVersion   String   @map("format_version") // SPDX-2.3, 1.5
-  source          String   // upload, scan, ci_cd
-  // Statistics
-  componentCount  Int      @default(0) @map("component_count")
-  vulnCount       Int      @default(0) @map("vuln_count")
-  criticalCount   Int      @default(0) @map("critical_count")
-  highCount       Int      @default(0) @map("high_count")
-  mediumCount     Int      @default(0) @map("medium_count")
-  lowCount        Int      @default(0) @map("low_count")
-  // Metadata
-  createdBy       String   @map("created_by")
-  rawContent      String?  @map("raw_content") // Original SBOM content
-  scanId          String?  @map("scan_id") // Link to scan if generated from scan
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
+  version         String              @default("1.0.0")
+  format          String
+  formatVersion   String              @map("format_version")
+  source          String
+  componentCount  Int                 @default(0) @map("component_count")
+  vulnCount       Int                 @default(0) @map("vuln_count")
+  criticalCount   Int                 @default(0) @map("critical_count")
+  highCount       Int                 @default(0) @map("high_count")
+  mediumCount     Int                 @default(0) @map("medium_count")
+  lowCount        Int                 @default(0) @map("low_count")
+  createdBy       String              @map("created_by")
+  rawContent      String?             @map("raw_content")
+  scanId          String?             @map("scan_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  projectId       String?             @map("project_id")
   components      SbomComponent[]
   vulnerabilities SbomVulnerability[]
+  project         Project?            @relation(fields: [projectId], references: [id])
 
   @@index([tenantId])
   @@index([repositoryId])
+  @@index([projectId])
   @@map("sboms")
 }
 
-// Component/package in SBOM
 model SbomComponent {
-  id              String   @id @default(uuid())
-  sbomId          String   @map("sbom_id")
-  purl            String?  // Package URL (pkg:npm/lodash@4.17.21)
+  id              String              @id @default(uuid())
+  sbomId          String              @map("sbom_id")
+  purl            String?
   name            String
   version         String?
-  type            String   // library, framework, application, container, os
+  type            String
   supplier        String?
   author          String?
   license         String?
-  licenseSpdxId   String?  @map("license_spdx_id")
+  licenseSpdxId   String?             @map("license_spdx_id")
   description     String?
-  checksum        String?  // SHA256 hash
-  checksumAlgo    String?  @map("checksum_algo")
+  checksum        String?
+  checksumAlgo    String?             @map("checksum_algo")
   homepage        String?
-  downloadUrl     String?  @map("download_url")
-  // Dependency info
-  isDirect        Boolean  @default(true) @map("is_direct") // Direct or transitive
-  parentId        String?  @map("parent_id") // Parent component for transitive
-  depth           Int      @default(0) // Dependency depth
-  scope           String?  // runtime, dev, test
-  // Metadata
-  externalRefs    Json     @default("[]") @map("external_refs")
-  metadata        Json     @default("{}")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  sbom            Sbom @relation(fields: [sbomId], references: [id], onDelete: Cascade)
+  downloadUrl     String?             @map("download_url")
+  isDirect        Boolean             @default(true) @map("is_direct")
+  parentId        String?             @map("parent_id")
+  depth           Int                 @default(0)
+  scope           String?
+  externalRefs    Json                @default("[]") @map("external_refs")
+  metadata        Json                @default("{}")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
   vulnerabilities SbomComponentVuln[]
+  sbom            Sbom                @relation(fields: [sbomId], references: [id], onDelete: Cascade)
 
   @@index([sbomId])
   @@index([purl])
@@ -1060,35 +1079,31 @@ model SbomComponent {
   @@map("sbom_components")
 }
 
-// Vulnerability affecting SBOM components
 model SbomVulnerability {
-  id              String   @id @default(uuid())
-  sbomId          String   @map("sbom_id")
-  cveId           String?  @map("cve_id") // CVE-2024-12345
-  ghsaId          String?  @map("ghsa_id") // GHSA-xxxx
-  osvId           String?  @map("osv_id") // OSV ID
-  severity        String   // critical, high, medium, low
-  cvssScore       Float?   @map("cvss_score")
-  cvssVector      String?  @map("cvss_vector")
-  title           String
-  description     String?
-  recommendation  String?
-  fixedVersion    String?  @map("fixed_version")
-  // Enrichment
-  epssScore       Float?   @map("epss_score")
-  isKev           Boolean  @default(false) @map("is_kev")
-  publishedAt     DateTime? @map("published_at")
-  references      Json     @default("[]")
-  // Status tracking
-  status          String   @default("open") // open, patched, ignored, accepted
-  ignoredReason   String?  @map("ignored_reason")
-  ignoredBy       String?  @map("ignored_by")
-  ignoredAt       DateTime? @map("ignored_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  sbom            Sbom @relation(fields: [sbomId], references: [id], onDelete: Cascade)
-  components      SbomComponentVuln[]
+  id             String              @id @default(uuid())
+  sbomId         String              @map("sbom_id")
+  cveId          String?             @map("cve_id")
+  ghsaId         String?             @map("ghsa_id")
+  osvId          String?             @map("osv_id")
+  severity       String
+  cvssScore      Float?              @map("cvss_score")
+  cvssVector     String?             @map("cvss_vector")
+  title          String
+  description    String?
+  recommendation String?
+  fixedVersion   String?             @map("fixed_version")
+  epssScore      Float?              @map("epss_score")
+  isKev          Boolean             @default(false) @map("is_kev")
+  publishedAt    DateTime?           @map("published_at")
+  references     Json                @default("[]")
+  status         String              @default("open")
+  ignoredReason  String?             @map("ignored_reason")
+  ignoredBy      String?             @map("ignored_by")
+  ignoredAt      DateTime?           @map("ignored_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  components     SbomComponentVuln[]
+  sbom           Sbom                @relation(fields: [sbomId], references: [id], onDelete: Cascade)
 
   @@index([sbomId])
   @@index([cveId])
@@ -1097,59 +1112,53 @@ model SbomVulnerability {
   @@map("sbom_vulnerabilities")
 }
 
-// Junction table for component-vulnerability mapping
 model SbomComponentVuln {
-  id              String   @id @default(uuid())
-  componentId     String   @map("component_id")
-  vulnId          String   @map("vuln_id")
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  component       SbomComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
-  vulnerability   SbomVulnerability @relation(fields: [vulnId], references: [id], onDelete: Cascade)
+  id            String            @id @default(uuid())
+  componentId   String            @map("component_id")
+  vulnId        String            @map("vuln_id")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  component     SbomComponent     @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  vulnerability SbomVulnerability @relation(fields: [vulnId], references: [id], onDelete: Cascade)
 
   @@unique([componentId, vulnId])
   @@map("sbom_component_vulns")
 }
 
-// Container Registry connection
 model ContainerRegistry {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  name            String
-  type            String   // docker_hub, ecr, gcr, acr, ghcr, harbor
-  url             String   // Registry URL
-  username        String?
-  password        String?  // Encrypted
-  accessToken     String?  @map("access_token") // Encrypted, for token-based auth
-  awsRegion       String?  @map("aws_region") // For ECR
-  awsAccessKeyId  String?  @map("aws_access_key_id")
-  awsSecretKey    String?  @map("aws_secret_key") // Encrypted
-  isActive        Boolean  @default(true) @map("is_active")
-  lastSyncAt      DateTime? @map("last_sync_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  images          ContainerImage[]
+  id             String           @id @default(uuid())
+  tenantId       String           @map("tenant_id")
+  name           String
+  type           String
+  url            String
+  username       String?
+  password       String?
+  accessToken    String?          @map("access_token")
+  awsRegion      String?          @map("aws_region")
+  awsAccessKeyId String?          @map("aws_access_key_id")
+  awsSecretKey   String?          @map("aws_secret_key")
+  isActive       Boolean          @default(true) @map("is_active")
+  lastSyncAt     DateTime?        @map("last_sync_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  images         ContainerImage[]
 
   @@index([tenantId])
   @@map("container_registries")
 }
 
-// Container image for scanning
 model ContainerImage {
-  id              String   @id @default(uuid())
-  registryId      String   @map("registry_id")
-  tenantId        String   @map("tenant_id")
-  repository      String   // e.g., myapp/api
-  tag             String   // e.g., latest, v1.2.3
-  digest          String?  // SHA256 digest
-  size            BigInt?  // Image size in bytes
-  platform        String?  // linux/amd64, linux/arm64
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  registry        ContainerRegistry @relation(fields: [registryId], references: [id], onDelete: Cascade)
-  scans           ContainerScan[]
+  id         String            @id @default(uuid())
+  registryId String            @map("registry_id")
+  tenantId   String            @map("tenant_id")
+  repository String
+  tag        String
+  digest     String?
+  size       BigInt?
+  platform   String?
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+  registry   ContainerRegistry @relation(fields: [registryId], references: [id], onDelete: Cascade)
+  scans      ContainerScan[]
 
   @@unique([registryId, repository, tag])
   @@index([tenantId])
@@ -1157,33 +1166,27 @@ model ContainerImage {
   @@map("container_images")
 }
 
-// Container scan result
 model ContainerScan {
-  id              String   @id @default(uuid())
-  imageId         String   @map("image_id")
-  tenantId        String   @map("tenant_id")
-  status          String   @default("pending") // pending, scanning, completed, failed
-  scanner         String   // trivy, grype, etc.
-  // Statistics
-  vulnCount       Int      @default(0) @map("vuln_count")
-  criticalCount   Int      @default(0) @map("critical_count")
-  highCount       Int      @default(0) @map("high_count")
-  mediumCount     Int      @default(0) @map("medium_count")
-  lowCount        Int      @default(0) @map("low_count")
-  // Layers
-  layerCount      Int      @default(0) @map("layer_count")
-  // Timing
-  startedAt       DateTime? @map("started_at")
-  completedAt     DateTime? @map("completed_at")
-  duration        Int?     // seconds
-  errorMessage    String?  @map("error_message")
-  // Raw output
-  rawOutput       Json?    @map("raw_output")
-  sbomId          String?  @map("sbom_id") // Generated SBOM
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  image           ContainerImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  findings        ContainerFinding[]
+  id            String             @id @default(uuid())
+  imageId       String             @map("image_id")
+  tenantId      String             @map("tenant_id")
+  status        String             @default("pending")
+  scanner       String
+  vulnCount     Int                @default(0) @map("vuln_count")
+  criticalCount Int                @default(0) @map("critical_count")
+  highCount     Int                @default(0) @map("high_count")
+  mediumCount   Int                @default(0) @map("medium_count")
+  lowCount      Int                @default(0) @map("low_count")
+  layerCount    Int                @default(0) @map("layer_count")
+  startedAt     DateTime?          @map("started_at")
+  completedAt   DateTime?          @map("completed_at")
+  duration      Int?
+  errorMessage  String?            @map("error_message")
+  rawOutput     Json?              @map("raw_output")
+  sbomId        String?            @map("sbom_id")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  findings      ContainerFinding[]
+  image         ContainerImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
 
   @@index([imageId])
   @@index([tenantId])
@@ -1191,28 +1194,24 @@ model ContainerScan {
   @@map("container_scans")
 }
 
-// Vulnerability found in container scan
 model ContainerFinding {
-  id              String   @id @default(uuid())
-  scanId          String   @map("scan_id")
-  cveId           String?  @map("cve_id")
-  severity        String   // critical, high, medium, low
-  title           String
-  description     String?
-  pkgName         String   @map("pkg_name")
-  installedVersion String  @map("installed_version")
-  fixedVersion    String?  @map("fixed_version")
-  layer           String?  // Layer where package was installed
-  // Enrichment
-  cvssScore       Float?   @map("cvss_score")
-  epssScore       Float?   @map("epss_score")
-  isKev           Boolean  @default(false) @map("is_kev")
-  // Status
-  status          String   @default("open") // open, fixed, ignored
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  scan            ContainerScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  id               String        @id @default(uuid())
+  scanId           String        @map("scan_id")
+  cveId            String?       @map("cve_id")
+  severity         String
+  title            String
+  description      String?
+  pkgName          String        @map("pkg_name")
+  installedVersion String        @map("installed_version")
+  fixedVersion     String?       @map("fixed_version")
+  layer            String?
+  cvssScore        Float?        @map("cvss_score")
+  epssScore        Float?        @map("epss_score")
+  isKev            Boolean       @default(false) @map("is_kev")
+  status           String        @default("open")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  scan             ContainerScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
 
   @@index([scanId])
   @@index([cveId])
@@ -1220,68 +1219,204 @@ model ContainerFinding {
   @@map("container_findings")
 }
 
-// Deployment environment
 model Environment {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  name            String   // development, staging, production
-  type            String   // kubernetes, ecs, cloud_run, lambda, vm
-  description     String?
-  // Kubernetes config
-  kubeConfig      String?  @map("kube_config") // Encrypted
-  kubeContext     String?  @map("kube_context")
-  namespace       String?
-  // Cloud config
-  cloudProvider   String?  @map("cloud_provider") // aws, gcp, azure
-  cloudRegion     String?  @map("cloud_region")
-  cloudProject    String?  @map("cloud_project")
-  // Status
-  isActive        Boolean  @default(true) @map("is_active")
-  lastSyncAt      DateTime? @map("last_sync_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  deployments     Deployment[]
+  id            String       @id @default(uuid())
+  tenantId      String       @map("tenant_id")
+  name          String
+  type          String
+  description   String?
+  kubeConfig    String?      @map("kube_config")
+  kubeContext   String?      @map("kube_context")
+  namespace     String?
+  cloudProvider String?      @map("cloud_provider")
+  cloudRegion   String?      @map("cloud_region")
+  cloudProject  String?      @map("cloud_project")
+  isActive      Boolean      @default(true) @map("is_active")
+  lastSyncAt    DateTime?    @map("last_sync_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  projectId     String?      @map("project_id")
+  deployments   Deployment[]
+  project       Project?     @relation(fields: [projectId], references: [id])
 
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@index([projectId])
   @@map("environments")
 }
 
-// Deployed service/application
 model Deployment {
-  id              String   @id @default(uuid())
-  environmentId   String   @map("environment_id")
-  tenantId        String   @map("tenant_id")
-  repositoryId    String?  @map("repository_id")
-  name            String   // Service name
-  version         String?  // Deployed version
-  image           String?  // Container image
-  imageDigest     String?  @map("image_digest")
-  replicas        Int      @default(1)
-  status          String   @default("unknown") // healthy, degraded, unhealthy, unknown
-  // Security posture
-  vulnCount       Int      @default(0) @map("vuln_count")
-  criticalCount   Int      @default(0) @map("critical_count")
-  lastScanId      String?  @map("last_scan_id")
-  lastSbomId      String?  @map("last_sbom_id")
-  // Metadata
-  labels          Json     @default("{}")
-  annotations     Json     @default("{}")
-  exposedPorts    Int[]    @default([]) @map("exposed_ports")
-  hasIngress      Boolean  @default(false) @map("has_ingress")
-  ingressHosts    String[] @default([]) @map("ingress_hosts")
-  // Tracking
-  deployedAt      DateTime? @map("deployed_at")
-  deployedBy      String?  @map("deployed_by")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  environment     Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  id            String      @id @default(uuid())
+  environmentId String      @map("environment_id")
+  tenantId      String      @map("tenant_id")
+  repositoryId  String?     @map("repository_id")
+  name          String
+  version       String?
+  image         String?
+  imageDigest   String?     @map("image_digest")
+  replicas      Int         @default(1)
+  status        String      @default("unknown")
+  vulnCount     Int         @default(0) @map("vuln_count")
+  criticalCount Int         @default(0) @map("critical_count")
+  lastScanId    String?     @map("last_scan_id")
+  lastSbomId    String?     @map("last_sbom_id")
+  labels        Json        @default("{}")
+  annotations   Json        @default("{}")
+  exposedPorts  Int[]       @default([]) @map("exposed_ports")
+  hasIngress    Boolean     @default(false) @map("has_ingress")
+  ingressHosts  String[]    @default([]) @map("ingress_hosts")
+  deployedAt    DateTime?   @map("deployed_at")
+  deployedBy    String?     @map("deployed_by")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
 
   @@unique([environmentId, name])
   @@index([tenantId])
   @@index([environmentId])
   @@index([repositoryId])
   @@map("deployments")
+}
+
+model ProjectComplianceConfig {
+  id                String                     @id @default(uuid())
+  tenantId          String                     @map("tenant_id")
+  projectId         String                     @map("project_id")
+  frameworkId       String                     @map("framework_id")
+  name              String
+  version           String
+  enabled           Boolean                    @default(true)
+  overallScore      Float?                     @map("overall_score")
+  compliantCount    Int                        @default(0) @map("compliant_count")
+  partialCount      Int                        @default(0) @map("partial_count")
+  nonCompliantCount Int                        @default(0) @map("non_compliant_count")
+  notAssessedCount  Int                        @default(0) @map("not_assessed_count")
+  lastAssessedAt    DateTime?                  @map("last_assessed_at")
+  lastAssessedBy    String?                    @map("last_assessed_by")
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+  project           Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  controls          ProjectComplianceControl[]
+
+  @@unique([projectId, frameworkId])
+  @@index([tenantId])
+  @@index([projectId])
+  @@map("project_compliance_configs")
+}
+
+model ProjectComplianceControl {
+  id               String                  @id @default(uuid())
+  configId         String                  @map("config_id")
+  controlId        String                  @map("control_id")
+  name             String
+  category         String?
+  description      String?
+  status           String                  @default("not_assessed")
+  evidence         String?
+  evidenceUrl      String?                 @map("evidence_url")
+  linkedFindingIds String[]                @default([]) @map("linked_finding_ids")
+  assessedAt       DateTime?               @map("assessed_at")
+  assessedBy       String?                 @map("assessed_by")
+  notes            String?
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+  config           ProjectComplianceConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@unique([configId, controlId])
+  @@index([configId])
+  @@index([status])
+  @@map("project_compliance_controls")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+// Penetration Testing Models
+model PenTestTarget {
+  id          String        @id @default(uuid())
+  tenantId    String        @map("tenant_id")
+  projectId   String?       @map("project_id")
+  name        String
+  url         String
+  type        String        @default("web") // web, api, network
+  description String?
+  authConfig  Json?         @map("auth_config") // credentials, headers, cookies
+  headers     Json?         @default("{}") // custom headers
+  isActive    Boolean       @default(true) @map("is_active")
+  lastScanAt  DateTime?     @map("last_scan_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  scans       PenTestScan[]
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@map("pentest_targets")
+}
+
+model PenTestScan {
+  id             String           @id @default(uuid())
+  tenantId       String           @map("tenant_id")
+  targetId       String           @map("target_id")
+  status         String           @default("pending") // pending, running, completed, failed, cancelled
+  scanners       String[]         @default([]) // sqlmap, nikto, sslyze, zap, nuclei
+  config         Json             @default("{}") // scanner-specific config
+  startedAt      DateTime?        @map("started_at")
+  completedAt    DateTime?        @map("completed_at")
+  duration       Int?             // seconds
+  findingsCount  Int              @default(0) @map("findings_count")
+  criticalCount  Int              @default(0) @map("critical_count")
+  highCount      Int              @default(0) @map("high_count")
+  mediumCount    Int              @default(0) @map("medium_count")
+  lowCount       Int              @default(0) @map("low_count")
+  infoCount      Int              @default(0) @map("info_count")
+  errorMessage   String?          @map("error_message")
+  rawOutput      Json?            @map("raw_output")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  target         PenTestTarget    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  findings       PenTestFinding[]
+
+  @@index([tenantId])
+  @@index([targetId])
+  @@index([status])
+  @@map("pentest_scans")
+}
+
+model PenTestFinding {
+  id             String      @id @default(uuid())
+  scanId         String      @map("scan_id")
+  tenantId       String      @map("tenant_id")
+  scanner        String      // which scanner found this
+  ruleId         String      @map("rule_id")
+  severity       String      // critical, high, medium, low, info
+  confidence     String      @default("medium") // high, medium, low
+  title          String
+  description    String?
+  url            String?     // affected URL/endpoint
+  parameter      String?     // affected parameter (for injection vulns)
+  payload        String?     // attack payload used
+  evidence       String?     // response evidence
+  cweIds         String[]    @default([]) @map("cwe_ids")
+  cveIds         String[]    @default([]) @map("cve_ids")
+  owaspIds       String[]    @default([]) @map("owasp_ids")
+  references     Json        @default("[]")
+  remediation    String?
+  status         String      @default("open") // open, confirmed, false_positive, fixed
+  verifiedAt     DateTime?   @map("verified_at")
+  verifiedBy     String?     @map("verified_by")
+  fingerprint    String?
+  metadata       Json        @default("{}")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  scan           PenTestScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId])
+  @@index([tenantId])
+  @@index([severity])
+  @@index([status])
+  @@index([scanner])
+  @@map("pentest_findings")
 }

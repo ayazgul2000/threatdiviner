@@ -1,12 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
+import * as ExcelJS from 'exceljs';
 
-export type ExportFormat = 'csv' | 'json';
+export type ExportFormat = 'csv' | 'json' | 'xlsx';
 
 export interface ExportOptions {
   format: ExportFormat;
   filters?: {
+    projectId?: string;
     repositoryId?: string;
     scanId?: string;
     severity?: string[];
@@ -36,6 +38,9 @@ export class ExportService {
 
     const where: any = { tenantId };
 
+    if (filters.projectId) {
+      where.projectId = filters.projectId;
+    }
     if (filters.repositoryId) {
       where.scan = { repositoryId: filters.repositoryId };
     }
@@ -100,13 +105,24 @@ export class ExportService {
       };
     }
 
-    // CSV format
-    const csvData = this.convertToCSV(exportData, [
+    const columns = [
       'id', 'title', 'severity', 'status', 'scanner', 'ruleId',
       'filePath', 'lineStart', 'lineEnd', 'description', 'recommendation',
       'cweId', 'cveId', 'cvss', 'repository', 'branch', 'commitSha',
       'createdAt', 'updatedAt',
-    ]);
+    ];
+
+    if (format === 'xlsx') {
+      const xlsxData = await this.convertToExcel(exportData, columns, 'Findings');
+      return {
+        filename: `findings-export-${Date.now()}.xlsx`,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        data: xlsxData,
+      };
+    }
+
+    // CSV format
+    const csvData = this.convertToCSV(exportData, columns);
 
     return {
       filename: `findings-export-${Date.now()}.csv`,
@@ -170,11 +186,22 @@ export class ExportService {
       };
     }
 
-    const csvData = this.convertToCSV(exportData, [
+    const columns = [
       'id', 'repository', 'branch', 'commitSha', 'status', 'triggeredBy',
       'startedAt', 'completedAt', 'durationSeconds', 'findingsCount',
       'errorMessage', 'createdAt',
-    ]);
+    ];
+
+    if (format === 'xlsx') {
+      const xlsxData = await this.convertToExcel(exportData, columns, 'Scans');
+      return {
+        filename: `scans-export-${Date.now()}.xlsx`,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        data: xlsxData,
+      };
+    }
+
+    const csvData = this.convertToCSV(exportData, columns);
 
     return {
       filename: `scans-export-${Date.now()}.csv`,
@@ -230,10 +257,21 @@ export class ExportService {
       };
     }
 
-    const csvData = this.convertToCSV(exportData, [
+    const columns = [
       'id', 'name', 'fullName', 'htmlUrl', 'defaultBranch', 'language',
       'isPrivate', 'totalScans', 'lastScanStatus', 'lastScanDate', 'createdAt',
-    ]);
+    ];
+
+    if (format === 'xlsx') {
+      const xlsxData = await this.convertToExcel(exportData, columns, 'Repositories');
+      return {
+        filename: `repositories-export-${Date.now()}.xlsx`,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        data: xlsxData,
+      };
+    }
+
+    const csvData = this.convertToCSV(exportData, columns);
 
     return {
       filename: `repositories-export-${Date.now()}.csv`,
@@ -285,10 +323,21 @@ export class ExportService {
       };
     }
 
-    const csvData = this.convertToCSV(exportData, [
+    const columns = [
       'id', 'action', 'resource', 'resourceId', 'userId', 'userEmail',
       'ipAddress', 'userAgent', 'details', 'createdAt',
-    ]);
+    ];
+
+    if (format === 'xlsx') {
+      const xlsxData = await this.convertToExcel(exportData, columns, 'Audit Logs');
+      return {
+        filename: `audit-logs-export-${Date.now()}.xlsx`,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        data: xlsxData,
+      };
+    }
+
+    const csvData = this.convertToCSV(exportData, columns);
 
     return {
       filename: `audit-logs-export-${Date.now()}.csv`,
@@ -383,6 +432,179 @@ export class ExportService {
     );
 
     return [header, ...rows].join('\n');
+  }
+
+  /**
+   * Convert array of objects to Excel buffer
+   */
+  private async convertToExcel(
+    data: any[],
+    columns: string[],
+    sheetName: string,
+  ): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'ThreatDiviner';
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet(sheetName);
+
+    // Define columns with headers and widths
+    worksheet.columns = columns.map((col) => ({
+      header: this.formatColumnHeader(col),
+      key: col,
+      width: this.getColumnWidth(col),
+    }));
+
+    // Style header row
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1F4E79' },
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 25;
+
+    // Add data rows
+    for (const row of data) {
+      const newRow = worksheet.addRow(row);
+
+      // Apply severity-based styling for findings
+      if (row.severity) {
+        const severityCell = newRow.getCell('severity');
+        switch (row.severity.toLowerCase()) {
+          case 'critical':
+            severityCell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FF8B0000' },
+            };
+            severityCell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+            break;
+          case 'high':
+            severityCell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFF4500' },
+            };
+            severityCell.font = { color: { argb: 'FFFFFFFF' } };
+            break;
+          case 'medium':
+            severityCell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FFFFA500' },
+            };
+            break;
+          case 'low':
+            severityCell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'FF90EE90' },
+            };
+            break;
+        }
+      }
+
+      // Apply status styling
+      if (row.status) {
+        const statusCell = newRow.getCell('status');
+        switch (row.status.toLowerCase()) {
+          case 'open':
+            statusCell.font = { color: { argb: 'FFFF0000' } };
+            break;
+          case 'resolved':
+          case 'fixed':
+            statusCell.font = { color: { argb: 'FF008000' } };
+            break;
+          case 'suppressed':
+          case 'false_positive':
+            statusCell.font = { color: { argb: 'FF808080' } };
+            break;
+        }
+      }
+    }
+
+    // Add filters to header row
+    worksheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: columns.length },
+    };
+
+    // Freeze header row
+    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // Add borders to all cells
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' },
+        };
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
+
+  /**
+   * Format column header for display
+   */
+  private formatColumnHeader(column: string): string {
+    return column
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, (str) => str.toUpperCase())
+      .replace(/Id$/, 'ID')
+      .replace(/Sha$/, 'SHA')
+      .replace(/Url$/, 'URL')
+      .replace(/Cwe/, 'CWE')
+      .replace(/Cve/, 'CVE')
+      .replace(/Cvss/, 'CVSS');
+  }
+
+  /**
+   * Get appropriate column width based on column name
+   */
+  private getColumnWidth(column: string): number {
+    const widthMap: Record<string, number> = {
+      id: 36,
+      title: 50,
+      description: 60,
+      recommendation: 60,
+      filePath: 40,
+      repository: 30,
+      fullName: 30,
+      htmlUrl: 40,
+      userAgent: 40,
+      details: 50,
+      errorMessage: 40,
+      commitSha: 12,
+      branch: 20,
+      severity: 12,
+      status: 12,
+      scanner: 15,
+      ruleId: 25,
+      lineStart: 10,
+      lineEnd: 10,
+      cweId: 12,
+      cveId: 15,
+      cvss: 8,
+      action: 20,
+      resource: 20,
+      resourceId: 36,
+      userId: 36,
+      userEmail: 30,
+      ipAddress: 15,
+      createdAt: 22,
+      updatedAt: 22,
+      startedAt: 22,
+      completedAt: 22,
+    };
+    return widthMap[column] || 15;
   }
 
   /**

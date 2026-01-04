@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatsSkeleton, TableSkeleton } from '@/components/ui/skeletons';
 import Link from 'next/link';
+import { useProject } from '@/contexts/project-context';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -41,6 +43,7 @@ interface MttrData {
 }
 
 export default function SlaDashboardPage() {
+  const { currentProject } = useProject();
   const [summary, setSummary] = useState<SlaSummary | null>(null);
   const [bySeverity, setBySeverity] = useState<SlaSummaryBySeverity[]>([]);
   const [atRisk, setAtRisk] = useState<AtRiskFinding[]>([]);
@@ -49,23 +52,36 @@ export default function SlaDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!currentProject) {
+      setLoading(false);
+      return;
+    }
     fetchData();
-  }, []);
+  }, [currentProject]);
 
   const fetchData = async () => {
     try {
       const [summaryRes, bySeverityRes, atRiskRes, breachedRes, mttrRes] = await Promise.all([
-        fetch(`${API_URL}/vulndb/sla/summary`, { credentials: 'include' }),
-        fetch(`${API_URL}/vulndb/sla/summary/by-severity`, { credentials: 'include' }),
-        fetch(`${API_URL}/vulndb/sla/at-risk`, { credentials: 'include' }),
-        fetch(`${API_URL}/vulndb/sla/breached`, { credentials: 'include' }),
-        fetch(`${API_URL}/vulndb/sla/mttr`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/summary?projectId=${currentProject!.id}`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/summary/by-severity?projectId=${currentProject!.id}`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/at-risk?projectId=${currentProject!.id}`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/breached?projectId=${currentProject!.id}`, { credentials: 'include' }),
+        fetch(`${API_URL}/vulndb/sla/mttr?projectId=${currentProject!.id}`, { credentials: 'include' }),
       ]);
 
       if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (bySeverityRes.ok) setBySeverity(await bySeverityRes.json());
-      if (atRiskRes.ok) setAtRisk(await atRiskRes.json());
-      if (breachedRes.ok) setBreached(await breachedRes.json());
+      if (bySeverityRes.ok) {
+        const data = await bySeverityRes.json();
+        setBySeverity(Array.isArray(data) ? data : []);
+      }
+      if (atRiskRes.ok) {
+        const data = await atRiskRes.json();
+        setAtRisk(Array.isArray(data) ? data : []);
+      }
+      if (breachedRes.ok) {
+        const data = await breachedRes.json();
+        setBreached(Array.isArray(data) ? data : []);
+      }
       if (mttrRes.ok) setMttr(await mttrRes.json());
     } catch (error) {
       console.error('Failed to fetch SLA data:', error);
@@ -90,6 +106,31 @@ export default function SlaDashboardPage() {
     const remainingHours = hours % 24;
     return `${days}d ${remainingHours.toFixed(0)}h`;
   };
+
+  if (!currentProject) {
+    return (
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">SLA Dashboard</h1>
+          <p className="text-gray-500">Track SLA compliance and remediation time metrics</p>
+        </div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">No project selected</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              Select a project from the sidebar to view SLA data
+            </p>
+            <Link href="/dashboard/projects">
+              <Button>Go to Projects</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

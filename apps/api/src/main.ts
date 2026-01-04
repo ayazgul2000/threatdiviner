@@ -1,12 +1,17 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log'],
+  });
 
   // Security headers with helmet
   app.use(
@@ -34,6 +39,12 @@ async function bootstrap(): Promise<void> {
       transform: true,
     }),
   );
+
+  // Enable global exception filter for graceful error handling
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  // Enable global timeout interceptor (30s default)
+  app.useGlobalInterceptors(new TimeoutInterceptor(30000));
 
   // Enable CORS with credentials for cookies
   app.enableCors({
@@ -64,8 +75,36 @@ async function bootstrap(): Promise<void> {
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
-  console.log(`ThreatDiviner API running on port ${port}`);
-  console.log(`API Documentation available at http://localhost:${port}/api/docs`);
+  logger.log(`ThreatDiviner API running on port ${port}`);
+  logger.log(`API Documentation available at http://localhost:${port}/api/docs`);
+
+  // Graceful shutdown handlers
+  const shutdown = async (signal: string) => {
+    logger.log(`${signal} received, shutting down gracefully...`);
+    try {
+      await app.close();
+      logger.log('Application closed successfully');
+      process.exit(0);
+    } catch (error) {
+      logger.error('Error during shutdown', error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', error);
+    process.exit(1);
+  });
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('Failed to bootstrap application:', error);
+  process.exit(1);
+});

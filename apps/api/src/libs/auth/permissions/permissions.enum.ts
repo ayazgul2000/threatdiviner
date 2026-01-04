@@ -48,6 +48,10 @@ export enum Permission {
 
   // Retention
   RETENTION_MANAGE = 'retention:manage',
+
+  // Alerts
+  ALERTS_READ = 'alerts:read',
+  ALERTS_WRITE = 'alerts:write',
 }
 
 export enum Role {

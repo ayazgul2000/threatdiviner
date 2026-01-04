@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { Button } from './button';
 
 interface EmptyStateProps {
-  icon?: 'scan' | 'repo' | 'finding' | 'alert' | 'chart' | 'cloud' | 'search' | 'error' | 'connection' | 'threat' | 'shield' | 'sbom';
+  icon?: 'scan' | 'repo' | 'finding' | 'alert' | 'chart' | 'cloud' | 'search' | 'error' | 'connection' | 'threat' | 'shield' | 'sbom' | 'container' | 'compliance' | 'folder' | 'users' | 'environment';
   title: string;
+  actionLabel?: string;
+  actionHref?: string;
   description?: string;
   action?: {
     label: string;
@@ -81,6 +83,31 @@ const ICONS: Record<string, React.ReactNode> = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
     </svg>
   ),
+  container: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+    </svg>
+  ),
+  compliance: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  folder: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    </svg>
+  ),
+  users: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  ),
+  environment: (
+    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+    </svg>
+  ),
 };
 
 export function EmptyState({
@@ -89,8 +116,12 @@ export function EmptyState({
   description,
   action,
   secondaryAction,
+  actionLabel,
+  actionHref,
   size = 'md',
 }: EmptyStateProps) {
+  // Support shorthand actionLabel/actionHref
+  const resolvedAction = action || (actionLabel ? { label: actionLabel, href: actionHref } : undefined);
   const sizeClasses = {
     sm: { padding: 'py-8', icon: 'w-12 h-12', title: 'text-base' },
     md: { padding: 'py-12', icon: 'w-16 h-16', title: 'text-lg' },
@@ -131,9 +162,9 @@ export function EmptyState({
           {description}
         </p>
       )}
-      {(action || secondaryAction) && (
+      {(resolvedAction || secondaryAction) && (
         <div className="flex items-center gap-3">
-          {renderActionButton(action, 'primary')}
+          {renderActionButton(resolvedAction, 'primary')}
           {renderActionButton(secondaryAction, 'secondary')}
         </div>
       )}
@@ -278,6 +309,61 @@ export function ZeroStateShield() {
       title="All clear!"
       description="No security vulnerabilities detected. Your codebase looks secure."
       size="md"
+    />
+  );
+}
+
+export function NoEnvironmentsEmpty({ onAdd }: { onAdd?: () => void }) {
+  return (
+    <EmptyState
+      icon="environment"
+      title="No environments configured"
+      description="Set up deployment environments to track security across your infrastructure."
+      action={onAdd ? { label: 'Add Environment', onClick: onAdd } : { label: 'Add Environment', href: '/dashboard/environments/new' }}
+    />
+  );
+}
+
+export function NoContainersEmpty({ onScan }: { onScan?: () => void }) {
+  return (
+    <EmptyState
+      icon="container"
+      title="No container images"
+      description="Scan container images to detect vulnerabilities in your deployments."
+      action={onScan ? { label: 'Scan Image', onClick: onScan } : { label: 'Scan Image', href: '/dashboard/containers/scan' }}
+    />
+  );
+}
+
+export function NoComplianceEmpty({ onConfigure }: { onConfigure?: () => void }) {
+  return (
+    <EmptyState
+      icon="compliance"
+      title="No compliance frameworks configured"
+      description="Enable compliance frameworks like OWASP Top 10, SOC 2, or PCI DSS to track your security posture."
+      action={onConfigure ? { label: 'Configure Compliance', onClick: onConfigure } : { label: 'Configure Compliance', href: '/dashboard/compliance/configure' }}
+    />
+  );
+}
+
+export function NoProjectSelectedEmpty() {
+  return (
+    <EmptyState
+      icon="folder"
+      title="No project selected"
+      description="Select a project from the sidebar to view its data, or create a new project to get started."
+      action={{ label: 'Go to Projects', href: '/dashboard/projects' }}
+    />
+  );
+}
+
+export function NoBaselinesEmpty({ onAdd }: { onAdd?: () => void }) {
+  return (
+    <EmptyState
+      icon="shield"
+      title="No baselined findings"
+      description="Baseline findings to mark them as accepted risks and filter them from future scans."
+      action={onAdd ? { label: 'Add Baseline', onClick: onAdd } : undefined}
     />
   );
 }

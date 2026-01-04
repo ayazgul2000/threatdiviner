@@ -36,6 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       sub: payload.sub,
+      userId: payload.sub, // Alias for controllers expecting userId
       email: payload.email,
       role: payload.role,
       tenantId: payload.tenantId,

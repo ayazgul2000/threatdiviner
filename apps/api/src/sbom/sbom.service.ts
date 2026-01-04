@@ -56,6 +56,7 @@ export class SbomService {
   async listSboms(
     tenantId: string,
     options?: {
+      projectId?: string;
       repositoryId?: string;
       format?: string;
       limit?: number;
@@ -64,6 +65,9 @@ export class SbomService {
   ) {
     const where: Prisma.SbomWhereInput = { tenantId };
 
+    if (options?.projectId) {
+      where.projectId = options.projectId;
+    }
     if (options?.repositoryId) {
       where.repositoryId = options.repositoryId;
     }
