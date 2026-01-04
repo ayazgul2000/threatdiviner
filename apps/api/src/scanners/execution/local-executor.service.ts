@@ -15,10 +15,18 @@ const ALLOWED_COMMANDS = new Set([
   'docker',
   'where',
   'which',
+  // Pen testing tools
+  'sqlmap',
+  'sslyze',
+  'nikto',
+  'pip',
+  'perl',
+  'nuclei',
 ]);
 
 // Dangerous shell metacharacters that could enable injection
-const DANGEROUS_CHARS = /[;&|`$(){}[\]<>\\!*?#~]/;
+// Note: backslash excluded to allow Windows paths
+const DANGEROUS_CHARS = /[;&|`$(){}[\]<>!*?#~]/;
 
 export interface ExecuteOptions {
   command: string;

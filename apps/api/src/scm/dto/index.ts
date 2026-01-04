@@ -34,6 +34,7 @@ export class AddRepositoryDto {
 }
 
 export class UpdateScanConfigDto {
+  // Individual enable toggles (legacy)
   @IsOptional()
   @IsBoolean()
   enableSast?: boolean;
@@ -54,6 +55,34 @@ export class UpdateScanConfigDto {
   @IsBoolean()
   enableDast?: boolean;
 
+  // Scanners array (new format from frontend)
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  scanners?: string[];
+
+  // General enable toggle
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  // Scan triggers
+  @IsOptional()
+  @IsBoolean()
+  scanOnPush?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  scanOnPr?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  scanOnSchedule?: boolean;
+
+  @IsOptional()
+  @IsString()
+  schedulePattern?: string | null;
+
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -63,6 +92,16 @@ export class UpdateScanConfigDto {
   @IsArray()
   @IsString({ each: true })
   skipPaths?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  targetUrls?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  containerImages?: string[];
 }
 
 export class TriggerScanDto {

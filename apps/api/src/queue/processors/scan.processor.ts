@@ -11,7 +11,6 @@ import { BanditScanner } from '../../scanners/sast/bandit';
 import { GosecScanner } from '../../scanners/sast/gosec';
 import { TrivyScanner } from '../../scanners/sca/trivy';
 import { GitleaksScanner } from '../../scanners/secrets/gitleaks';
-import { TruffleHogScanner } from '../../scanners/secrets/trufflehog';
 import { CheckovScanner } from '../../scanners/iac/checkov';
 import { NucleiScanner } from '../../scanners/dast/nuclei';
 import { FindingProcessorService } from '../../scanners/services/finding-processor.service';
@@ -44,7 +43,6 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly gosecScanner: GosecScanner,
     private readonly trivyScanner: TrivyScanner,
     private readonly gitleaksScanner: GitleaksScanner,
-    private readonly trufflehogScanner: TruffleHogScanner,
     private readonly checkovScanner: CheckovScanner,
     private readonly nucleiScanner: NucleiScanner,
     private readonly findingProcessor: FindingProcessorService,
@@ -61,21 +59,54 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    this.worker = new Worker(
-      QUEUE_NAMES.SCAN,
-      async (job: Job<ScanJobData>) => this.process(job),
-      { connection: this.connection },
-    );
+    try {
+      this.logger.log(`Connecting to Redis at ${this.connection.host}:${this.connection.port}...`);
 
-    this.worker.on('completed', (job) => {
-      this.logger.log(`Job ${job.id} completed`);
-    });
+      this.worker = new Worker(
+        QUEUE_NAMES.SCAN,
+        async (job: Job<ScanJobData>) => this.process(job),
+        {
+          connection: this.connection,
+          concurrency: 2, // Process up to 2 jobs concurrently
+        },
+      );
 
-    this.worker.on('failed', (job, err) => {
-      this.logger.error(`Job ${job?.id} failed: ${err.message}`);
-    });
+      this.worker.on('completed', (job) => {
+        this.logger.log(`Job ${job.id} completed successfully`);
+      });
 
-    this.logger.log('Scan worker started');
+      this.worker.on('failed', (job, err) => {
+        this.logger.error(`Job ${job?.id} failed: ${err.message}`, err.stack);
+      });
+
+      this.worker.on('error', (err) => {
+        this.logger.error(`Worker error: ${err.message}`, err.stack);
+      });
+
+      this.worker.on('ready', () => {
+        this.logger.log('Scan worker connected to Redis and ready to process jobs');
+      });
+
+      this.worker.on('active', (job) => {
+        this.logger.log(`Job ${job.id} started processing for ${job.data?.fullName || 'unknown'}`);
+      });
+
+      this.worker.on('progress', (job, progress) => {
+        this.logger.debug(`Job ${job.id} progress: ${progress}%`);
+      });
+
+      this.worker.on('stalled', (jobId) => {
+        this.logger.warn(`Job ${jobId} has stalled`);
+      });
+
+      // Wait for the worker to be ready
+      await this.worker.waitUntilReady();
+      this.logger.log(`Scan worker started on queue '${QUEUE_NAMES.SCAN}'`);
+    } catch (error) {
+      this.logger.error(`Failed to start scan worker: ${error}`);
+      // Don't throw - allow app to start even if Redis is not available
+      this.logger.warn('Scan processing will not work until Redis is available');
+    }
   }
 
   async onModuleDestroy() {
@@ -259,12 +290,10 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       this.logger.log('Added Trivy scanner (SCA)');
     }
 
-    // Secrets Scanners - always run for secrets detection
+    // Secrets Scanner (Gitleaks) - always run for secrets detection
     if (config.enableSecrets !== false) {
       scanners.push(this.gitleaksScanner);
       this.logger.log('Added Gitleaks scanner (secrets)');
-      scanners.push(this.trufflehogScanner);
-      this.logger.log('Added TruffleHog scanner (secrets)');
     }
 
     // IaC Scanner (Checkov) - run when IaC files detected

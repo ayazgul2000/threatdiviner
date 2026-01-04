@@ -25,7 +25,6 @@ import { TrivyScanner } from './sca/trivy/trivy.scanner';
 
 // Secrets Scanners
 import { GitleaksScanner } from './secrets/gitleaks/gitleaks.scanner';
-import { TruffleHogScanner } from './secrets/trufflehog/trufflehog.scanner';
 
 // IaC Scanners
 import { CheckovScanner } from './iac/checkov/checkov.scanner';
@@ -63,7 +62,6 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 
     // Secrets Scanners
     GitleaksScanner,
-    TruffleHogScanner,
 
     // IaC Scanners
     CheckovScanner,
@@ -89,7 +87,6 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     GosecScanner,
     TrivyScanner,
     GitleaksScanner,
-    TruffleHogScanner,
     CheckovScanner,
     NucleiScanner,
     ZapScanner,

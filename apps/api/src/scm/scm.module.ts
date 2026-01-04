@@ -4,7 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
 import { ScmController } from './scm.controller';
 import { WebhooksController } from './webhooks.controller';
-import { ScmService, CryptoService, PRCommentsService } from './services';
+import { ScmService, CryptoService, PRCommentsService, ConnectionStatusService } from './services';
 import { SarifUploadService } from './services/sarif-upload.service';
 import { GitHubProvider, GitLabProvider, BitbucketProvider, AzureDevOpsProvider } from './providers';
 
@@ -16,6 +16,7 @@ import { GitHubProvider, GitLabProvider, BitbucketProvider, AzureDevOpsProvider 
     CryptoService,
     PRCommentsService,
     SarifUploadService,
+    ConnectionStatusService,
     GitHubProvider,
     GitLabProvider,
     BitbucketProvider,
@@ -26,6 +27,7 @@ import { GitHubProvider, GitLabProvider, BitbucketProvider, AzureDevOpsProvider 
     CryptoService,
     PRCommentsService,
     SarifUploadService,
+    ConnectionStatusService,
     GitHubProvider,
     GitLabProvider,
     BitbucketProvider,

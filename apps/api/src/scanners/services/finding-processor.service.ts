@@ -22,11 +22,19 @@ export class FindingProcessorService {
 
     this.logger.log(`Storing ${findings.length} findings for scan ${scanId}`);
 
+    // Get the scan to retrieve projectId
+    const scan = await this.prisma.scan.findUnique({
+      where: { id: scanId },
+      select: { projectId: true },
+    });
+    const projectId = scan?.projectId || null;
+
     // Transform to Prisma format
     const findingsData = findings.map((f) => ({
       tenantId,
       scanId,
       repositoryId,
+      projectId, // Associate findings with the scan's project
       scanner: f.scanner,
       ruleId: this.extractShortRuleId(f.ruleId),
       severity: f.severity,

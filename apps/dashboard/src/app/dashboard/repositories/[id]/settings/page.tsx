@@ -18,14 +18,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 interface ScannerConfig {
   id: string;
   name: string;
-  type: 'sast' | 'sca' | 'secrets' | 'iac' | 'dast';
+  type: 'sast' | 'sca' | 'secrets' | 'iac' | 'dast' | 'container';
   description: string;
   enabled: boolean;
   isDefault: boolean;
 }
 
 interface DastConfig {
-  targetUrl: string;
+  targetUrls: string[];
+  newUrl: string;
   scanType: 'baseline' | 'full' | 'api';
   authEnabled: boolean;
   authType?: 'basic' | 'bearer' | 'form';
@@ -36,10 +37,9 @@ const SCANNERS: ScannerConfig[] = [
   { id: 'semgrep', name: 'Semgrep', type: 'sast', description: 'Static Application Security Testing for code vulnerabilities', enabled: true, isDefault: true },
   { id: 'trivy', name: 'Trivy', type: 'sca', description: 'Software Composition Analysis for dependency vulnerabilities', enabled: true, isDefault: true },
   { id: 'gitleaks', name: 'Gitleaks', type: 'secrets', description: 'Secret detection for API keys, passwords, tokens', enabled: true, isDefault: true },
-  { id: 'trufflehog', name: 'TruffleHog', type: 'secrets', description: 'Advanced secret scanning with entropy analysis', enabled: false, isDefault: false },
   { id: 'checkov', name: 'Checkov', type: 'iac', description: 'Infrastructure as Code scanning (Terraform, CloudFormation)', enabled: false, isDefault: false },
   { id: 'nuclei', name: 'Nuclei', type: 'dast', description: 'Dynamic vulnerability scanning with templates', enabled: false, isDefault: false },
-  { id: 'zap', name: 'OWASP ZAP', type: 'dast', description: 'Web application security scanner', enabled: false, isDefault: false },
+  { id: 'container', name: 'Container Scan', type: 'container', description: 'Container image vulnerability scanning for Docker images', enabled: false, isDefault: false },
 ];
 
 const SCANNER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -48,6 +48,7 @@ const SCANNER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   secrets: { label: 'Secrets', color: 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300' },
   iac: { label: 'IaC', color: 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' },
   dast: { label: 'DAST', color: 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' },
+  container: { label: 'Container', color: 'bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300' },
 };
 
 const TIMEZONES = [
@@ -78,7 +79,8 @@ export default function RepositorySettingsPage() {
 
   // DAST configuration
   const [dastConfig, setDastConfig] = useState<DastConfig>({
-    targetUrl: '',
+    targetUrls: [],
+    newUrl: '',
     scanType: 'baseline',
     authEnabled: false,
   });
@@ -112,8 +114,8 @@ export default function RepositorySettingsPage() {
         // Load existing scan config if available
         if (repo.scanConfig) {
           // Update scanner toggles based on saved config
-          if (repo.scanConfig.scanners) {
-            setScanners(scanners.map(s => ({
+          if (repo.scanConfig.scanners && repo.scanConfig.scanners.length > 0) {
+            setScanners(prevScanners => prevScanners.map(s => ({
               ...s,
               enabled: repo.scanConfig!.scanners.includes(s.id),
             })));
@@ -121,6 +123,13 @@ export default function RepositorySettingsPage() {
           setScheduleEnabled(repo.scanConfig.scanOnSchedule);
           if (repo.scanConfig.schedulePattern) {
             setCustomCron(repo.scanConfig.schedulePattern);
+          }
+          // Load DAST target URLs
+          if (repo.scanConfig.targetUrls && repo.scanConfig.targetUrls.length > 0) {
+            setDastConfig(prev => ({
+              ...prev,
+              targetUrls: repo.scanConfig!.targetUrls,
+            }));
           }
         }
       } catch (err) {
@@ -185,9 +194,14 @@ export default function RepositorySettingsPage() {
         scanOnSchedule: scheduleEnabled,
         schedulePattern,
         scanners: enabledScanners,
+        targetUrls: dastConfig.targetUrls,
       });
 
       setSuccess('Settings saved successfully');
+      // Navigate back to repository page after short delay
+      setTimeout(() => {
+        router.push(`/dashboard/repositories/${repositoryId}`);
+      }, 1000);
     } catch (err) {
       console.error('Failed to save settings:', err);
       setError('Failed to save settings');
@@ -310,16 +324,71 @@ export default function RepositorySettingsPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Target URL *
+                  Target URLs *
                 </label>
-                <input
-                  type="url"
-                  value={dastConfig.targetUrl}
-                  onChange={(e) => setDastConfig({ ...dastConfig, targetUrl: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                  placeholder="https://staging.example.com"
-                />
-                <p className="text-xs text-gray-500 mt-1">URL of your staging environment to scan</p>
+                <p className="text-xs text-gray-500 mb-2">URLs of your staging/test environments to scan (e.g., https://staging.example.com)</p>
+
+                {/* Existing URLs */}
+                {dastConfig.targetUrls.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {dastConfig.targetUrls.map((url, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full text-sm text-red-700 dark:text-red-300"
+                      >
+                        {url}
+                        <button
+                          onClick={() => setDastConfig(prev => ({
+                            ...prev,
+                            targetUrls: prev.targetUrls.filter((_, i) => i !== idx),
+                          }))}
+                          className="text-red-400 hover:text-red-600"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new URL */}
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={dastConfig.newUrl}
+                    onChange={(e) => setDastConfig({ ...dastConfig, newUrl: e.target.value })}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && dastConfig.newUrl) {
+                        e.preventDefault();
+                        if (!dastConfig.targetUrls.includes(dastConfig.newUrl)) {
+                          setDastConfig(prev => ({
+                            ...prev,
+                            targetUrls: [...prev.targetUrls, prev.newUrl],
+                            newUrl: '',
+                          }));
+                        }
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    placeholder="https://staging.example.com"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (dastConfig.newUrl && !dastConfig.targetUrls.includes(dastConfig.newUrl)) {
+                        setDastConfig(prev => ({
+                          ...prev,
+                          targetUrls: [...prev.targetUrls, prev.newUrl],
+                          newUrl: '',
+                        }));
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
               </div>
 
               <div>
