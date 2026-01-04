@@ -1,187 +1,306 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useProject } from '@/contexts/project-context';
+import { ProjectSelector } from './project-selector';
+import {
+  LayoutDashboard,
+  FolderGit2,
+  GitBranch,
+  Search,
+  Bug,
+  Shield,
+  Cloud,
+  Lightbulb,
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  Target,
+  Globe,
+  Workflow,
+  Database,
+  Bell,
+  Key,
+  Users,
+  FileText,
+  Server,
+  Scan,
+  AlertTriangle,
+  BarChart3,
+  Skull,
+  Network,
+  LogOut,
+  Building2,
+  Package,
+  Clock,
+  CheckCircle2,
+} from 'lucide-react';
 
-interface NavItem {
-  name: string;
+type MenuItem = {
   href: string;
-  icon: React.ReactNode;
-}
+  label: string;
+  icon: any;
+};
 
-interface NavSection {
-  title: string;
-  items: NavItem[];
-}
+type MenuSection = {
+  type: 'section';
+  label: string;
+  icon: any;
+  items: MenuItem[];
+  requiresProject?: boolean;
+  adminOnly?: boolean;
+};
 
-const navigation: NavItem[] = [
-  {
-    name: 'Overview',
-    href: '/dashboard',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Connections',
-    href: '/dashboard/connections',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Repositories',
-    href: '/dashboard/repositories',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Scans',
-    href: '/dashboard/scans',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Findings',
-    href: '/dashboard/findings',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Pipeline',
-    href: '/dashboard/pipeline',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Analytics',
-    href: '/dashboard/analytics',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Cloud (CSPM)',
-    href: '/dashboard/cloud',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'SIEM',
-    href: '/dashboard/siem',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'ATT&CK Matrix',
-    href: '/dashboard/attack',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'VulnDB',
-    href: '/dashboard/vulndb',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-      </svg>
-    ),
-  },
-  {
-    name: 'SLA Dashboard',
-    href: '/dashboard/sla',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Settings',
-    href: '/dashboard/settings',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-];
+type TopLevelItem = {
+  type: 'item';
+  href: string;
+  label: string;
+  icon: any;
+};
+
+type MenuConfigItem = TopLevelItem | MenuSection;
+
+// Build menu config dynamically based on project context
+function getMenuConfig(hasProject: boolean, projectName?: string): MenuConfigItem[] {
+  const config: MenuConfigItem[] = [
+    // ═══ WORKSPACE ═══
+    { type: 'item', href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { type: 'item', href: '/dashboard/projects', label: 'Projects', icon: FolderGit2 },
+  ];
+
+  // ═══ PROJECT: [Name] ═══ (only when project selected)
+  if (hasProject) {
+    config.push({
+      type: 'section',
+      label: projectName ? `Project: ${projectName.slice(0, 15)}${projectName.length > 15 ? '...' : ''}` : 'Project',
+      icon: FolderGit2,
+      items: [
+        { href: '/dashboard/repositories', label: 'Repositories', icon: GitBranch },
+        { href: '/dashboard/scans', label: 'Scans', icon: Search },
+        { href: '/dashboard/findings', label: 'Findings', icon: Bug },
+        { href: '/dashboard/baselines', label: 'Baselines', icon: FileText },
+      ],
+      requiresProject: true,
+    });
+  }
+
+  // ═══ SECURITY ANALYSIS ═══
+  config.push({
+    type: 'section',
+    label: 'Security Analysis',
+    icon: Shield,
+    items: [
+      { href: '/dashboard/threat-modeling', label: 'Threat Models', icon: Target },
+      { href: '/dashboard/pen-testing', label: 'Pen Testing', icon: Scan },
+      { href: '/dashboard/compliance', label: 'Compliance', icon: CheckCircle2 },
+      { href: '/dashboard/sbom', label: 'SBOM', icon: Package },
+      { href: '/dashboard/containers', label: 'Containers', icon: Server },
+    ],
+  });
+
+  // ═══ DEPLOYMENTS ═══
+  config.push({
+    type: 'section',
+    label: 'Deployments',
+    icon: Cloud,
+    items: [
+      { href: '/dashboard/environments', label: 'Environments', icon: Globe },
+      { href: '/dashboard/pipeline', label: 'Pipeline', icon: Workflow },
+    ],
+  });
+
+  // ═══ INTELLIGENCE ═══
+  config.push({
+    type: 'section',
+    label: 'Intelligence',
+    icon: Lightbulb,
+    items: [
+      { href: '/dashboard/vulndb', label: 'Vulnerabilities', icon: Database },
+      { href: '/dashboard/attack', label: 'ATT&CK Matrix', icon: Skull },
+      { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
+      { href: '/dashboard/sla', label: 'SLA Tracker', icon: Clock },
+    ],
+  });
+
+  // ═══ SETTINGS ═══
+  const settingsItems: MenuItem[] = [];
+
+  if (hasProject) {
+    settingsItems.push({ href: '/dashboard/settings/project', label: 'Project Settings', icon: Settings });
+  }
+
+  // Org settings (show for all but will be access-controlled)
+  settingsItems.push({ href: '/dashboard/settings/org', label: 'Organization', icon: Building2 });
+
+  config.push({
+    type: 'section',
+    label: 'Settings',
+    icon: Settings,
+    items: settingsItems,
+  });
+
+  return config;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { currentProject } = useProject();
+  const [expandedSections, setExpandedSections] = useState<string[]>([]);
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const hasProject = !!currentProject;
+  const menuConfig = getMenuConfig(hasProject, currentProject?.name);
+
+  // Auto-expand section containing active route
+  useEffect(() => {
+    menuConfig.forEach((item) => {
+      if (item.type === 'section') {
+        const hasActiveItem = item.items.some(
+          (subItem) => pathname === subItem.href || pathname.startsWith(subItem.href + '/')
+        );
+        if (hasActiveItem && !expandedSections.includes(item.label)) {
+          setExpandedSections((prev) => [...prev, item.label]);
+        }
+      }
+    });
+  }, [pathname, menuConfig]);
+
+  const toggleSection = (label: string) => {
+    const isExpanding = !expandedSections.includes(label);
+
+    // Close all others, toggle this one (accordion behavior)
+    setExpandedSections(isExpanding ? [label] : []);
+
+    // Scroll section into view when expanding
+    if (isExpanding) {
+      setTimeout(() => {
+        const sectionEl = sectionRefs.current[label];
+        if (sectionEl) {
+          sectionEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 50);
+    }
+  };
+
+  const isActive = (href: string) => {
+    return pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/'));
+  };
 
   return (
-    <div className="flex flex-col h-full w-64 bg-gray-900 text-white">
-      {/* Logo */}
-      <div className="flex items-center h-16 px-6 border-b border-gray-800">
-        <svg className="w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-        <span className="ml-2 text-xl font-bold">ThreatDiviner</span>
+    <aside className="w-64 bg-slate-900 text-slate-200 h-screen flex flex-col">
+      {/* Logo - Fixed */}
+      <div className="p-4 border-b border-slate-700">
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <Shield className="w-8 h-8 text-blue-500" />
+          <span className="text-xl font-bold text-white">ThreatDiviner</span>
+        </Link>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href ||
-            (item.href !== '/dashboard' && pathname.startsWith(item.href));
+      {/* Project Selector */}
+      <div className="border-b border-slate-700 overflow-visible relative z-10">
+        <ProjectSelector />
+      </div>
+
+      {/* Navigation - Scrollable */}
+      <nav className="flex-1 overflow-y-auto py-4">
+        {menuConfig.map((item) => {
+          if (item.type === 'item') {
+            // Regular menu item
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`
+                  flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg
+                  transition-colors duration-150
+                  ${isActive(item.href)
+                    ? 'bg-blue-600 text-white'
+                    : 'hover:bg-slate-800 text-slate-300'
+                  }
+                `}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-sm font-medium">{item.label}</span>
+              </Link>
+            );
+          }
+
+          // Collapsible section
+          const Icon = item.icon;
+          const isExpanded = expandedSections.includes(item.label);
+          const hasActiveChild = item.items.some((sub) => isActive(sub.href));
+          const isProjectSection = item.requiresProject;
 
           return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`
-                flex items-center px-3 py-2 text-sm font-medium rounded-lg
-                transition-colors duration-200
-                ${isActive
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                }
-              `}
+            <div
+              key={item.label}
+              className="mt-1"
+              ref={(el) => { sectionRefs.current[item.label] = el; }}
             >
-              {item.icon}
-              <span className="ml-3">{item.name}</span>
-            </Link>
+              {/* Section header */}
+              <button
+                onClick={() => toggleSection(item.label)}
+                className={`
+                  w-full flex items-center justify-between px-4 py-2.5 mx-2 rounded-lg
+                  transition-colors duration-150
+                  ${hasActiveChild ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}
+                  ${isProjectSection ? 'bg-slate-800/50' : ''}
+                  hover:bg-slate-800
+                `}
+                style={{ width: 'calc(100% - 1rem)' }}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className="w-5 h-5" />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </div>
+                {isExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+
+              {/* Section items (collapsible) */}
+              {isExpanded && (
+                <div className="ml-4 mt-1 space-y-0.5">
+                  {item.items.map((subItem) => {
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.href}
+                        href={subItem.href}
+                        className={`
+                          flex items-center gap-3 px-4 py-2 mx-2 rounded-lg
+                          transition-colors duration-150 text-sm
+                          ${isActive(subItem.href)
+                            ? 'bg-blue-600/20 text-blue-400 border-l-2 border-blue-500'
+                            : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'
+                          }
+                        `}
+                      >
+                        <SubIcon className="w-4 h-4" />
+                        <span>{subItem.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
 
-      {/* User info */}
-      <div className="px-4 py-4 border-t border-gray-800">
+      {/* User section - Fixed at bottom */}
+      <div className="p-4 border-t border-slate-700">
         <div className="flex items-center">
           <div className="flex-shrink-0">
-            <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
-              <span className="text-sm font-medium text-gray-300">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <span className="text-sm font-medium text-white">
                 {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
               </span>
             </div>
@@ -190,21 +309,19 @@ export function Sidebar() {
             <p className="text-sm font-medium text-white truncate">
               {user?.name || user?.email}
             </p>
-            <p className="text-xs text-gray-400 truncate">
-              {user?.role}
+            <p className="text-xs text-slate-400 truncate capitalize">
+              {user?.role?.toLowerCase()}
             </p>
           </div>
           <button
             onClick={logout}
-            className="ml-2 p-1 text-gray-400 hover:text-white"
+            className="ml-2 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Logout"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }
