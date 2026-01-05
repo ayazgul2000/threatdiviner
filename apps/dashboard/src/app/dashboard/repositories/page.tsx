@@ -24,7 +24,7 @@ import {
   Input,
 } from '@/components/ui';
 import { TableSkeleton } from '@/components/ui/skeletons';
-import { repositoriesApi, connectionsApi, scansApi, settingsApi, type Repository, type ScmConnection, API_URL } from '@/lib/api';
+import { repositoriesApi, connectionsApi, settingsApi, type Repository, type ScmConnection, API_URL } from '@/lib/api';
 import { useProject } from '@/contexts/project-context';
 import { useAuth } from '@/lib/auth-context';
 
@@ -39,6 +39,51 @@ interface AvailableRepo {
   isPrivate: boolean;
 }
 
+// Scan status types for status dot indicator
+type ScanStatus = 'success' | 'warning' | 'error' | 'none';
+
+// Get scan status based on last scan results
+function getScanStatus(repo: Repository): ScanStatus {
+  if (!repo.lastScanAt) return 'none';
+
+  // Check if we have findings data from the last scan
+  const lastScan = repo.lastScan;
+  if (!lastScan) return 'none';
+
+  // Check based on severity counts
+  if (lastScan.criticalCount > 0 || lastScan.highCount > 0) {
+    return 'error';
+  }
+  if (lastScan.mediumCount > 0) {
+    return 'warning';
+  }
+  return 'success';
+}
+
+// Status dot component
+function StatusDot({ status }: { status: ScanStatus }) {
+  const colors = {
+    success: 'bg-green-500',
+    warning: 'bg-yellow-500',
+    error: 'bg-red-500',
+    none: 'bg-gray-400',
+  };
+
+  const titles = {
+    success: 'No critical/high findings',
+    warning: 'Medium findings present',
+    error: 'Critical or high findings',
+    none: 'Never scanned',
+  };
+
+  return (
+    <span
+      className={`inline-block w-2.5 h-2.5 rounded-full ${colors[status]}`}
+      title={titles[status]}
+    />
+  );
+}
+
 export default function RepositoriesPage() {
   const { currentProject } = useProject();
   const { user } = useAuth();
@@ -51,7 +96,6 @@ export default function RepositoriesPage() {
   const [availableRepos, setAvailableRepos] = useState<AvailableRepo[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [addingRepo, setAddingRepo] = useState<string | null>(null);
-  const [triggeringScan, setTriggeringScan] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [repoSearchQuery, setRepoSearchQuery] = useState('');
 
@@ -152,19 +196,6 @@ export default function RepositoriesPage() {
       toastCtx.success('Repository Removed', `${repo.fullName} has been removed`);
     } catch (err) {
       toastCtx.error('Error', err instanceof Error ? err.message : 'Failed to delete repository');
-    }
-  };
-
-  const handleTriggerScan = async (repo: Repository) => {
-    setTriggeringScan(repo.id);
-    try {
-      await scansApi.trigger(repo.id);
-      toastCtx.success('Scan Started', `Started scanning ${repo.fullName}`);
-      fetchData();
-    } catch (err) {
-      toastCtx.error('Error', err instanceof Error ? err.message : 'Failed to trigger scan');
-    } finally {
-      setTriggeringScan(null);
     }
   };
 
@@ -296,7 +327,7 @@ export default function RepositoriesPage() {
         </div>
       )}
 
-      {/* Repositories Table */}
+      {/* Repositories Table - Simplified: status dot, repo name, last scanned, Open button */}
       {repositories.length === 0 ? (
         <NoRepositoriesEmpty
           onConnect={() => setShowAddModal(true)}
@@ -307,27 +338,25 @@ export default function RepositoriesPage() {
             <Table>
               <TableHeader>
                 <TableRow hoverable={false}>
+                  <TableHead className="w-12">Status</TableHead>
                   <TableHead>Repository</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Last Scan</TableHead>
-                  <TableHead>Triggers</TableHead>
-                  <TableHead>Scanners</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Last Scanned</TableHead>
+                  <TableHead className="text-right w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredRepositories.map((repo) => (
                   <TableRow key={repo.id}>
                     <TableCell>
-                      <Link
-                        href={`/dashboard/repositories/${repo.id}`}
-                        className="flex items-center gap-3 hover:text-blue-600"
-                      >
+                      <StatusDot status={getScanStatus(repo)} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
                         <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
                           {getProviderIcon(repo.connection?.provider || 'github')}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
+                          <p className="font-medium text-gray-900 dark:text-white">
                             {repo.fullName}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
@@ -339,16 +368,11 @@ export default function RepositoriesPage() {
                             </span>
                           </div>
                         </div>
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <code className="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-                        {repo.defaultBranch}
-                      </code>
+                      </div>
                     </TableCell>
                     <TableCell>
                       {repo.lastScanAt ? (
-                        <div>
+                        <div className="text-sm">
                           <p className="text-gray-900 dark:text-white">
                             {new Date(repo.lastScanAt).toLocaleDateString()}
                           </p>
@@ -357,73 +381,15 @@ export default function RepositoriesPage() {
                           </p>
                         </div>
                       ) : (
-                        <span className="text-gray-400">Never scanned</span>
+                        <span className="text-gray-400 text-sm">Never scanned</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {repo.scanConfig?.scanOnPush && (
-                          <Badge variant="info" size="sm">Push</Badge>
-                        )}
-                        {repo.scanConfig?.scanOnPr && (
-                          <Badge variant="info" size="sm">PR</Badge>
-                        )}
-                        {repo.scanConfig?.scanOnSchedule && (
-                          <Badge variant="info" size="sm">Schedule</Badge>
-                        )}
-                        {!repo.scanConfig?.scanOnPush && !repo.scanConfig?.scanOnPr && !repo.scanConfig?.scanOnSchedule && (
-                          <Badge variant="default" size="sm">Manual only</Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 max-w-[150px]">
-                        {repo.scanConfig?.scanners?.slice(0, 2).map((scanner) => (
-                          <Badge key={scanner} variant="default" size="sm">
-                            {scanner}
-                          </Badge>
-                        ))}
-                        {repo.scanConfig?.scanners && repo.scanConfig.scanners.length > 2 && (
-                          <Badge variant="default" size="sm">
-                            +{repo.scanConfig.scanners.length - 2}
-                          </Badge>
-                        )}
-                        {(!repo.scanConfig?.scanners || repo.scanConfig.scanners.length === 0) && (
-                          <span className="text-gray-400 text-sm">All</span>
-                        )}
-                      </div>
-                    </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => handleTriggerScan(repo)}
-                          loading={triggeringScan === repo.id}
-                        >
-                          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                          Scan
+                      <Link href={`/dashboard/repositories/${repo.id}`}>
+                        <Button variant="primary" size="sm">
+                          Open
                         </Button>
-                        <Link href={`/dashboard/repositories/${repo.id}/settings`}>
-                          <Button variant="secondary" size="sm">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleDeleteRepo(repo)}
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </Button>
-                      </div>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -514,7 +480,7 @@ export default function RepositoriesPage() {
                   })}
                   {filteredAvailableRepos.length === 0 && repoSearchQuery && (
                     <div className="text-center py-8 text-gray-500">
-                      No repositories match "{repoSearchQuery}"
+                      No repositories match &quot;{repoSearchQuery}&quot;
                     </div>
                   )}
                 </div>

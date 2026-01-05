@@ -307,13 +307,26 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     }
 
     // DAST Scanner (Nuclei) - run when target URLs configured
+    this.logger.log(`DAST check: enableDast=${config.enableDast}, targetUrls=${JSON.stringify(config.targetUrls)}`);
     if (config.enableDast && config.targetUrls && config.targetUrls.length > 0) {
       scanners.push(this.nucleiScanner);
       this.logger.log('Added Nuclei scanner (DAST)');
+    } else if (config.enableDast) {
+      this.logger.warn('DAST enabled but no target URLs configured - skipping Nuclei scanner');
     }
 
     this.logger.log(`Selected ${scanners.length} scanners: ${scanners.map(s => s.name).join(', ')}`);
     return scanners;
+  }
+
+  private getScannerCategory(scannerName: string): string {
+    const name = scannerName.toLowerCase();
+    if (['semgrep', 'bandit', 'gosec'].includes(name)) return 'sast';
+    if (['trivy'].includes(name)) return 'sca';
+    if (['gitleaks'].includes(name)) return 'secrets';
+    if (['checkov'].includes(name)) return 'iac';
+    if (['nuclei', 'zap'].includes(name)) return 'dast';
+    return 'other';
   }
 
   private async runScanners(
@@ -321,38 +334,105 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     context: ScanContext,
   ): Promise<NormalizedFinding[]> {
     const allFindings: NormalizedFinding[] = [];
+    const scanId = context.scanId;
 
     // Run scanners in parallel with settled to handle partial failures
     const results = await Promise.allSettled(
       scanners.map(async (scanner) => {
+        const startTime = Date.now();
+        const category = this.getScannerCategory(scanner.name);
+
+        // Create scanner result record as "running"
+        const scannerResult = await this.prisma.scannerResult.create({
+          data: {
+            scanId,
+            scanner: scanner.name,
+            category,
+            status: 'running',
+            startedAt: new Date(),
+            targetInfo: category === 'dast'
+              ? JSON.stringify(context.config?.targetUrls || [])
+              : JSON.stringify(context.languages || []),
+          },
+        });
+
         this.logger.log(`Running ${scanner.name}...`);
 
-        const isAvailable = await scanner.isAvailable();
-        if (!isAvailable) {
-          this.logger.warn(`Scanner ${scanner.name} is not available`);
-          return [];
+        try {
+          const isAvailable = await scanner.isAvailable();
+          if (!isAvailable) {
+            this.logger.warn(`Scanner ${scanner.name} is not available`);
+            await this.prisma.scannerResult.update({
+              where: { id: scannerResult.id },
+              data: {
+                status: 'skipped',
+                errorMessage: 'Scanner not available',
+                completedAt: new Date(),
+                duration: Date.now() - startTime,
+              },
+            });
+            return { findings: [], scannerResultId: scannerResult.id };
+          }
+
+          const output = await scanner.scan(context);
+          const duration = Date.now() - startTime;
+
+          if (output.timedOut) {
+            this.logger.warn(`Scanner ${scanner.name} timed out`);
+            await this.prisma.scannerResult.update({
+              where: { id: scannerResult.id },
+              data: {
+                status: 'failed',
+                errorMessage: 'Scanner timed out',
+                exitCode: -1,
+                completedAt: new Date(),
+                duration,
+              },
+            });
+            return { findings: [], scannerResultId: scannerResult.id };
+          }
+
+          const findings = await scanner.parseOutput(output);
+
+          // Update scanner result with success
+          await this.prisma.scannerResult.update({
+            where: { id: scannerResult.id },
+            data: {
+              status: output.exitCode === 0 || output.exitCode === 1 ? 'completed' : 'failed',
+              exitCode: output.exitCode,
+              findingsCount: findings.length,
+              completedAt: new Date(),
+              duration,
+              command: `${scanner.name} scan`,
+              errorMessage: output.exitCode > 1 ? output.stderr?.substring(0, 500) : null,
+            },
+          });
+
+          if (output.exitCode !== 0 && output.exitCode !== 1) {
+            this.logger.warn(`Scanner ${scanner.name} exited with code ${output.exitCode}`);
+          }
+
+          return { findings, scannerResultId: scannerResult.id };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          await this.prisma.scannerResult.update({
+            where: { id: scannerResult.id },
+            data: {
+              status: 'failed',
+              errorMessage: errorMessage.substring(0, 500),
+              completedAt: new Date(),
+              duration: Date.now() - startTime,
+            },
+          });
+          throw error;
         }
-
-        const output = await scanner.scan(context);
-
-        if (output.timedOut) {
-          this.logger.warn(`Scanner ${scanner.name} timed out`);
-          return [];
-        }
-
-        if (output.exitCode !== 0 && output.exitCode !== 1) {
-          // Exit code 1 usually means findings were found
-          this.logger.warn(`Scanner ${scanner.name} exited with code ${output.exitCode}`);
-        }
-
-        return scanner.parseOutput(output);
       }),
     );
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.status === 'fulfilled') {
-        allFindings.push(...result.value);
+        allFindings.push(...result.value.findings);
       } else {
         this.logger.error(`Scanner ${scanners[i].name} failed: ${result.reason}`);
       }

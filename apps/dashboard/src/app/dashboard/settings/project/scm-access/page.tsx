@@ -287,7 +287,7 @@ export default function ScmAccessPage() {
             <GitBranch className="w-12 h-12 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">No SCM Connections</h3>
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              This project doesn't have access to any SCM connections yet.
+              This project doesn&apos;t have access to any SCM connections yet.
               {availableConnections.length > 0
                 ? ' Grant access to allow importing repositories.'
                 : ' Add an SCM connection in organization settings first.'}

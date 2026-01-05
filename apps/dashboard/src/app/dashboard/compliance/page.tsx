@@ -165,7 +165,7 @@ export default function CompliancePage() {
             <div className="text-center">
               <div className="text-3xl font-bold text-green-600">
                 {frameworks.length > 0
-                  ? Math.round(frameworks.reduce((sum, f) => sum + (f.overallScore || f.score || 0), 0) / frameworks.length)
+                  ? Math.round(frameworks.reduce((sum, f) => sum + (f.score || 0), 0) / frameworks.length)
                   : 0}%
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400">Avg. Score</div>
@@ -202,7 +202,7 @@ export default function CompliancePage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <CardTitle className="text-lg">{fw.frameworkName || fw.name}</CardTitle>
+                      <CardTitle className="text-lg">{fw.name}</CardTitle>
                       <Badge className={tierBadge.className} size="sm">
                         {tierBadge.label}
                       </Badge>
@@ -211,8 +211,8 @@ export default function CompliancePage() {
                       Version {fw.version}
                     </p>
                   </div>
-                  <div className={`text-3xl font-bold ${getScoreColor(fw.overallScore || fw.score || 0)}`}>
-                    {fw.overallScore || fw.score || 0}%
+                  <div className={`text-3xl font-bold ${getScoreColor(fw.score || 0)}`}>
+                    {fw.score || 0}%
                   </div>
                 </div>
               </CardHeader>
@@ -220,8 +220,8 @@ export default function CompliancePage() {
                 {/* Progress Bar */}
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-4">
                   <div
-                    className={`h-2 rounded-full transition-all ${getProgressColor(fw.overallScore || fw.score || 0)}`}
-                    style={{ width: `${fw.overallScore || fw.score || 0}%` }}
+                    className={`h-2 rounded-full transition-all ${getProgressColor(fw.score || 0)}`}
+                    style={{ width: `${fw.score || 0}%` }}
                   />
                 </div>
 
@@ -261,7 +261,7 @@ export default function CompliancePage() {
                     </span>
                   </div>
                   <Link
-                    href={`/dashboard/compliance/${fw.framework || fw.id}`}
+                    href={`/dashboard/compliance/${fw.id}`}
                     className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400"
                   >
                     View Details →

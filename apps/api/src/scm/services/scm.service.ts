@@ -466,6 +466,7 @@ export class ScmService {
     schedulePattern: string | null;
     targetUrls: string[];
     containerImages: string[];
+    dastScanMode: 'quick' | 'standard' | 'full';
   }>) {
     this.logger.log(`Updating scan config for repository ${repositoryId}, config: ${JSON.stringify(config)}`);
 
@@ -512,6 +513,7 @@ export class ScmService {
     if (config.skipPaths !== undefined) updateData.skipPaths = config.skipPaths;
     if (config.targetUrls !== undefined) updateData.targetUrls = config.targetUrls;
     if (config.containerImages !== undefined) updateData.containerImages = config.containerImages;
+    if (config.dastScanMode !== undefined) updateData.dastScanMode = config.dastScanMode;
 
     // Use upsert to create ScanConfig if it doesn't exist
     this.logger.log(`Upserting scan config with data: ${JSON.stringify(updateData)}`);
@@ -537,11 +539,12 @@ export class ScmService {
         skipPaths: updateData.skipPaths as string[] ?? ['node_modules', 'vendor', '.git'],
         targetUrls: updateData.targetUrls as string[] ?? [],
         containerImages: updateData.containerImages as string[] ?? [],
+        dastScanMode: updateData.dastScanMode as string ?? 'standard',
         updatedAt: new Date(),
       },
     });
 
-    this.logger.log(`Scan config saved: id=${updatedConfig.id}, enableSast=${updatedConfig.enableSast}, scheduleEnabled=${updatedConfig.scheduleEnabled}`);
+    this.logger.log(`Scan config saved: id=${updatedConfig.id}, enableSast=${updatedConfig.enableSast}, scheduleEnabled=${updatedConfig.scheduleEnabled}, dastScanMode=${updatedConfig.dastScanMode}`);
 
     // Return transformed config for frontend
     return this.transformScanConfig(updatedConfig);
@@ -563,7 +566,7 @@ export class ScmService {
   }
 
   // Scan operations
-  async triggerScan(tenantId: string, repositoryId: string, branch?: string): Promise<string> {
+  async triggerScan(tenantId: string, repositoryId: string, branch?: string, scanners?: string[]): Promise<string> {
     const repository = await this.prisma.repository.findFirst({
       where: { id: repositoryId, tenantId },
       include: { connection: true, scanConfig: true },
@@ -593,7 +596,7 @@ export class ScmService {
     });
 
     // Get scan config (use defaults if not configured)
-    const scanConfig = repository.scanConfig || {
+    const savedConfig = repository.scanConfig || {
       enableSast: true,
       enableSca: true,
       enableSecrets: true,
@@ -606,6 +609,26 @@ export class ScmService {
       branches: [repository.defaultBranch] as string[],
     };
 
+    // If scanners array is provided, use it to override saved config
+    // Otherwise fall back to saved config
+    let enableSast = savedConfig.enableSast;
+    let enableSca = savedConfig.enableSca;
+    let enableSecrets = savedConfig.enableSecrets;
+    let enableIac = savedConfig.enableIac;
+    let enableDast = 'enableDast' in savedConfig ? savedConfig.enableDast : false;
+    let enableContainerScan = 'enableContainerScan' in savedConfig ? savedConfig.enableContainerScan : false;
+
+    if (scanners && scanners.length > 0) {
+      // Override with passed scanners
+      enableSast = scanners.includes('semgrep');
+      enableSca = scanners.includes('trivy');
+      enableSecrets = scanners.includes('gitleaks');
+      enableIac = scanners.includes('checkov');
+      enableDast = scanners.includes('nuclei') || scanners.includes('zap');
+      enableContainerScan = scanners.includes('container');
+      this.logger.log(`Using override scanners: ${scanners.join(', ')}`);
+    }
+
     // Build job data
     const jobData: ScanJobData = {
       scanId: scan.id,
@@ -617,22 +640,22 @@ export class ScmService {
       cloneUrl: repository.cloneUrl,
       fullName: repository.fullName,
       config: {
-        enableSast: scanConfig.enableSast,
-        enableSca: scanConfig.enableSca,
-        enableSecrets: scanConfig.enableSecrets,
-        enableIac: scanConfig.enableIac,
-        enableDast: 'enableDast' in scanConfig ? scanConfig.enableDast : false,
-        enableContainerScan: 'enableContainerScan' in scanConfig ? scanConfig.enableContainerScan : false,
-        targetUrls: 'targetUrls' in scanConfig ? (scanConfig.targetUrls as string[]) : [],
-        containerImages: 'containerImages' in scanConfig ? (scanConfig.containerImages as string[]) : [],
-        skipPaths: (scanConfig.skipPaths as string[]) || [],
-        branches: (scanConfig.branches as string[]) || [repository.defaultBranch],
+        enableSast,
+        enableSca,
+        enableSecrets,
+        enableIac,
+        enableDast,
+        enableContainerScan,
+        targetUrls: 'targetUrls' in savedConfig ? (savedConfig.targetUrls as string[]) : [],
+        containerImages: 'containerImages' in savedConfig ? (savedConfig.containerImages as string[]) : [],
+        skipPaths: (savedConfig.skipPaths as string[]) || [],
+        branches: (savedConfig.branches as string[]) || [repository.defaultBranch],
       },
     };
 
     // Queue scan job
     await this.queueService.enqueueScan(jobData);
-    this.logger.log(`Scan ${scan.id} queued for ${repository.fullName}@${targetBranch}`);
+    this.logger.log(`Scan ${scan.id} queued for ${repository.fullName}@${targetBranch} with scanners: sast=${enableSast}, sca=${enableSca}, secrets=${enableSecrets}, iac=${enableIac}, dast=${enableDast}`);
 
     return scan.id;
   }
@@ -643,12 +666,18 @@ export class ScmService {
       include: {
         repository: {
           select: {
+            id: true,
+            name: true,
             fullName: true,
             htmlUrl: true,
+            scanConfig: true,
           },
         },
         findings: {
           orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
+        },
+        scannerResults: {
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
@@ -657,7 +686,54 @@ export class ScmService {
       throw new NotFoundException('Scan not found');
     }
 
-    return scan;
+    // Calculate severity counts from findings
+    const severityCounts = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+    };
+
+    for (const finding of scan.findings) {
+      const severity = finding.severity.toLowerCase();
+      if (severity in severityCounts) {
+        severityCounts[severity as keyof typeof severityCounts]++;
+      }
+    }
+
+    // Transform scanConfig to frontend format
+    const scanConfig = scan.repository?.scanConfig;
+    return {
+      ...scan,
+      // Provide both formats for compatibility
+      findingsCount: {
+        total: scan.findings.length,
+        critical: severityCounts.critical,
+        high: severityCounts.high,
+        medium: severityCounts.medium,
+        low: severityCounts.low,
+        info: severityCounts.info,
+      },
+      // Also provide as top-level for scan cockpit page
+      criticalCount: severityCounts.critical,
+      highCount: severityCounts.high,
+      mediumCount: severityCounts.medium,
+      lowCount: severityCounts.low,
+      infoCount: severityCounts.info,
+      repository: {
+        ...scan.repository,
+        scanConfig: scanConfig ? {
+          enableSast: scanConfig.enableSast,
+          enableSca: scanConfig.enableSca,
+          enableSecrets: scanConfig.enableSecrets,
+          enableIac: scanConfig.enableIac,
+          enableDast: scanConfig.enableDast,
+          enableContainerScan: scanConfig.enableContainerScan,
+          targetUrls: scanConfig.targetUrls,
+        } : null,
+      },
+    };
   }
 
   async listScans(tenantId: string, repositoryId?: string, limit = 50, projectId?: string) {

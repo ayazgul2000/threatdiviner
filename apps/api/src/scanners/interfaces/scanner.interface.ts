@@ -26,6 +26,7 @@ export interface ScanOutput {
   stdout: string;
   stderr: string;
   outputFile?: string;
+  rawOutput?: string; // Raw output for parsing (e.g., from Docker stdout)
   duration: number;
   timedOut: boolean;
 }

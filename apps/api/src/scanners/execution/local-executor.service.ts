@@ -1,27 +1,43 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { spawn } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ScanOutput } from '../interfaces';
 
-// Allowlist of safe scanner commands
+// Allowlist of safe scanner commands (include .exe variants for Windows)
 const ALLOWED_COMMANDS = new Set([
   'semgrep',
+  'semgrep.exe',
   'gitleaks',
+  'gitleaks.exe',
   'trivy',
+  'trivy.exe',
   'bandit',
+  'bandit.exe',
   'gosec',
+  'gosec.exe',
   'checkov',
+  'checkov.exe',
   'nuclei',
+  'nuclei.exe',
   'zap',
+  'zap.exe',
   'docker',
+  'docker.exe',
   'where',
+  'where.exe',
   'which',
   // Pen testing tools
   'sqlmap',
+  'sqlmap.exe',
   'sslyze',
+  'sslyze.exe',
   'nikto',
+  'nikto.exe',
   'pip',
+  'pip.exe',
   'perl',
-  'nuclei',
+  'perl.exe',
 ]);
 
 // Dangerous shell metacharacters that could enable injection
@@ -149,6 +165,14 @@ export class LocalExecutorService {
 
   async isCommandAvailable(command: string): Promise<boolean> {
     try {
+      // If it's a full path, check if file exists
+      if (path.isAbsolute(command) || command.includes('/') || command.includes('\\')) {
+        const exists = fs.existsSync(command);
+        this.logger.log(`Checking if ${command} exists: ${exists}`);
+        return exists;
+      }
+
+      // Otherwise use where/which to find in PATH
       const result = await this.execute({
         command: process.platform === 'win32' ? 'where' : 'which',
         args: [command],

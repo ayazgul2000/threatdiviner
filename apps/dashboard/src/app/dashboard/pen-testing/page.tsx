@@ -117,7 +117,7 @@ export default function PenTestingPage() {
 
   // New target form
   const [showAddTarget, setShowAddTarget] = useState(false);
-  const [newTarget, setNewTarget] = useState({ name: '', url: '', type: 'web' as const, description: '' });
+  const [newTarget, setNewTarget] = useState<{ name: string; url: string; type: 'web' | 'api' | 'network'; description: string }>({ name: '', url: '', type: 'web', description: '' });
   const [saving, setSaving] = useState(false);
 
   // Scan modal

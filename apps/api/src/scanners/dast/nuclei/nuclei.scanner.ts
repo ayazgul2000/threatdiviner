@@ -5,6 +5,60 @@ import * as path from 'path';
 import { IScanner, ScanContext, ScanOutput, NormalizedFinding, Severity, Confidence } from '../../interfaces';
 import { LocalExecutorService } from '../../execution';
 
+export type DastScanMode = 'quick' | 'standard' | 'full';
+export type ScanPhase = 'discovery' | 'deep' | 'single';
+
+// Template configuration by scan mode
+const SCAN_MODE_TEMPLATES: Record<DastScanMode, string[]> = {
+  // Quick (~1 min): Technology detection & exposed panels
+  quick: [
+    'http/technologies',
+    'http/exposed-panels',
+  ],
+  // Standard (~5 min): + Exposures & misconfigurations
+  standard: [
+    'http/technologies',
+    'http/exposed-panels',
+    'http/exposures',
+    'http/misconfiguration',
+  ],
+  // Full (~15-30 min): + CVEs & vulnerabilities
+  full: [
+    'http/technologies',
+    'http/exposed-panels',
+    'http/exposures',
+    'http/misconfiguration',
+    'http/cves',
+    'http/vulnerabilities',
+  ],
+};
+
+// Discovery phase templates (fast, detect technologies)
+const DISCOVERY_TEMPLATES = [
+  'http/technologies',
+  'http/exposed-panels',
+  'http/misconfiguration',
+];
+
+// Technology-focused templates mapping for deep phase
+const TECH_FOCUSED_TEMPLATES: Record<string, string[]> = {
+  apache: ['http/apache', 'http/cves/apache'],
+  nginx: ['http/nginx'],
+  wordpress: ['http/wordpress'],
+  tomcat: ['http/tomcat'],
+  iis: ['http/iis'],
+  php: ['http/php'],
+  nodejs: ['http/nodejs', 'http/node'],
+  spring: ['http/spring'],
+  joomla: ['http/joomla'],
+  drupal: ['http/drupal'],
+  jenkins: ['http/jenkins'],
+  gitlab: ['http/gitlab'],
+  grafana: ['http/grafana'],
+  kubernetes: ['http/kubernetes'],
+  docker: ['http/docker'],
+};
+
 interface NucleiJsonResult {
   template: string;
   'template-url'?: string;
@@ -59,11 +113,82 @@ export class NucleiScanner implements IScanner {
     return this.executor.getCommandVersion(this.nucleiPath, '-version');
   }
 
+  /**
+   * Get templates for discovery phase (fast, tech detection)
+   */
+  getDiscoveryTemplates(): string[] {
+    return DISCOVERY_TEMPLATES;
+  }
+
+  /**
+   * Get focused templates based on detected technologies
+   */
+  getFocusedTemplates(techs: string[]): string[] {
+    const templates: Set<string> = new Set();
+
+    for (const tech of techs) {
+      const techLower = tech.toLowerCase();
+      const focused = TECH_FOCUSED_TEMPLATES[techLower];
+      if (focused) {
+        focused.forEach(t => templates.add(t));
+      }
+    }
+
+    // Always include CVEs and vulnerabilities for deep scan
+    templates.add('http/cves');
+    templates.add('http/vulnerabilities');
+
+    return Array.from(templates);
+  }
+
+  /**
+   * Parse technologies from discovery phase findings
+   */
+  parseTechnologies(findings: NormalizedFinding[]): string[] {
+    const techs: Set<string> = new Set();
+
+    for (const finding of findings) {
+      // Extract tech from template-id patterns
+      const templateId = finding.ruleId || '';
+
+      // Common tech patterns in nuclei template IDs
+      const techPatterns = [
+        /apache/i, /nginx/i, /wordpress/i, /tomcat/i, /iis/i,
+        /php/i, /nodejs?/i, /spring/i, /joomla/i, /drupal/i,
+        /jenkins/i, /gitlab/i, /grafana/i, /kubernetes/i, /docker/i,
+      ];
+
+      for (const pattern of techPatterns) {
+        const match = templateId.match(pattern);
+        if (match) {
+          techs.add(match[0].toLowerCase());
+        }
+      }
+
+      // Also check metadata.extracted for tech names
+      const extracted = finding.metadata?.extracted as string[] | undefined;
+      if (extracted) {
+        extracted.forEach(e => {
+          if (typeof e === 'string' && e.length < 50) {
+            // Check if it matches known tech names
+            for (const tech of Object.keys(TECH_FOCUSED_TEMPLATES)) {
+              if (e.toLowerCase().includes(tech)) {
+                techs.add(tech);
+              }
+            }
+          }
+        });
+      }
+    }
+
+    return Array.from(techs);
+  }
+
   async scan(context: ScanContext): Promise<ScanOutput> {
     const outputFile = path.join(context.workDir, 'nuclei-results.json');
 
     // Get target URLs from config
-    const targetUrls = context.config?.targetUrls as string[] || [];
+    let targetUrls = context.config?.targetUrls as string[] || [];
     if (targetUrls.length === 0) {
       this.logger.warn('No target URLs configured for DAST scan');
       return {
@@ -76,36 +201,62 @@ export class NucleiScanner implements IScanner {
       };
     }
 
+    // Replace 'localhost' with '127.0.0.1' in target URLs to avoid DNS resolution issues
+    targetUrls = targetUrls.map(url => url.replace(/localhost/gi, '127.0.0.1'));
+    this.logger.log(`Target URLs (normalized): ${targetUrls.join(', ')}`);
+
     // Create targets file
     const targetsFile = path.join(context.workDir, 'nuclei-targets.txt');
     await fs.writeFile(targetsFile, targetUrls.join('\n'));
+
+    // Get scan phase and mode from config
+    const scanPhase = (context.config?.scanPhase as ScanPhase) || 'single';
+    const scanMode = (context.config?.dastScanMode as DastScanMode) || 'standard';
+    const detectedTechs = (context.config?.detectedTechnologies as string[]) || [];
+    this.logger.log(`DAST scan phase: ${scanPhase}, mode: ${scanMode}`);
 
     const args = [
       '-l', targetsFile,
       '-json-export', outputFile,
       '-silent',
       '-no-color',
-      '-rate-limit', '50', // Rate limit to avoid overwhelming targets
+      '-rate-limit', '20',
       '-bulk-size', '25',
       '-concurrency', '10',
     ];
 
-    // Add custom templates path if configured
+    // Determine templates based on phase
+    let templates: string[] = [];
+
     if (this.templatesPath) {
+      // Use custom templates path if configured
       args.push('-t', this.templatesPath);
+    } else if (scanPhase === 'discovery') {
+      // Discovery phase: fast tech detection
+      templates = this.getDiscoveryTemplates();
+      this.logger.log(`Discovery phase using templates: ${templates.join(', ')}`);
+    } else if (scanPhase === 'deep' && detectedTechs.length > 0) {
+      // Deep phase: focused on detected technologies
+      templates = this.getFocusedTemplates(detectedTechs);
+      this.logger.log(`Deep phase for techs [${detectedTechs.join(', ')}] using templates: ${templates.join(', ')}`);
     } else {
-      // Use default security templates
-      args.push('-t', 'http/cves');
-      args.push('-t', 'http/vulnerabilities');
-      args.push('-t', 'http/exposures');
-      args.push('-t', 'http/misconfiguration');
+      // Single/default: use mode-based templates
+      templates = SCAN_MODE_TEMPLATES[scanMode];
+      this.logger.log(`Single phase using templates for ${scanMode} mode: ${templates.join(', ')}`);
     }
 
-    // Severity filter
-    args.push('-s', 'critical,high,medium');
+    // Add templates to args
+    for (const template of templates) {
+      args.push('-t', template);
+    }
+
+    // Only add severity filter for deep/full modes
+    if (scanPhase === 'deep' || scanMode === 'full') {
+      args.push('-s', 'critical,high,medium');
+    }
 
     // Add timeout
-    args.push('-timeout', String(Math.floor(context.timeout / 1000 / 60)) + 'm');
+    args.push('-timeout', String(Math.floor(context.timeout / 1000)));
 
     const result = await this.executor.execute({
       command: this.nucleiPath,
