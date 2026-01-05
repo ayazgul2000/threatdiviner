@@ -68,13 +68,12 @@ interface Scan {
   }>;
 }
 
-// Available scanners
+// Available scanners for code security (DAST moved to Targets)
 const AVAILABLE_SCANNERS = [
   { id: 'semgrep', name: 'Semgrep', category: 'SAST', description: 'Static code analysis' },
   { id: 'trivy', name: 'Trivy', category: 'SCA', description: 'Dependency vulnerabilities' },
   { id: 'gitleaks', name: 'Gitleaks', category: 'Secrets', description: 'Secret detection' },
   { id: 'checkov', name: 'Checkov', category: 'IaC', description: 'Infrastructure as Code' },
-  { id: 'nuclei', name: 'Nuclei', category: 'DAST', description: 'Dynamic testing' },
 ];
 
 // Trigger icon component
@@ -205,13 +204,13 @@ export default function RepositoryDetailPage() {
         setSelectedScanners(scanConfig.scanners);
         return;
       }
-      // Fallback to legacy boolean format
+      // Fallback to legacy boolean format (code security scanners only)
       const defaults: string[] = [];
       if (scanConfig.enableSast !== false) defaults.push('semgrep');
       if (scanConfig.enableSca !== false) defaults.push('trivy');
       if (scanConfig.enableSecrets !== false) defaults.push('gitleaks');
       if (scanConfig.enableIac) defaults.push('checkov');
-      if (scanConfig.enableDast) defaults.push('nuclei');
+      // Note: DAST scanners (nuclei, etc.) are now managed under Targets, not Repositories
       setSelectedScanners(defaults.length > 0 ? defaults : ['semgrep', 'trivy', 'gitleaks']);
     } else {
       setSelectedScanners(['semgrep', 'trivy', 'gitleaks']);

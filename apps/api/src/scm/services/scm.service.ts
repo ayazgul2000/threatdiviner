@@ -615,18 +615,19 @@ export class ScmService {
     let enableSca = savedConfig.enableSca;
     let enableSecrets = savedConfig.enableSecrets;
     let enableIac = savedConfig.enableIac;
-    let enableDast = 'enableDast' in savedConfig ? savedConfig.enableDast : false;
+    // DAST scanners are NOT run for repository scans - they are managed under Targets
+    const enableDast = false;
     let enableContainerScan = 'enableContainerScan' in savedConfig ? savedConfig.enableContainerScan : false;
 
     if (scanners && scanners.length > 0) {
-      // Override with passed scanners
-      enableSast = scanners.includes('semgrep');
-      enableSca = scanners.includes('trivy');
-      enableSecrets = scanners.includes('gitleaks');
-      enableIac = scanners.includes('checkov');
-      enableDast = scanners.includes('nuclei') || scanners.includes('zap');
-      enableContainerScan = scanners.includes('container');
-      this.logger.log(`Using override scanners: ${scanners.join(', ')}`);
+      // Override with passed scanners (filter out DAST scanners)
+      const codeSecurityScanners = scanners.filter(s => !['nuclei', 'zap', 'nikto', 'sqlmap', 'sslyze'].includes(s));
+      enableSast = codeSecurityScanners.includes('semgrep');
+      enableSca = codeSecurityScanners.includes('trivy');
+      enableSecrets = codeSecurityScanners.includes('gitleaks');
+      enableIac = codeSecurityScanners.includes('checkov');
+      enableContainerScan = codeSecurityScanners.includes('container');
+      this.logger.log(`Using override scanners (code security only): ${codeSecurityScanners.join(', ')}`);
     }
 
     // Build job data

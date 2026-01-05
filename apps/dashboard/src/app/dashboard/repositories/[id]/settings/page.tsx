@@ -16,22 +16,12 @@ import { repositoriesApi, branchesApi, type Repository, type ScanConfig, type Sc
 interface ScannerConfig {
   id: string;
   name: string;
-  type: 'sast' | 'sca' | 'secrets' | 'iac' | 'dast' | 'container';
+  type: 'sast' | 'sca' | 'secrets' | 'iac' | 'container';
   description: string;
   enabled: boolean;
   isDefault: boolean;
 }
 
-type DastScanMode = 'quick' | 'standard' | 'full';
-
-interface DastConfig {
-  targetUrls: string[];
-  newUrl: string;
-  scanMode: DastScanMode;
-  authEnabled: boolean;
-  authType?: 'basic' | 'bearer' | 'form';
-  authConfig?: Record<string, string>;
-}
 
 interface WebhookConfig {
   url: string;
@@ -49,7 +39,6 @@ const SCANNERS: ScannerConfig[] = [
   { id: 'trivy', name: 'Trivy', type: 'sca', description: 'Software Composition Analysis for dependency vulnerabilities', enabled: true, isDefault: true },
   { id: 'gitleaks', name: 'Gitleaks', type: 'secrets', description: 'Secret detection for API keys, passwords, tokens', enabled: true, isDefault: true },
   { id: 'checkov', name: 'Checkov', type: 'iac', description: 'Infrastructure as Code scanning (Terraform, CloudFormation)', enabled: false, isDefault: false },
-  { id: 'nuclei', name: 'Nuclei', type: 'dast', description: 'Dynamic vulnerability scanning with templates', enabled: false, isDefault: false },
   { id: 'container', name: 'Container Scan', type: 'container', description: 'Container image vulnerability scanning for Docker images', enabled: false, isDefault: false },
 ];
 
@@ -58,7 +47,6 @@ const SCANNER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   sca: { label: 'SCA', color: 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' },
   secrets: { label: 'Secrets', color: 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300' },
   iac: { label: 'IaC', color: 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' },
-  dast: { label: 'DAST', color: 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' },
   container: { label: 'Container', color: 'bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300' },
 };
 
@@ -79,14 +67,6 @@ export default function RepositorySettingsPage() {
 
   // Scanner configuration
   const [scanners, setScanners] = useState<ScannerConfig[]>(SCANNERS);
-
-  // DAST configuration
-  const [dastConfig, setDastConfig] = useState<DastConfig>({
-    targetUrls: [],
-    newUrl: '',
-    scanMode: 'standard',
-    authEnabled: false,
-  });
 
   // Webhook configuration
   const [webhookConfig, setWebhookConfig] = useState<WebhookConfig>({
@@ -146,18 +126,6 @@ export default function RepositorySettingsPage() {
           setScheduleEnabled(repo.scanConfig.scanOnSchedule);
           if (repo.scanConfig.schedulePattern) {
             setCustomCron(repo.scanConfig.schedulePattern);
-          }
-          if (repo.scanConfig.targetUrls && repo.scanConfig.targetUrls.length > 0) {
-            setDastConfig(prev => ({
-              ...prev,
-              targetUrls: repo.scanConfig!.targetUrls,
-            }));
-          }
-          if ((repo.scanConfig as any).dastScanMode) {
-            setDastConfig(prev => ({
-              ...prev,
-              scanMode: (repo.scanConfig as any).dastScanMode as DastScanMode,
-            }));
           }
           if (repo.scanConfig.branches && repo.scanConfig.branches.length > 0) {
             setDefaultBranch(repo.scanConfig.branches[0]);
@@ -301,8 +269,6 @@ export default function RepositorySettingsPage() {
         scanOnSchedule: scheduleEnabled,
         schedulePattern,
         scanners: enabledScanners,
-        targetUrls: dastConfig.targetUrls,
-        dastScanMode: dastConfig.scanMode,
         branches: defaultBranch ? [defaultBranch] : undefined,
       } as any);
 
@@ -870,100 +836,6 @@ export default function RepositorySettingsPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* DAST Configuration */}
-          {scanners.some(s => s.type === 'dast' && s.enabled) && (
-            <Card variant="bordered">
-              <CardHeader>
-                <CardTitle>DAST Configuration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Target URLs *
-                    </label>
-                    <p className="text-xs text-gray-500 mb-2">URLs of your staging/test environments to scan</p>
-
-                    {dastConfig.targetUrls.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {dastConfig.targetUrls.map((url, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 px-3 py-1 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full text-sm text-red-700 dark:text-red-300"
-                          >
-                            {url}
-                            <button
-                              onClick={() => setDastConfig(prev => ({
-                                ...prev,
-                                targetUrls: prev.targetUrls.filter((_, i) => i !== idx),
-                              }))}
-                              className="text-red-400 hover:text-red-600"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={dastConfig.newUrl}
-                        onChange={(e) => setDastConfig({ ...dastConfig, newUrl: e.target.value })}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && dastConfig.newUrl) {
-                            e.preventDefault();
-                            if (!dastConfig.targetUrls.includes(dastConfig.newUrl)) {
-                              setDastConfig(prev => ({
-                                ...prev,
-                                targetUrls: [...prev.targetUrls, prev.newUrl],
-                                newUrl: '',
-                              }));
-                            }
-                          }
-                        }}
-                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                        placeholder="https://staging.example.com"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          if (dastConfig.newUrl && !dastConfig.targetUrls.includes(dastConfig.newUrl)) {
-                            setDastConfig(prev => ({
-                              ...prev,
-                              targetUrls: [...prev.targetUrls, prev.newUrl],
-                              newUrl: '',
-                            }));
-                          }
-                        }}
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      DAST Scan Mode
-                    </label>
-                    <select
-                      value={dastConfig.scanMode}
-                      onChange={(e) => setDastConfig({ ...dastConfig, scanMode: e.target.value as DastScanMode })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                    >
-                      <option value="quick">Quick Scan (~1 min) - Technology detection & exposed panels</option>
-                      <option value="standard">Standard Scan (~5 min) - + Exposures & misconfigurations</option>
-                      <option value="full">Full Scan (~15-30 min) - + CVEs & vulnerabilities</option>
-                    </select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* AI Triage */}
           <Card variant="bordered">
