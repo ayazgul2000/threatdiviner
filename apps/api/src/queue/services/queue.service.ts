@@ -1,7 +1,8 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { Queue, Job } from 'bullmq';
-import { QUEUE_NAMES, JOB_NAMES, SCAN_JOB_OPTIONS, NOTIFY_JOB_OPTIONS } from '../queue.constants';
-import { ScanJobData, NotifyJobData, CleanupJobData } from '../jobs';
+import { RedisClientType } from 'redis';
+import { QUEUE_NAMES, JOB_NAMES, SCAN_JOB_OPTIONS, NOTIFY_JOB_OPTIONS, TARGET_SCAN_JOB_OPTIONS, REDIS_PUBSUB } from '../queue.constants';
+import { ScanJobData, NotifyJobData, CleanupJobData, TargetScanJobData } from '../jobs';
 
 @Injectable()
 export class QueueService {
@@ -9,8 +10,10 @@ export class QueueService {
 
   constructor(
     @Inject(`BullQueue_${QUEUE_NAMES.SCAN}`) private readonly scanQueue: Queue,
+    @Inject(`BullQueue_${QUEUE_NAMES.TARGET_SCAN}`) private readonly targetScanQueue: Queue,
     @Inject(`BullQueue_${QUEUE_NAMES.NOTIFY}`) private readonly notifyQueue: Queue,
     @Inject(`BullQueue_${QUEUE_NAMES.CLEANUP}`) private readonly cleanupQueue: Queue,
+    @Inject(REDIS_PUBSUB.SCAN_CANCELLATION) private readonly redisPublisher: RedisClientType,
   ) {}
 
   async enqueueScan(data: ScanJobData): Promise<Job<ScanJobData>> {
@@ -71,6 +74,40 @@ export class QueueService {
     return job;
   }
 
+  async enqueueTargetScan(data: TargetScanJobData): Promise<Job<TargetScanJobData>> {
+    this.logger.log(`Enqueueing target scan for ${data.targetName} (${data.targetUrl})`);
+
+    try {
+      const job = await this.targetScanQueue.add(
+        JOB_NAMES.PROCESS_TARGET_SCAN,
+        data,
+        {
+          ...TARGET_SCAN_JOB_OPTIONS,
+          jobId: `target-scan-${data.scanId}`,
+        },
+      );
+
+      this.logger.log(`Target scan job ${job.id} created for scan ${data.scanId}`);
+
+      // Log queue stats for debugging
+      const [waiting, active] = await Promise.all([
+        this.targetScanQueue.getWaitingCount(),
+        this.targetScanQueue.getActiveCount(),
+      ]);
+      this.logger.log(`Target scan queue stats: ${waiting} waiting, ${active} active`);
+
+      return job;
+    } catch (error) {
+      this.logger.error(`Failed to enqueue target scan job: ${error}`);
+      throw error;
+    }
+  }
+
+  async getTargetScanJob(scanId: string): Promise<Job<TargetScanJobData> | null> {
+    const job = await this.targetScanQueue.getJob(`target-scan-${scanId}`);
+    return job || null;
+  }
+
   async getScanJob(scanId: string): Promise<Job<ScanJobData> | null> {
     const job = await this.scanQueue.getJob(`scan-${scanId}`);
     return job || null;
@@ -88,12 +125,61 @@ export class QueueService {
 
     const state = await job.getState();
     if (state === 'active') {
+      // Signal via Redis Pub/Sub for immediate cancellation
+      try {
+        await this.redisPublisher.publish(REDIS_PUBSUB.SCAN_CANCELLATION, scanId);
+        this.logger.log(`Published cancellation signal for scan ${scanId}`);
+      } catch (error) {
+        this.logger.error(`Failed to publish cancellation signal: ${error}`);
+      }
+
       // Can't cancel active jobs directly, need to signal the processor
       await job.moveToFailed(new Error('Cancelled by user'), 'cancelled');
       return true;
     } else if (state === 'waiting' || state === 'delayed') {
       await job.remove();
       return true;
+    }
+
+    return false;
+  }
+
+  async cancelTargetScan(scanId: string): Promise<boolean> {
+    const job = await this.getTargetScanJob(scanId);
+    if (!job) {
+      this.logger.warn(`Target scan job not found for scan ${scanId}`);
+      return false;
+    }
+
+    const state = await job.getState();
+    this.logger.log(`Cancelling target scan job ${job.id}, current state: ${state}`);
+
+    try {
+      if (state === 'active') {
+        // Signal via Redis Pub/Sub for immediate cancellation
+        try {
+          await this.redisPublisher.publish(REDIS_PUBSUB.SCAN_CANCELLATION, scanId);
+          this.logger.log(`Published cancellation signal for target scan ${scanId}`);
+        } catch (error) {
+          this.logger.error(`Failed to publish cancellation signal: ${error}`);
+        }
+
+        // For active jobs, we can't moveToFailed without the lock
+        // The process kill in pentest.service handles stopping the actual scanner
+        // Just log that we attempted - the DB status update handles the rest
+        this.logger.log(`Job ${job.id} is active - signal sent`);
+        return true;
+      } else if (state === 'waiting' || state === 'delayed') {
+        await job.remove();
+        this.logger.log(`Target scan job ${job.id} removed from queue`);
+        return true;
+      } else if (state === 'completed' || state === 'failed') {
+        this.logger.log(`Job ${job.id} already in terminal state: ${state}`);
+        return true;
+      }
+    } catch (error) {
+      this.logger.error(`Error cancelling job ${job.id}: ${error}`);
+      // Don't throw - the DB status update will still happen
     }
 
     return false;

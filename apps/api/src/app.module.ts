@@ -42,6 +42,8 @@ import { ProjectsModule } from './projects/projects.module';
 import { AlertsModule } from './alerts/alerts.module';
 import { SettingsModule } from './settings/settings.module';
 import { PenTestModule } from './pentest/pentest.module';
+import { TargetsModule } from './targets/targets.module';
+import { ScansModule } from './scans/scans.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -112,6 +114,8 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     AlertsModule,
     SettingsModule,
     PenTestModule,
+    TargetsModule,
+    ScansModule,
   ],
   controllers: [HealthController],
   providers: [

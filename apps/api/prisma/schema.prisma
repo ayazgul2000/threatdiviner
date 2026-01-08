@@ -22,18 +22,18 @@ model Tenant {
   maxUsers                Int                 @default(5) @map("max_users")
   scanRetentionDays       Int                 @default(90) @map("scan_retention_days")
   allowProjectConnections Boolean             @default(false) @map("allow_project_connections")
-  apiKeys              ApiKey[]
-  findingBaselines     FindingBaseline[]
-  findings             Finding[]
-  jiraConfig           JiraConfig?
-  notificationConfig   NotificationConfig?
-  orgMembers           OrgMember[]
-  projects             Project[]
-  repositories         Repository[]
-  scanConfigs          ScanConfig[]
-  scans                Scan[]
-  scmConnections       ScmConnection[]
-  users                User[]
+  apiKeys                 ApiKey[]
+  findingBaselines        FindingBaseline[]
+  findings                Finding[]
+  jiraConfig              JiraConfig?
+  notificationConfig      NotificationConfig?
+  orgMembers              OrgMember[]
+  projects                Project[]
+  repositories            Repository[]
+  scanConfigs             ScanConfig[]
+  scans                   Scan[]
+  scmConnections          ScmConnection[]
+  users                   User[]
 
   @@map("tenants")
 }
@@ -119,23 +119,23 @@ model ProjectMember {
 }
 
 model ScmConnection {
-  id             String       @id @default(uuid())
-  tenantId       String       @map("tenant_id")
+  id             String             @id @default(uuid())
+  tenantId       String             @map("tenant_id")
   provider       String
-  authMethod     String       @map("auth_method")
-  accessToken    String       @map("access_token")
-  refreshToken   String?      @map("refresh_token")
-  tokenExpiresAt DateTime?    @map("token_expires_at")
-  installationId String?      @map("installation_id")
-  externalId     String       @map("external_id")
-  externalName   String       @map("external_name")
+  authMethod     String             @map("auth_method")
+  accessToken    String             @map("access_token")
+  refreshToken   String?            @map("refresh_token")
+  tokenExpiresAt DateTime?          @map("token_expires_at")
+  installationId String?            @map("installation_id")
+  externalId     String             @map("external_id")
+  externalName   String             @map("external_name")
   scope          String[]
-  isActive       Boolean      @default(true) @map("is_active")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  isActive       Boolean            @default(true) @map("is_active")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
   repositories   Repository[]
-  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  projectAccess       ProjectScmAccess[]
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectAccess  ProjectScmAccess[]
 
   @@unique([tenantId, provider, externalId])
   @@index([tenantId])
@@ -144,12 +144,12 @@ model ScmConnection {
 
 // Project-level access to SCM connections
 model ProjectScmAccess {
-  id           String        @id @default(uuid())
-  projectId    String        @map("project_id")
-  connectionId String        @map("connection_id")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  connection   ScmConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  id           String              @id @default(uuid())
+  projectId    String              @map("project_id")
+  connectionId String              @map("connection_id")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection   ScmConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   repoAccess   ProjectRepoAccess[]
 
   @@unique([projectId, connectionId])
@@ -173,27 +173,36 @@ model ProjectRepoAccess {
 }
 
 model Repository {
-  id               String            @id @default(uuid())
-  tenantId         String            @map("tenant_id")
-  connectionId     String            @map("connection_id")
-  name             String
-  fullName         String            @map("full_name")
-  cloneUrl         String            @map("clone_url")
-  htmlUrl          String            @map("html_url")
-  defaultBranch    String            @default("main") @map("default_branch")
-  language         String?
-  isPrivate        Boolean           @default(true) @map("is_private")
-  isActive         Boolean           @default(true) @map("is_active")
-  lastScanAt       DateTime?         @map("last_scan_at")
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
-  projectId        String?           @map("project_id")
-  findingBaselines FindingBaseline[]
-  connection       ScmConnection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  project          Project?          @relation(fields: [projectId], references: [id])
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  scanConfig       ScanConfig?
-  scans            Scan[]
+  id                      String            @id @default(uuid())
+  tenantId                String            @map("tenant_id")
+  connectionId            String            @map("connection_id")
+  name                    String
+  fullName                String            @map("full_name")
+  cloneUrl                String            @map("clone_url")
+  htmlUrl                 String            @map("html_url")
+  defaultBranch           String            @default("main") @map("default_branch")
+  language                String?
+  isPrivate               Boolean           @default(true) @map("is_private")
+  isActive                Boolean           @default(true) @map("is_active")
+  lastScanAt              DateTime?         @map("last_scan_at")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
+  projectId               String?           @map("project_id")
+  // Webhook configuration
+  webhookUrl              String?           @unique @map("webhook_url")
+  webhookSecret           String?           @map("webhook_secret")
+  webhookBranchFilters    String[]          @default([]) @map("webhook_branch_filters")
+  webhookBranchExcludes   String[]          @default([]) @map("webhook_branch_excludes")
+  webhookScannersEnabled  String[]          @default([]) @map("webhook_scanners_enabled")
+  webhookBlockSeverity    String?           @map("webhook_block_severity")
+  webhookDiffOnly         Boolean           @default(true) @map("webhook_diff_only")
+  webhookInlineComments   Boolean           @default(true) @map("webhook_inline_comments")
+  findingBaselines        FindingBaseline[]
+  connection              ScmConnection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  project                 Project?          @relation(fields: [projectId], references: [id])
+  tenant                  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scanConfig              ScanConfig?
+  scans                   Scan[]
 
   @@unique([tenantId, fullName])
   @@index([tenantId])
@@ -211,6 +220,7 @@ model ScanConfig {
   enableIac            Boolean    @default(true) @map("enable_iac")
   enableDast           Boolean    @default(false) @map("enable_dast")
   enableContainerScan  Boolean    @default(false) @map("enable_container_scan")
+  dastScanMode         String     @default("standard") @map("dast_scan_mode") // quick, standard, full
   targetUrls           String[]   @default([]) @map("target_urls")
   containerImages      String[]   @default([]) @map("container_images")
   branches             String[]   @default(["main", "master"])
@@ -237,35 +247,58 @@ model ScanConfig {
 }
 
 model Scan {
-  id             String     @id @default(uuid())
-  tenantId       String     @map("tenant_id")
-  repositoryId   String     @map("repository_id")
-  commitSha      String     @map("commit_sha")
+  id             String          @id @default(uuid())
+  tenantId       String          @map("tenant_id")
+  repositoryId   String          @map("repository_id")
+  commitSha      String          @map("commit_sha")
   branch         String
-  status         String     @default("pending")
-  triggeredBy    String     @map("triggered_by")
-  triggerEvent   String?    @map("trigger_event")
-  pullRequestId  String?    @map("pull_request_id")
-  pullRequestUrl String?    @map("pull_request_url")
-  checkRunId     String?    @map("check_run_id")
-  sarifUploadId  String?    @map("sarif_upload_id")
-  sarifUploadUrl String?    @map("sarif_upload_url")
-  startedAt      DateTime?  @map("started_at")
-  completedAt    DateTime?  @map("completed_at")
+  status         String          @default("pending")
+  triggeredBy    String          @map("triggered_by")
+  triggerEvent   String?         @map("trigger_event")
+  pullRequestId  String?         @map("pull_request_id")
+  pullRequestUrl String?         @map("pull_request_url")
+  checkRunId     String?         @map("check_run_id")
+  sarifUploadId  String?         @map("sarif_upload_id")
+  sarifUploadUrl String?         @map("sarif_upload_url")
+  startedAt      DateTime?       @map("started_at")
+  completedAt    DateTime?       @map("completed_at")
   duration       Int?
-  errorMessage   String?    @map("error_message")
-  createdAt      DateTime   @default(now()) @map("created_at")
-  projectId      String?    @map("project_id")
+  errorMessage   String?         @map("error_message")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  projectId      String?         @map("project_id")
   findings       Finding[]
-  project        Project?   @relation(fields: [projectId], references: [id])
-  repository     Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scannerResults ScannerResult[]
+  project        Project?        @relation(fields: [projectId], references: [id])
+  repository     Repository      @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([repositoryId])
   @@index([projectId])
   @@index([status])
   @@map("scans")
+}
+
+model ScannerResult {
+  id            String    @id @default(uuid())
+  scanId        String    @map("scan_id")
+  scanner       String // e.g., "semgrep", "trivy", "gitleaks", "nuclei"
+  category      String // e.g., "sast", "sca", "secrets", "iac", "dast"
+  status        String // "pending", "running", "completed", "failed", "skipped"
+  exitCode      Int?      @map("exit_code")
+  duration      Int? // milliseconds
+  findingsCount Int       @default(0) @map("findings_count")
+  errorMessage  String?   @map("error_message")
+  command       String? // The command that was run
+  targetInfo    String?   @map("target_info") // e.g., target URLs for DAST, languages for SAST
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  scan          Scan      @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId])
+  @@index([scanner])
+  @@map("scanner_results")
 }
 
 model Finding {
@@ -1334,22 +1367,38 @@ enum ProjectStatus {
   DELETED
 }
 
-// Penetration Testing Models
+// Penetration Testing / DAST Targets
 model PenTestTarget {
-  id          String        @id @default(uuid())
-  tenantId    String        @map("tenant_id")
-  projectId   String?       @map("project_id")
-  name        String
-  url         String
-  type        String        @default("web") // web, api, network
-  description String?
-  authConfig  Json?         @map("auth_config") // credentials, headers, cookies
-  headers     Json?         @default("{}") // custom headers
-  isActive    Boolean       @default(true) @map("is_active")
-  lastScanAt  DateTime?     @map("last_scan_at")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-  scans       PenTestScan[]
+  id              String        @id @default(uuid())
+  tenantId        String        @map("tenant_id")
+  projectId       String?       @map("project_id")
+  name            String
+  url             String
+  type            String        @default("web_application") // web_application, api_endpoint, network_service
+  description     String?
+
+  // Authentication
+  authType        String?       @map("auth_type") // none, basic, bearer, cookie
+  authCredentials Json?         @map("auth_credentials") // encrypted credentials
+  authConfig      Json?         @map("auth_config") // legacy: credentials, headers, cookies
+  headers         Json?         @default("{}") // custom headers
+
+  // Scan configuration
+  defaultScanners   String[]      @default(["nuclei"]) @map("default_scanners")
+  defaultScanMode   String        @default("standard") @map("default_scan_mode") // quick, standard, comprehensive
+  rateLimitPreset   String        @default("medium") @map("rate_limit_preset") // low, medium, high
+  rateLimitRps      Int?          @map("rate_limit_rps") // deprecated: use rateLimitPreset
+  excludePaths      String[]      @default([]) @map("exclude_paths")
+
+  // Risk tracking
+  riskScore       Int?          @map("risk_score") // 0-100
+  lastScanId      String?       @map("last_scan_id")
+
+  isActive        Boolean       @default(true) @map("is_active")
+  lastScanAt      DateTime?     @map("last_scan_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  scans           PenTestScan[]
 
   @@index([tenantId])
   @@index([projectId])
@@ -1357,61 +1406,69 @@ model PenTestTarget {
 }
 
 model PenTestScan {
-  id             String           @id @default(uuid())
-  tenantId       String           @map("tenant_id")
-  targetId       String           @map("target_id")
-  status         String           @default("pending") // pending, running, completed, failed, cancelled
-  scanners       String[]         @default([]) // sqlmap, nikto, sslyze, zap, nuclei
-  config         Json             @default("{}") // scanner-specific config
-  startedAt      DateTime?        @map("started_at")
-  completedAt    DateTime?        @map("completed_at")
-  duration       Int?             // seconds
-  findingsCount  Int              @default(0) @map("findings_count")
-  criticalCount  Int              @default(0) @map("critical_count")
-  highCount      Int              @default(0) @map("high_count")
-  mediumCount    Int              @default(0) @map("medium_count")
-  lowCount       Int              @default(0) @map("low_count")
-  infoCount      Int              @default(0) @map("info_count")
-  errorMessage   String?          @map("error_message")
-  rawOutput      Json?            @map("raw_output")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-  target         PenTestTarget    @relation(fields: [targetId], references: [id], onDelete: Cascade)
-  findings       PenTestFinding[]
+  id                   String           @id @default(uuid())
+  tenantId             String           @map("tenant_id")
+  targetId             String           @map("target_id")
+  status               String           @default("pending") // pending, running, completed, failed, cancelled
+  scanners             String[]         @default([]) // sqlmap, nikto, sslyze, zap, nuclei
+  config               Json             @default("{}") // scanner-specific config
+  scanMode             String           @default("standard") @map("scan_mode") // quick, standard, comprehensive
+  scanPhase            String           @default("discovery") @map("scan_phase") // discovery, scanning, complete
+  detectedTechnologies String[]         @default([]) @map("detected_technologies") // populated by discovery phase
+  crawledUrls          Int              @default(0) @map("crawled_urls") // count of URLs discovered by Katana
+  parentScanId         String?          @map("parent_scan_id") // links deep scan to its discovery scan
+  startedAt            DateTime?        @map("started_at")
+  completedAt          DateTime?        @map("completed_at")
+  duration             Int? // seconds
+  findingsCount        Int              @default(0) @map("findings_count")
+  criticalCount        Int              @default(0) @map("critical_count")
+  highCount            Int              @default(0) @map("high_count")
+  mediumCount          Int              @default(0) @map("medium_count")
+  lowCount             Int              @default(0) @map("low_count")
+  infoCount            Int              @default(0) @map("info_count")
+  errorMessage         String?          @map("error_message")
+  rawOutput            Json?            @map("raw_output")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  target               PenTestTarget    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  parentScan           PenTestScan?     @relation("ScanHierarchy", fields: [parentScanId], references: [id])
+  childScans           PenTestScan[]    @relation("ScanHierarchy")
+  findings             PenTestFinding[]
 
   @@index([tenantId])
   @@index([targetId])
   @@index([status])
+  @@index([parentScanId])
   @@map("pentest_scans")
 }
 
 model PenTestFinding {
-  id             String      @id @default(uuid())
-  scanId         String      @map("scan_id")
-  tenantId       String      @map("tenant_id")
-  scanner        String      // which scanner found this
-  ruleId         String      @map("rule_id")
-  severity       String      // critical, high, medium, low, info
-  confidence     String      @default("medium") // high, medium, low
-  title          String
-  description    String?
-  url            String?     // affected URL/endpoint
-  parameter      String?     // affected parameter (for injection vulns)
-  payload        String?     // attack payload used
-  evidence       String?     // response evidence
-  cweIds         String[]    @default([]) @map("cwe_ids")
-  cveIds         String[]    @default([]) @map("cve_ids")
-  owaspIds       String[]    @default([]) @map("owasp_ids")
-  references     Json        @default("[]")
-  remediation    String?
-  status         String      @default("open") // open, confirmed, false_positive, fixed
-  verifiedAt     DateTime?   @map("verified_at")
-  verifiedBy     String?     @map("verified_by")
-  fingerprint    String?
-  metadata       Json        @default("{}")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
-  scan           PenTestScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  id          String      @id @default(uuid())
+  scanId      String      @map("scan_id")
+  tenantId    String      @map("tenant_id")
+  scanner     String // which scanner found this
+  ruleId      String      @map("rule_id")
+  severity    String // critical, high, medium, low, info
+  confidence  String      @default("medium") // high, medium, low
+  title       String
+  description String?
+  url         String? // affected URL/endpoint
+  parameter   String? // affected parameter (for injection vulns)
+  payload     String? // attack payload used
+  evidence    String? // response evidence
+  cweIds      String[]    @default([]) @map("cwe_ids")
+  cveIds      String[]    @default([]) @map("cve_ids")
+  owaspIds    String[]    @default([]) @map("owasp_ids")
+  references  Json        @default("[]")
+  remediation String?
+  status      String      @default("open") // open, confirmed, false_positive, fixed
+  verifiedAt  DateTime?   @map("verified_at")
+  verifiedBy  String?     @map("verified_by")
+  fingerprint String?
+  metadata    Json        @default("{}")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  scan        PenTestScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
 
   @@index([scanId])
   @@index([tenantId])

@@ -71,7 +71,7 @@ SeverityBadge.displayName = 'SeverityBadge';
 
 // Convenience component for status badges
 interface StatusBadgeProps extends Omit<BadgeProps, 'variant'> {
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'open' | 'fixed' | 'ignored' | 'false_positive';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'open' | 'fixed' | 'ignored' | 'false_positive' | 'queued' | 'cloning' | 'scanning' | 'analyzing' | 'storing' | 'notifying';
 }
 
 const statusVariants: Record<StatusBadgeProps['status'], BadgeVariant> = {
@@ -80,6 +80,13 @@ const statusVariants: Record<StatusBadgeProps['status'], BadgeVariant> = {
   completed: 'success',
   failed: 'danger',
   cancelled: 'warning',
+  // Scan pipeline statuses
+  queued: 'default',
+  cloning: 'info',
+  scanning: 'info',
+  analyzing: 'info',
+  storing: 'info',
+  notifying: 'info',
   // Finding statuses
   open: 'danger',
   fixed: 'success',
@@ -93,6 +100,14 @@ const statusLabels: Record<StatusBadgeProps['status'], string> = {
   completed: 'Completed',
   failed: 'Failed',
   cancelled: 'Cancelled',
+  // Scan pipeline statuses
+  queued: 'Queued',
+  cloning: 'Cloning',
+  scanning: 'Scanning',
+  analyzing: 'Analyzing',
+  storing: 'Storing',
+  notifying: 'Notifying',
+  // Finding statuses
   open: 'Open',
   fixed: 'Fixed',
   ignored: 'Ignored',

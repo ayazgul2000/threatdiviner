@@ -5,6 +5,7 @@ import { ScmModule } from '../scm/scm.module';
 import { QueueModule } from '../queue/queue.module';
 import { AiModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ScansModule } from '../scans/scans.module';
 
 // Utils
 import { GitService } from './utils/git.service';
@@ -33,15 +34,19 @@ import { CheckovScanner } from './iac/checkov/checkov.scanner';
 import { NucleiScanner } from './dast/nuclei/nuclei.scanner';
 import { ZapScanner } from './dast/zap/zap.scanner';
 
+// Discovery Scanners
+import { KatanaScanner } from './discovery/katana/katana.scanner';
+
 // Services
 import { FindingProcessorService } from './services/finding-processor.service';
 import { DiffFilterService } from './services/diff-filter.service';
 
 // Processors
 import { ScanProcessor, NotifyProcessor } from '../queue/processors';
+import { TargetScanProcessor } from '../queue/processors/target-scan.processor';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule, forwardRef(() => NotificationsModule)],
+  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule, ScansModule, forwardRef(() => NotificationsModule)],
   providers: [
     // Utils
     GitService,
@@ -70,6 +75,9 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     NucleiScanner,
     ZapScanner,
 
+    // Discovery Scanners
+    KatanaScanner,
+
     // Services
     FindingProcessorService,
     DiffFilterService,
@@ -77,6 +85,7 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     // Queue Processors
     ScanProcessor,
     NotifyProcessor,
+    TargetScanProcessor,
   ],
   exports: [
     GitService,
@@ -90,6 +99,7 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     CheckovScanner,
     NucleiScanner,
     ZapScanner,
+    KatanaScanner,
     FindingProcessorService,
     DiffFilterService,
   ],

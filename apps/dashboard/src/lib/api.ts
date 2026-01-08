@@ -39,6 +39,16 @@ export interface Repository {
   createdAt: string;
   scanConfig?: ScanConfig;
   connection?: ScmConnection;
+  // Last scan summary for status indicator
+  lastScan?: {
+    id: string;
+    status: string;
+    criticalCount: number;
+    highCount: number;
+    mediumCount: number;
+    lowCount: number;
+    infoCount: number;
+  } | null;
 }
 
 export interface ScanConfig {
@@ -53,6 +63,8 @@ export interface ScanConfig {
   excludePaths: string[];
   targetUrls: string[];
   containerImages: string[];
+  branches?: string[];
+  dastScanMode?: 'quick' | 'standard' | 'full';
 }
 
 export interface Scan {
@@ -265,11 +277,13 @@ export const scansApi = {
     return response.scan;
   },
 
-  trigger: (repositoryId: string, branch?: string) =>
-    fetchApi<Scan>('/scm/scans', {
+  trigger: async (repositoryId: string, branch?: string, scanners?: string[]): Promise<{ scanId: string }> => {
+    const result = await fetchApi<{ scanId: string }>('/scm/scans', {
       method: 'POST',
-      body: JSON.stringify({ repositoryId, branch }),
-    }),
+      body: JSON.stringify({ repositoryId, branch, scanners }),
+    });
+    return result;
+  },
 
   cancel: (id: string) =>
     fetchApi<void>(`/scm/scans/${id}/cancel`, { method: 'POST' }),
@@ -417,8 +431,11 @@ export interface ScmLanguages {
 }
 
 export const branchesApi = {
-  list: (repositoryId: string) =>
-    fetchApi<ScmBranch[]>(`/scm/repositories/${repositoryId}/branches`),
+  list: async (repositoryId: string): Promise<ScmBranch[]> => {
+    const response = await fetchApi<{ branches: ScmBranch[] } | ScmBranch[]>(`/scm/repositories/${repositoryId}/branches`);
+    // Handle both wrapped and direct array responses
+    return Array.isArray(response) ? response : (response.branches || []);
+  },
 
   getLanguages: (repositoryId: string) =>
     fetchApi<ScmLanguages>(`/scm/repositories/${repositoryId}/languages`),

@@ -3,9 +3,7 @@
     {
       name: 'api',
       cwd: 'C:/dev/threatdiviner/apps/api',
-      script: 'cmd.exe',
-      args: '/c pnpm start:dev',
-      interpreter: 'none',
+      script: 'pm2-start.js',
       autorestart: true,
       max_restarts: 10,
       env: {
@@ -15,9 +13,7 @@
     {
       name: 'dashboard',
       cwd: 'C:/dev/threatdiviner/apps/dashboard',
-      script: 'cmd.exe',
-      args: '/c pnpm dev',
-      interpreter: 'none',
+      script: 'pm2-start.js',
       autorestart: true,
       max_restarts: 10,
       env: {

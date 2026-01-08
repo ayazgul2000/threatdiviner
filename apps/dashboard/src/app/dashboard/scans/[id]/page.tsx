@@ -27,10 +27,28 @@ import { API_URL, scansApi, findingsApi, type Scan, type Finding } from '@/lib/a
 
 type ScanStatus = 'queued' | 'running' | 'completed' | 'failed';
 
+interface ScannerResult {
+  id: string;
+  scanId: string;
+  scanner: string;
+  category: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  exitCode: number | null;
+  duration: number | null;
+  findingsCount: number;
+  errorMessage: string | null;
+  command: string | null;
+  targetInfo: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
 interface ScannerStatus {
   name: string;
   label: string;
   enabled: boolean;
+  status?: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  results?: ScannerResult[];
 }
 
 export default function ScanDetailPage() {
@@ -44,6 +62,7 @@ export default function ScanDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
+  const [selectedScanner, setSelectedScanner] = useState<ScannerStatus | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -105,11 +124,15 @@ export default function ScanDetailPage() {
         throw new Error('Failed to trigger scan');
       }
 
-      const newScan = await response.json();
+      const result = await response.json();
+      const newScanId = result.scanId || result.id;
+
       success('Scan triggered', `New scan started for ${scan.repository?.fullName || 'repository'}`);
 
       // Redirect to new scan page
-      window.location.href = `/dashboard/scans/${newScan.id}`;
+      if (newScanId) {
+        window.location.href = `/dashboard/scans/${newScanId}`;
+      }
     } catch (err) {
       console.error('Failed to re-run scan:', err);
       showError('Failed to trigger scan', err instanceof Error ? err.message : 'Unknown error');
@@ -119,16 +142,70 @@ export default function ScanDetailPage() {
   };
 
   const getScannerBreakdown = (): ScannerStatus[] => {
+    // Get scan config and scanner results from the scan
+    const scanConfig = (scan?.repository as any)?.scanConfig;
+    const scannerResults: ScannerResult[] = (scan as any)?.scannerResults || [];
+
+    // Group scanner results by category
+    const resultsByCategory: Record<string, ScannerResult[]> = {};
+    for (const result of scannerResults) {
+      if (!resultsByCategory[result.category]) {
+        resultsByCategory[result.category] = [];
+      }
+      resultsByCategory[result.category].push(result);
+    }
+
+    // Determine aggregate status for each category
+    const getCategoryStatus = (results: ScannerResult[]): ScannerStatus['status'] => {
+      if (!results || results.length === 0) return undefined;
+      if (results.some(r => r.status === 'running')) return 'running';
+      if (results.some(r => r.status === 'pending')) return 'pending';
+      if (results.every(r => r.status === 'skipped')) return 'skipped';
+      if (results.some(r => r.status === 'failed')) return 'failed';
+      if (results.every(r => r.status === 'completed')) return 'completed';
+      return 'completed';
+    };
+
     const scanners: ScannerStatus[] = [
-      { name: 'sast', label: 'SAST', enabled: false },
-      { name: 'sca', label: 'SCA', enabled: false },
-      { name: 'secrets', label: 'Secrets', enabled: false },
-      { name: 'iac', label: 'IaC', enabled: false },
-      { name: 'dast', label: 'DAST', enabled: false },
+      {
+        name: 'sast',
+        label: 'SAST',
+        enabled: scanConfig?.enableSast ?? false,
+        status: getCategoryStatus(resultsByCategory['sast']),
+        results: resultsByCategory['sast'],
+      },
+      {
+        name: 'sca',
+        label: 'SCA',
+        enabled: scanConfig?.enableSca ?? false,
+        status: getCategoryStatus(resultsByCategory['sca']),
+        results: resultsByCategory['sca'],
+      },
+      {
+        name: 'secrets',
+        label: 'Secrets',
+        enabled: scanConfig?.enableSecrets ?? false,
+        status: getCategoryStatus(resultsByCategory['secrets']),
+        results: resultsByCategory['secrets'],
+      },
+      {
+        name: 'iac',
+        label: 'IaC',
+        enabled: scanConfig?.enableIac ?? false,
+        status: getCategoryStatus(resultsByCategory['iac']),
+        results: resultsByCategory['iac'],
+      },
+      {
+        name: 'dast',
+        label: 'DAST',
+        enabled: scanConfig?.enableDast ?? false,
+        status: getCategoryStatus(resultsByCategory['dast']),
+        results: resultsByCategory['dast'],
+      },
     ];
 
-    // Check which scanners ran based on findings
-    const scannerTypes = new Set(
+    // Also check findings to catch any scanners that produced results (for backward compatibility)
+    const scannerTypesFromFindings = new Set(
       findings.map((f) => {
         const scanner = f.scanner.toLowerCase();
         if (scanner.includes('semgrep') || scanner.includes('bandit') || scanner.includes('gosec')) return 'sast';
@@ -140,10 +217,71 @@ export default function ScanDetailPage() {
       })
     );
 
+    // Enable if configured OR if there are findings/results from that scanner type
     return scanners.map((s) => ({
       ...s,
-      enabled: scannerTypes.has(s.name) || findings.some((f) => f.scanner.toLowerCase().includes(s.name)),
+      enabled: !!(s.enabled || scannerTypesFromFindings.has(s.name) || (s.results && s.results.length > 0)),
     }));
+  };
+
+  const formatDurationMs = (ms: number | null): string => {
+    if (!ms) return '-';
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
+  };
+
+  const getStatusIcon = (status?: ScannerStatus['status']) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        );
+      case 'running':
+        return (
+          <svg className="animate-spin w-5 h-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        );
+      case 'failed':
+        return (
+          <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      case 'skipped':
+        return (
+          <svg className="w-5 h-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        );
+      case 'pending':
+        return (
+          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        );
+    }
+  };
+
+  const getStatusLabel = (status?: ScannerStatus['status']): string => {
+    switch (status) {
+      case 'completed': return 'Completed';
+      case 'running': return 'Running';
+      case 'failed': return 'Failed';
+      case 'skipped': return 'Skipped';
+      case 'pending': return 'Pending';
+      default: return 'Not Run';
+    }
   };
 
   if (loading) {
@@ -281,27 +419,126 @@ export default function ScanDetailPage() {
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             {scannerBreakdown.map((scanner) => (
-              <div
+              <button
                 key={scanner.name}
-                className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
+                onClick={() => scanner.enabled && scanner.results?.length ? setSelectedScanner(scanner) : null}
+                className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                  scanner.enabled && scanner.results?.length
+                    ? 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer'
+                    : 'bg-gray-50 dark:bg-gray-800 cursor-default'
+                }`}
               >
-                {scanner.enabled ? (
-                  <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                )}
-                <span className={`font-medium ${scanner.enabled ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
-                  {scanner.label}
-                </span>
-              </div>
+                {getStatusIcon(scanner.status)}
+                <div className="flex flex-col items-start">
+                  <span className={`font-medium ${scanner.enabled ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                    {scanner.label}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {getStatusLabel(scanner.status)}
+                  </span>
+                </div>
+              </button>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      {/* Scanner Details Modal */}
+      {selectedScanner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedScanner(null)}>
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {selectedScanner.label} Scanner Details
+              </h3>
+              <button
+                onClick={() => setSelectedScanner(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[calc(80vh-60px)]">
+              {selectedScanner.results?.map((result) => (
+                <div key={result.id} className="mb-4 last:mb-0 p-4 border dark:border-gray-700 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(result.status)}
+                      <span className="font-medium text-gray-900 dark:text-white capitalize">{result.scanner}</span>
+                      <Badge variant={result.status === 'completed' ? 'success' : result.status === 'failed' ? 'danger' : 'default'}>
+                        {result.status}
+                      </Badge>
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      {result.findingsCount} finding{result.findingsCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Exit Code:</span>
+                      <span className={`ml-2 font-mono ${result.exitCode === 0 ? 'text-green-600' : result.exitCode === 1 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {result.exitCode ?? '-'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Duration:</span>
+                      <span className="ml-2 font-mono text-gray-900 dark:text-white">
+                        {formatDurationMs(result.duration)}
+                      </span>
+                    </div>
+                    {result.startedAt && (
+                      <div>
+                        <span className="text-gray-500">Started:</span>
+                        <span className="ml-2 text-gray-900 dark:text-white">
+                          {new Date(result.startedAt).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    )}
+                    {result.completedAt && (
+                      <div>
+                        <span className="text-gray-500">Completed:</span>
+                        <span className="ml-2 text-gray-900 dark:text-white">
+                          {new Date(result.completedAt).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {result.targetInfo && (
+                    <div className="mt-3">
+                      <span className="text-sm text-gray-500">Target Info:</span>
+                      <pre className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-x-auto">
+                        {(() => {
+                          try {
+                            const parsed = JSON.parse(result.targetInfo);
+                            return Array.isArray(parsed) ? parsed.join(', ') : result.targetInfo;
+                          } catch {
+                            return result.targetInfo;
+                          }
+                        })()}
+                      </pre>
+                    </div>
+                  )}
+                  {result.errorMessage && (
+                    <div className="mt-3">
+                      <span className="text-sm text-red-500">Error:</span>
+                      <pre className="mt-1 p-2 bg-red-50 dark:bg-red-900/20 rounded text-xs text-red-600 dark:text-red-400 overflow-x-auto">
+                        {result.errorMessage}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(!selectedScanner.results || selectedScanner.results.length === 0) && (
+                <div className="text-center text-gray-500 py-8">
+                  No detailed results available for this scanner category.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Findings List */}
       <Card variant="bordered">
