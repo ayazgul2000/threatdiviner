@@ -150,16 +150,19 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
    * This is called IMMEDIATELY when the API publishes a cancel request
    */
   private handleCancellation(scanId: string) {
+    this.logger.log(`[CANCEL] Received cancellation signal for scan ${scanId}`);
+    this.logger.log(`[CANCEL] Active scans: ${Array.from(this.activeScans.keys()).join(', ')}`);
+
     const scanState = this.activeScans.get(scanId);
     if (scanState) {
-      this.logger.log(`Received cancellation signal for scan ${scanId} - killing process immediately`);
+      this.logger.log(`[CANCEL] Found scan ${scanId} in activeScans - killing process immediately`);
 
       // Mark as cancelled
       scanState.cancelled = true;
 
       // Kill the running process (this kills the entire process group)
       const killed = this.executor.killProcess(scanId);
-      this.logger.log(`Process kill for ${scanId}: ${killed}`);
+      this.logger.log(`[CANCEL] Process kill for ${scanId}: ${killed}`);
 
       // Cleanup work directory
       if (scanState.workDir) {
@@ -478,8 +481,9 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
 
           // ============ TWO-PHASE NUCLEI HANDLING ============
           // For quick/standard modes, run two-phase scan: discovery → focused
+          this.logger.log(`[DEBUG] Scanner: ${scannerConfig.name}, config: ${JSON.stringify(scannerConfig.config)}`);
           if (scannerConfig.name === 'nuclei' && scannerConfig.config?.twoPhase) {
-            this.logger.log(`[${scanMode}] Running two-phase Nuclei scan (discovery → focused)`);
+            this.logger.log(`[TWO-PHASE] Running two-phase Nuclei scan for ${scanMode} mode (discovery → focused)`);
 
             const twoPhaseResult = await this.runTwoPhaseNucleiScan(
               scanId,
@@ -500,43 +504,10 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
               storedFingerprints,
             );
 
-            // Store findings from two-phase scan
-            for (const finding of twoPhaseResult.findings) {
-              if (finding.fingerprint && storedFingerprints.has(finding.fingerprint)) continue;
-              if (finding.fingerprint) storedFingerprints.add(finding.fingerprint);
-
-              const created = await this.prisma.penTestFinding.create({
-                data: {
-                  scanId,
-                  tenantId,
-                  scanner: scannerConfig.name,
-                  ruleId: finding.ruleId,
-                  severity: finding.severity,
-                  confidence: finding.confidence || 'medium',
-                  title: finding.title,
-                  description: finding.description,
-                  url: finding.filePath || targetUrl,
-                  parameter: finding.metadata?.parameter,
-                  payload: finding.metadata?.payload,
-                  evidence: finding.metadata?.evidence,
-                  cweIds: finding.cweIds || [],
-                  cveIds: finding.cveIds || [],
-                  owaspIds: finding.owaspIds || [],
-                  references: finding.references || [],
-                  remediation: finding.fix?.description,
-                  fingerprint: finding.fingerprint,
-                  metadata: { ...finding.metadata, scanMode },
-                },
-              });
-
-              allFindings.push(created);
-              const sev = finding.severity.toLowerCase();
-              if (sev in severityCounts) {
-                severityCounts[sev as keyof FindingsCount]++;
-              }
-            }
-
+            // NOTE: Findings are already stored via onFinding callback during scan
+            // Just log the results - no need to store again
             this.logger.log(`Two-phase Nuclei complete: ${twoPhaseResult.findings.length} findings in ${twoPhaseResult.duration}ms`);
+            this.logger.log(`Detected technologies: ${Array.from(detectedTechnologies).join(', ') || 'none'}`);
 
             // Update job progress and continue to next scanner
             await job.updateProgress(20 + (i + 1) * progressPerScanner);
