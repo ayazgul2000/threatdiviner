@@ -13,7 +13,7 @@ import { KatanaScanner } from '../../scanners/discovery/katana';
 import { LocalExecutorService } from '../../scanners/execution';
 import { DiscoveredParam } from '../../scanners/interfaces';
 import { QUEUE_NAMES, REDIS_PUBSUB } from '../queue.constants';
-import { TargetScanJobData, FindingsCount } from '../jobs';
+import { TargetScanJobData, TargetScanConfig, FindingsCount } from '../jobs';
 import { BULL_CONNECTION } from '../custom-bull.module';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -392,7 +392,7 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
             if (finding.fingerprint) {
               storedFingerprints.add(finding.fingerprint);
             }
-            
+
             try {
               const created = await this.prisma.penTestFinding.create({
                 data: {
@@ -457,6 +457,74 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
               this.logger.warn(`Failed to store real-time finding: ${err}`);
             }
           };
+
+          // ============ TWO-PHASE NUCLEI HANDLING ============
+          // For quick/standard modes, run two-phase scan: discovery → focused
+          if (scannerConfig.name === 'nuclei' && scannerConfig.config?.twoPhase) {
+            this.logger.log(`[${scanMode}] Running two-phase Nuclei scan (discovery → focused)`);
+
+            const twoPhaseResult = await this.runTwoPhaseNucleiScan(
+              scanId,
+              tenantId,
+              targetUrl,
+              discoveredUrls.length > 0 ? [...new Set([targetUrl, ...discoveredUrls])] : [targetUrl],
+              workDir,
+              scanMode,
+              config,
+              {
+                onProgress: createProgressCallback(scannerConfig.name),
+                onLog,
+                onFinding,
+                onTemplateEvent,
+              },
+              detectedTechnologies,
+              allFindings,
+              storedFingerprints,
+            );
+
+            // Store findings from two-phase scan
+            for (const finding of twoPhaseResult.findings) {
+              if (finding.fingerprint && storedFingerprints.has(finding.fingerprint)) continue;
+              if (finding.fingerprint) storedFingerprints.add(finding.fingerprint);
+
+              const created = await this.prisma.penTestFinding.create({
+                data: {
+                  scanId,
+                  tenantId,
+                  scanner: scannerConfig.name,
+                  ruleId: finding.ruleId,
+                  severity: finding.severity,
+                  confidence: finding.confidence || 'medium',
+                  title: finding.title,
+                  description: finding.description,
+                  url: finding.filePath || targetUrl,
+                  parameter: finding.metadata?.parameter,
+                  payload: finding.metadata?.payload,
+                  evidence: finding.metadata?.evidence,
+                  cweIds: finding.cweIds || [],
+                  cveIds: finding.cveIds || [],
+                  owaspIds: finding.owaspIds || [],
+                  references: finding.references || [],
+                  remediation: finding.fix?.description,
+                  fingerprint: finding.fingerprint,
+                  metadata: { ...finding.metadata, scanMode },
+                },
+              });
+
+              allFindings.push(created);
+              const sev = finding.severity.toLowerCase();
+              if (sev in severityCounts) {
+                severityCounts[sev as keyof FindingsCount]++;
+              }
+            }
+
+            this.logger.log(`Two-phase Nuclei complete: ${twoPhaseResult.findings.length} findings in ${twoPhaseResult.duration}ms`);
+
+            // Update job progress and continue to next scanner
+            await job.updateProgress(20 + (i + 1) * progressPerScanner);
+            continue;
+          }
+          // ============ END TWO-PHASE HANDLING ============
 
           // Build target URLs for this scanner
           // Use discovered URLs if available, otherwise just base URL
@@ -747,18 +815,21 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     switch (mode) {
       case 'quick':
         return [
-          { name: 'nuclei', label: 'Vulnerability Detection' },
+          // Two-phase nuclei: discovery (tech detection) → focused (tech-specific vulns)
+          { name: 'nuclei', label: 'Vulnerability Detection', config: { twoPhase: true } },
           { name: 'sslyze', label: 'SSL/TLS Analysis' },
         ];
       case 'standard':
         return [
-          { name: 'nuclei', label: 'Vulnerability Detection' },
+          // Two-phase nuclei: discovery (tech detection) → focused (tech-specific vulns)
+          { name: 'nuclei', label: 'Vulnerability Detection', config: { twoPhase: true } },
           { name: 'sslyze', label: 'SSL/TLS Analysis' },
           { name: 'zap', label: 'Web Application Testing', config: { passiveOnly: true } },
         ];
       case 'comprehensive':
         return [
-          { name: 'nuclei', label: 'Vulnerability Detection' },
+          // Full nuclei scan (all templates) for comprehensive mode
+          { name: 'nuclei', label: 'Vulnerability Detection', config: { scanPhase: 'full' } },
           { name: 'sslyze', label: 'SSL/TLS Analysis' },
           { name: 'zap', label: 'Web Application Testing', config: { passiveOnly: false } },
           { name: 'sqlmap', label: 'SQL Injection Testing' },
@@ -883,5 +954,182 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
 
       return { discoveredUrls, discoveredParams, jsFiles };
     }
+  }
+
+  /**
+   * Run two-phase Nuclei scan: Discovery → Focused
+   *
+   * Phase 1 (Discovery): Fast tech detection using http/technologies templates
+   * Phase 2 (Focused): Run tech-specific vulnerability templates based on detected stack
+   *
+   * This optimizes scan time by only running relevant vulnerability checks
+   * instead of scanning with ALL templates.
+   */
+  private async runTwoPhaseNucleiScan(
+    scanId: string,
+    _tenantId: string,
+    _targetUrl: string,
+    targetUrls: string[],
+    workDir: string,
+    scanMode: string,
+    config: TargetScanConfig,
+    callbacks: {
+      onProgress: (progress: { scanner: string; percent: number; phase?: string }) => void;
+      onLog: (line: string, stream: 'stdout' | 'stderr') => void;
+      onFinding: (finding: any) => Promise<void>;
+      onTemplateEvent: (event: any) => void;
+    },
+    detectedTechnologies: Set<string>,
+    _allFindings: any[],
+    storedFingerprints: Set<string>,
+  ): Promise<{ findings: any[]; duration: number; templateStats?: any }> {
+    const nucleiScanner = this.scanners.get('nuclei')!.scanner as NucleiScanner;
+    const startTime = Date.now();
+    let totalFindings: any[] = [];
+
+    // ============ PHASE 1: DISCOVERY ============
+    this.logger.log(`[Two-Phase Nuclei] Starting Phase 1: Technology Discovery`);
+
+    // Emit discovery phase start
+    this.scanGateway.emitScanPhase(scanId, {
+      phase: 'scanning',
+      percent: 10,
+      detectedTechnologies: [],
+    });
+
+    this.scanGateway.emitScannerStart(scanId, {
+      scanner: 'nuclei',
+      label: 'Tech Discovery',
+      phase: 'discovery',
+    });
+
+    const discoveryContext = {
+      scanId,
+      workDir,
+      timeout: 0, // No external timeout for nuclei
+      excludePaths: (config.excludePaths as string[]) || [],
+      languages: ['web'],
+      config: {
+        targetUrls,
+        scanMode,
+        scanPhase: 'discovery',
+        authType: config.authType,
+        authCredentials: config.authCredentials,
+        headers: config.headers,
+        rateLimitPreset: config.rateLimitPreset || 'medium',
+        excludePaths: config.excludePaths,
+        onProgress: (p: any) => callbacks.onProgress({ ...p, phase: 'Tech Discovery' }),
+        onLog: callbacks.onLog,
+        onTemplateEvent: callbacks.onTemplateEvent,
+        onFinding: callbacks.onFinding,
+      },
+    };
+
+    const discoveryOutput = await nucleiScanner.scan(discoveryContext);
+    const discoveryFindings = await nucleiScanner.parseOutput(discoveryOutput);
+
+    // Store discovery findings
+    for (const finding of discoveryFindings) {
+      if (finding.fingerprint && storedFingerprints.has(finding.fingerprint)) continue;
+      if (finding.fingerprint) storedFingerprints.add(finding.fingerprint);
+      totalFindings.push(finding);
+    }
+
+    // Parse detected technologies from discovery findings
+    const parsedTechs = nucleiScanner.parseTechnologies(discoveryFindings);
+    parsedTechs.forEach(tech => detectedTechnologies.add(tech));
+
+    const discoveryDuration = Date.now() - startTime;
+    this.logger.log(`[Two-Phase Nuclei] Discovery complete: ${discoveryFindings.length} findings, ${parsedTechs.length} technologies detected: ${parsedTechs.join(', ')}`);
+
+    // Emit discovery complete
+    this.scanGateway.emitScannerComplete(scanId, {
+      scanner: 'nuclei',
+      label: 'Tech Discovery',
+      findingsCount: discoveryFindings.length,
+      duration: discoveryDuration,
+      status: 'completed',
+    });
+
+    // Emit technologies detected
+    this.scanGateway.emitScanPhase(scanId, {
+      phase: 'scanning',
+      percent: 40,
+      detectedTechnologies: Array.from(detectedTechnologies),
+      focusedTemplateCount: nucleiScanner.getFocusedTemplates(parsedTechs).length,
+    });
+
+    // Check for cancellation between phases
+    if (this.isCancelled(scanId)) {
+      this.logger.log(`[Two-Phase Nuclei] Cancelled after discovery phase`);
+      return { findings: totalFindings, duration: Date.now() - startTime };
+    }
+
+    // ============ PHASE 2: FOCUSED VULNERABILITY SCAN ============
+    if (parsedTechs.length === 0) {
+      this.logger.log(`[Two-Phase Nuclei] No technologies detected, skipping focused phase`);
+      return { findings: totalFindings, duration: Date.now() - startTime };
+    }
+
+    const focusedTemplates = nucleiScanner.getFocusedTemplates(parsedTechs);
+    this.logger.log(`[Two-Phase Nuclei] Starting Phase 2: Focused scan with ${focusedTemplates.length} templates for [${parsedTechs.join(', ')}]`);
+
+    this.scanGateway.emitScannerStart(scanId, {
+      scanner: 'nuclei',
+      label: 'Vulnerability Scan',
+      phase: 'focused',
+    });
+
+    const focusedContext = {
+      scanId,
+      workDir,
+      timeout: 0,
+      excludePaths: (config.excludePaths as string[]) || [],
+      languages: ['web'],
+      config: {
+        targetUrls,
+        scanMode,
+        scanPhase: 'focused',
+        detectedTechnologies: parsedTechs,
+        authType: config.authType,
+        authCredentials: config.authCredentials,
+        headers: config.headers,
+        rateLimitPreset: config.rateLimitPreset || 'medium',
+        excludePaths: config.excludePaths,
+        onProgress: (p: any) => callbacks.onProgress({ ...p, phase: 'Vulnerability Scan' }),
+        onLog: callbacks.onLog,
+        onTemplateEvent: callbacks.onTemplateEvent,
+        onFinding: callbacks.onFinding,
+      },
+    };
+
+    const focusedOutput = await nucleiScanner.scan(focusedContext);
+    const focusedFindings = await nucleiScanner.parseOutput(focusedOutput);
+
+    // Store focused findings
+    for (const finding of focusedFindings) {
+      if (finding.fingerprint && storedFingerprints.has(finding.fingerprint)) continue;
+      if (finding.fingerprint) storedFingerprints.add(finding.fingerprint);
+      totalFindings.push(finding);
+    }
+
+    const totalDuration = Date.now() - startTime;
+    this.logger.log(`[Two-Phase Nuclei] Focused scan complete: ${focusedFindings.length} findings in ${totalDuration}ms total`);
+
+    // Emit focused phase complete
+    this.scanGateway.emitScannerComplete(scanId, {
+      scanner: 'nuclei',
+      label: 'Vulnerability Scan',
+      findingsCount: focusedFindings.length,
+      duration: totalDuration - discoveryDuration,
+      status: 'completed',
+      templateStats: (focusedOutput as any).templateStats,
+    });
+
+    return {
+      findings: totalFindings,
+      duration: totalDuration,
+      templateStats: (focusedOutput as any).templateStats,
+    };
   }
 }
