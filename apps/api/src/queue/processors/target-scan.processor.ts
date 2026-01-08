@@ -1018,11 +1018,13 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     const discoveryOutput = await nucleiScanner.scan(discoveryContext);
     const discoveryFindings = await nucleiScanner.parseOutput(discoveryOutput);
 
-    // Store discovery findings
+    // Store discovery findings to DB
     for (const finding of discoveryFindings) {
       if (finding.fingerprint && storedFingerprints.has(finding.fingerprint)) continue;
       if (finding.fingerprint) storedFingerprints.add(finding.fingerprint);
       totalFindings.push(finding);
+      // Store to DB via callback (real-time streaming may have missed some)
+      await callbacks.onFinding(finding);
     }
 
     // Parse detected technologies from discovery findings

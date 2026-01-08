@@ -164,34 +164,51 @@ export class NucleiScanner implements IScanner {
     const techs: Set<string> = new Set();
 
     for (const finding of findings) {
-      // Extract tech from template-id patterns
       const templateId = finding.ruleId || '';
+      const title = finding.title || '';
 
-      // Common tech patterns in nuclei template IDs
+      // 1. Extract from fingerprinthub templates: "fingerprinthub-web-fingerprints:tech-name"
+      const fingerprintMatch = templateId.match(/fingerprinthub[^:]*:(.+)/i);
+      if (fingerprintMatch) {
+        techs.add(fingerprintMatch[1].toLowerCase().replace(/-/g, ' '));
+      }
+
+      // 2. Extract from detect templates: "tech-name-detect"
+      const detectMatch = templateId.match(/^(.+)-detect$/i);
+      if (detectMatch) {
+        techs.add(detectMatch[1].toLowerCase().replace(/-/g, ' '));
+      }
+
+      // 3. Common tech patterns in template IDs
       const techPatterns = [
         /apache/i, /nginx/i, /wordpress/i, /tomcat/i, /iis/i,
         /php/i, /nodejs?/i, /spring/i, /joomla/i, /drupal/i,
         /jenkins/i, /gitlab/i, /grafana/i, /kubernetes/i, /docker/i,
+        /express/i, /angular/i, /react/i, /vue/i, /jquery/i,
       ];
 
       for (const pattern of techPatterns) {
-        const match = templateId.match(pattern);
-        if (match) {
-          techs.add(match[0].toLowerCase());
+        if (templateId.match(pattern) || title.match(pattern)) {
+          const match = (templateId + ' ' + title).match(pattern);
+          if (match) techs.add(match[0].toLowerCase());
         }
       }
 
-      // Also check metadata.extracted for tech names
+      // 4. Extract from title for technology fingerprints
+      if (title.toLowerCase().includes('technology') || templateId.includes('technologies')) {
+        // Add the title as tech name (cleaned up)
+        const cleanTitle = title.replace(/fingerprint|technology|detect|panel/gi, '').trim();
+        if (cleanTitle.length > 2 && cleanTitle.length < 50) {
+          techs.add(cleanTitle.toLowerCase());
+        }
+      }
+
+      // 5. Check metadata.extracted for tech names
       const extracted = finding.metadata?.extracted as string[] | undefined;
       if (extracted) {
         extracted.forEach(e => {
-          if (typeof e === 'string' && e.length < 50) {
-            // Check if it matches known tech names
-            for (const tech of Object.keys(TECH_FOCUSED_TEMPLATES)) {
-              if (e.toLowerCase().includes(tech)) {
-                techs.add(tech);
-              }
-            }
+          if (typeof e === 'string' && e.length > 2 && e.length < 50) {
+            techs.add(e.toLowerCase());
           }
         });
       }
@@ -222,6 +239,34 @@ export class NucleiScanner implements IScanner {
 
     // Replace 'localhost' with '127.0.0.1' in target URLs to avoid DNS resolution issues
     targetUrls = targetUrls.map(url => url.replace(/localhost/gi, '127.0.0.1'));
+
+    // For discovery phase, only scan the base URL (fast tech detection like CLI)
+    const phase = (context.config?.scanPhase as ScanPhase) || 'single';
+    const baseUrl = targetUrls[0]; // First URL is the main target
+
+    if (phase === 'discovery' && baseUrl) {
+      this.logger.log(`Discovery phase: using single base URL for fast tech detection`);
+      targetUrls = [baseUrl];
+    } else if (baseUrl) {
+      // For other phases, filter to same-origin URLs only
+      try {
+        const baseHost = new URL(baseUrl).host;
+        const originalCount = targetUrls.length;
+        targetUrls = targetUrls.filter(url => {
+          try {
+            return new URL(url).host === baseHost;
+          } catch {
+            return false;
+          }
+        });
+        if (targetUrls.length < originalCount) {
+          this.logger.log(`Filtered ${originalCount - targetUrls.length} external URLs, keeping ${targetUrls.length} same-origin URLs`);
+        }
+      } catch {
+        // If URL parsing fails, keep all URLs
+      }
+    }
+
     this.logger.log(`Target URLs (normalized): ${targetUrls.join(', ')}`);
 
     // Create targets file (normalize path for Windows shell compatibility)
@@ -256,16 +301,15 @@ export class NucleiScanner implements IScanner {
 
     const args = [
       '-l', targetsFile,
-      '-jsonl',                // Output findings as JSONL to stdout for real-time streaming
+      '-json-export', outputFile,  // Export findings to JSON file
+      '-jsonl',                    // Also output JSONL to stdout for real-time streaming
       '-no-color',
-      '-rate-limit', String(rateLimitConfig.rateLimit),
-      '-bulk-size', String(rateLimitConfig.bulkSize),
-      '-concurrency', String(rateLimitConfig.concurrency),
-      '-stats',                // Enable stats output for progress tracking
-      '-stats-json',           // Get stats in JSON format for parsing
-      '-stats-interval', '3',  // Update stats every 3 seconds
-      '-error-log', errorLogFile,  // Capture template errors
-      '-vv',                   // Verbose mode to see loaded templates
+      '-rate-limit', '50',         // Conservative rate limit for multiple URLs
+      '-bulk-size', '25',          // Batch size for efficiency
+      '-concurrency', '10',        // Limit concurrent requests
+      '-stats',                    // Enable stats output for progress tracking
+      '-stats-json',               // Get stats in JSON format for parsing
+      '-stats-interval', '3',      // Update stats every 3 seconds
     ];
 
     // Determine templates based on phase
@@ -297,13 +341,16 @@ export class NucleiScanner implements IScanner {
       args.push('-t', template);
     }
 
-    // Only add severity filter for focused/full phases
+    // Only add severity filter for focused/full phases (include info for tech detection)
     if (scanPhase === 'focused' || scanPhase === 'full') {
-      args.push('-s', 'critical,high,medium');
+      args.push('-s', 'critical,high,medium,low,info');
     }
 
     // Add per-request timeout (30 seconds is reasonable for most web requests)
-    const perRequestTimeout = Math.min(30, Math.floor(context.timeout / 1000));
+    // When context.timeout is 0 (no external timeout), default to 30 seconds
+    const perRequestTimeout = context.timeout > 0
+      ? Math.min(30, Math.floor(context.timeout / 1000))
+      : 30;
     args.push('-timeout', String(perRequestTimeout));
 
     // Callback to emit template events
@@ -828,6 +875,8 @@ export class NucleiScanner implements IScanner {
         return 'medium';
       case 'low':
         return 'low';
+      case 'info':
+        return 'info';
       default:
         return 'info';
     }
