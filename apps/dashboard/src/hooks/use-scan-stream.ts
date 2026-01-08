@@ -220,19 +220,22 @@ export function useScanStream(scanId: string | null) {
       }));
     });
 
-    // New finding
+    // Helper to process a single finding
+    const processFinding = (data: { scanner: string; finding: any }): StreamedFinding => ({
+      id: data.finding.id,
+      scanner: data.scanner,
+      severity: data.finding.severity,
+      title: data.finding.title,
+      filePath: data.finding.filePath,
+      url: data.finding.url,
+      cweIds: data.finding.cweIds,
+      cveIds: data.finding.cveIds,
+      timestamp: new Date().toISOString(),
+    });
+
+    // New finding (single)
     socket.on('scanner:finding', (data: { scanner: string; finding: any }) => {
-      const newFinding: StreamedFinding = {
-        id: data.finding.id,
-        scanner: data.scanner,
-        severity: data.finding.severity,
-        title: data.finding.title,
-        filePath: data.finding.filePath,
-        url: data.finding.url,
-        cweIds: data.finding.cweIds,
-        cveIds: data.finding.cveIds,
-        timestamp: new Date().toISOString(),
-      };
+      const newFinding = processFinding(data);
 
       setState(prev => {
         // Update severity breakdown
@@ -260,6 +263,56 @@ export function useScanStream(scanId: string | null) {
           scannerStatus: newStatus,
         };
       });
+    });
+
+    // Batched findings (for high-throughput scanners like nuclei)
+    socket.on('scanner:findings:batch', (data: { findings: Array<{ scanner: string; finding: any }> }) => {
+      const newFindings = data.findings.map(processFinding);
+
+      setState(prev => {
+        // Update severity breakdown for all findings
+        const newBreakdown = { ...prev.severityBreakdown };
+        const scannerCounts: Record<string, number> = {};
+
+        for (const finding of newFindings) {
+          const severity = finding.severity.toLowerCase() as keyof typeof newBreakdown;
+          if (severity in newBreakdown) {
+            newBreakdown[severity]++;
+          }
+          // Track per-scanner count
+          scannerCounts[finding.scanner] = (scannerCounts[finding.scanner] || 0) + 1;
+        }
+
+        // Update scanner findings counts
+        const newStatus = new Map(prev.scannerStatus);
+        for (const [scanner, count] of Object.entries(scannerCounts)) {
+          const scannerStatus = newStatus.get(scanner);
+          if (scannerStatus) {
+            newStatus.set(scanner, {
+              ...scannerStatus,
+              findingsCount: scannerStatus.findingsCount + count,
+            });
+          }
+        }
+
+        return {
+          ...prev,
+          findings: [...newFindings.reverse(), ...prev.findings].slice(0, 100),
+          totalFindings: prev.totalFindings + newFindings.length,
+          severityBreakdown: newBreakdown,
+          scannerStatus: newStatus,
+        };
+      });
+    });
+
+    // Technology detected in real-time
+    socket.on('scan:technology', (data: { technology: string }) => {
+      setState(prev => ({
+        ...prev,
+        detectedTechnologies: prev.detectedTechnologies.includes(data.technology)
+          ? prev.detectedTechnologies
+          : [...prev.detectedTechnologies, data.technology],
+      }));
     });
 
     // Real-time log line from scanner

@@ -4,11 +4,15 @@ import {
   SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, Injectable } from '@nestjs/common';
+import { Logger, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { createClient, RedisClientType } from 'redis';
 
 // Event types for scan streaming
 export interface ScannerStartEvent {
@@ -126,7 +130,7 @@ export interface ScanCompleteEvent {
   namespace: '/scans',
 })
 @Injectable()
-export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, OnModuleDestroy {
   @WebSocketServer()
   server!: Server;
 
@@ -134,6 +138,67 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly connectedClients = new Map<string, Set<string>>(); // scanId -> clientIds
   // Track which scanners are currently running for each scan
   private readonly activeScanners = new Map<string, Map<string, { status: string; findingsCount: number }>>();
+
+  // Redis adapter clients for multi-instance scaling
+  private pubClient: RedisClientType | null = null;
+  private subClient: RedisClientType | null = null;
+
+  // Finding batching to prevent UI flooding (nuclei can emit 50+/sec)
+  private readonly findingBuffer: Map<string, ScannerFindingEvent[]> = new Map();
+  private readonly BATCH_INTERVAL_MS = 300; // Flush every 300ms
+  private batchTimer: NodeJS.Timeout | null = null;
+
+  constructor(private readonly configService: ConfigService) {}
+
+  /**
+   * Initialize Redis adapter for multi-instance WebSocket scaling
+   * This allows workers on different machines to emit events that reach
+   * all connected clients regardless of which API server they're connected to
+   */
+  async afterInit(server: Server) {
+    const redisHost = this.configService.get('REDIS_HOST', 'localhost');
+    const redisPort = this.configService.get('REDIS_PORT', 6379);
+    const redisUrl = `redis://${redisHost}:${redisPort}`;
+
+    try {
+      this.pubClient = createClient({ url: redisUrl }) as RedisClientType;
+      this.subClient = this.pubClient.duplicate() as RedisClientType;
+
+      await Promise.all([
+        this.pubClient.connect(),
+        this.subClient.connect(),
+      ]);
+
+      server.adapter(createAdapter(this.pubClient, this.subClient));
+      this.logger.log(`WebSocket Redis adapter connected to ${redisUrl}`);
+    } catch (error) {
+      this.logger.warn(`Redis adapter setup failed (${error}), falling back to single-instance mode`);
+      // Gateway still works without Redis adapter, just won't scale across instances
+    }
+
+    // Start the batch flush timer
+    this.batchTimer = setInterval(() => this.flushFindingBatch(), this.BATCH_INTERVAL_MS);
+    this.logger.log('Finding batch timer started');
+  }
+
+  async onModuleDestroy() {
+    // Stop batch timer
+    if (this.batchTimer) {
+      clearInterval(this.batchTimer);
+      this.batchTimer = null;
+    }
+
+    // Flush any remaining findings
+    this.flushFindingBatch();
+
+    // Close Redis connections
+    if (this.pubClient) {
+      await this.pubClient.quit();
+    }
+    if (this.subClient) {
+      await this.subClient.quit();
+    }
+  }
 
   handleConnection(client: Socket) {
     this.logger.log(`[WebSocket] Client connected: ${client.id}`);
@@ -245,12 +310,49 @@ export class ScanGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * Emit individual finding as it's discovered (streaming)
+   * Emit individual finding - batched to prevent UI flooding
+   * Findings are buffered and sent every BATCH_INTERVAL_MS (300ms)
    */
   emitScannerFinding(scanId: string, event: ScannerFindingEvent) {
+    // Add to buffer instead of emitting immediately
+    if (!this.findingBuffer.has(scanId)) {
+      this.findingBuffer.set(scanId, []);
+    }
+    this.findingBuffer.get(scanId)!.push(event);
+    this.logger.debug(`[${scanId}] Finding buffered from ${event.scanner}: ${event.finding.title}`);
+  }
+
+  /**
+   * Emit individual finding immediately (bypass batching for critical findings)
+   */
+  emitScannerFindingImmediate(scanId: string, event: ScannerFindingEvent) {
     const room = `scan:${scanId}`;
     this.server.to(room).emit('scanner:finding', event);
-    this.logger.debug(`[${scanId}] Finding from ${event.scanner}: ${event.finding.title}`);
+    this.logger.debug(`[${scanId}] Finding (immediate) from ${event.scanner}: ${event.finding.title}`);
+  }
+
+  /**
+   * Flush all buffered findings to their respective rooms
+   * Called periodically by the batch timer
+   */
+  private flushFindingBatch() {
+    for (const [scanId, findings] of this.findingBuffer) {
+      if (findings.length === 0) continue;
+
+      const room = `scan:${scanId}`;
+
+      // Send as batch for efficiency
+      if (findings.length > 1) {
+        this.server.to(room).emit('scanner:findings:batch', { findings });
+        this.logger.debug(`[${scanId}] Flushed ${findings.length} findings as batch`);
+      } else {
+        // Single finding, send normally
+        this.server.to(room).emit('scanner:finding', findings[0]);
+      }
+
+      // Clear the buffer for this scan
+      this.findingBuffer.set(scanId, []);
+    }
   }
 
   /**
