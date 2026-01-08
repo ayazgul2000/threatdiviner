@@ -131,14 +131,15 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
       });
 
       await this.redisSubscriber.connect();
-      this.logger.log('Redis cancellation subscriber connected');
+      this.logger.log(`[REDIS] Cancellation subscriber connected to ${this.connection.host}:${this.connection.port}`);
 
       // Subscribe to cancellation channel
       await this.redisSubscriber.subscribe(REDIS_PUBSUB.SCAN_CANCELLATION, (scanId) => {
+        this.logger.log(`[REDIS] Received message on channel '${REDIS_PUBSUB.SCAN_CANCELLATION}': ${scanId}`);
         this.handleCancellation(scanId);
       });
 
-      this.logger.log(`Subscribed to ${REDIS_PUBSUB.SCAN_CANCELLATION} channel for instant cancellation`);
+      this.logger.log(`[REDIS] Subscribed to channel '${REDIS_PUBSUB.SCAN_CANCELLATION}' for instant cancellation`);
     } catch (error) {
       this.logger.warn(`Failed to set up cancellation subscriber: ${error}`);
       // Continue without Pub/Sub - fallback to polling (less responsive)
