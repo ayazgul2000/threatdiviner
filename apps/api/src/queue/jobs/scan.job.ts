@@ -83,3 +83,30 @@ export interface CleanupJobData {
   workDir: string;
   scanId: string;
 }
+
+export interface TargetScanJobData {
+  scanId: string;
+  tenantId: string;
+  targetId: string;
+  targetUrl: string;
+  targetName: string;
+  scanMode: 'quick' | 'standard' | 'comprehensive';
+  /** @deprecated Use scanMode instead - kept for backwards compatibility */
+  scanners?: string[];
+  /** @deprecated Use scanMode instead */
+  scanPhase?: 'discovery' | 'focused' | 'single' | 'full';
+  detectedTechnologies?: string[];
+  parentScanId?: string;
+  config: TargetScanConfig;
+}
+
+export interface TargetScanConfig {
+  authType?: string;
+  authCredentials?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  rateLimitPreset?: 'low' | 'medium' | 'high';
+  /** @deprecated Use rateLimitPreset instead */
+  rateLimitRps?: number;
+  excludePaths?: string[];
+  timeout?: number;
+}

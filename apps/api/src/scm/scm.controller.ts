@@ -236,12 +236,13 @@ export class ScmController {
   @UseGuards(JwtAuthGuard)
   async listScans(
     @CurrentUser() user: { tenantId: string },
-    @Query('projectId') projectId: string,
+    @Query('projectId') projectId?: string,
     @Query('repositoryId') repositoryId?: string,
     @Query('limit') limit?: string,
   ) {
-    if (!projectId) {
-      throw new BadRequestException('projectId query parameter is required');
+    // Allow filtering by either projectId or repositoryId (or both)
+    if (!projectId && !repositoryId) {
+      throw new BadRequestException('Either projectId or repositoryId query parameter is required');
     }
     return this.scmService.listScans(
       user.tenantId,
@@ -261,6 +262,7 @@ export class ScmController {
       user.tenantId,
       dto.repositoryId,
       dto.branch,
+      dto.scanners,
     );
     return { scanId };
   }
@@ -288,10 +290,9 @@ export class ScmController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    // If scanId is provided, we can look up projectId from the scan
-    // Otherwise projectId is required
-    if (!projectId && !scanId) {
-      throw new BadRequestException('Either projectId or scanId query parameter is required');
+    // Allow filtering by projectId, scanId, or repositoryId
+    if (!projectId && !scanId && !repositoryId) {
+      throw new BadRequestException('Either projectId, scanId, or repositoryId query parameter is required');
     }
     return this.scmService.listFindings(user.tenantId, {
       scanId,

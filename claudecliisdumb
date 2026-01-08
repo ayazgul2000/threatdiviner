@@ -1,0 +1,436 @@
+# Katana Scanner Hanging Issue - Handoff Document
+
+## Problem Summary
+Katana scans via the ThreatDiviner API hang indefinitely. Direct CLI execution works fine.
+
+## Files Involved
+- `apps/api/src/scanners/discovery/katana/katana.scanner.ts` - Katana scanner wrapper
+- `apps/api/src/pentest/pentest.service.ts` - PenTest service that orchestrates scans
+
+## Root Cause
+The `buildArgs()` function in `katana.scanner.ts` (lines 140-201) builds command args for Katana.
+
+**Standard mode (line 158-164) uses `-jc` flag (JS crawling) which causes Katana to hang on certain targets.**
+
+Current standard mode args:
+```
+-u <url> -silent -nc -d 3 -c 30 -rl 100 -jc -timeout 30
+```
+
+The `-jc` flag enables JavaScript crawling which parses JS files. This hangs indefinitely on some targets.
+
+## Evidence
+
+### Direct CLI works (completes in seconds):
+```
+C:\Users\ayazg\go\bin\katana.exe -u http://127.0.0.1:3500 -d 1 -timeout 30
+```
+Output: Found 6 URLs instantly
+
+### API call hangs (4+ minutes, never completes):
+```
+[LocalExecutorService] Executing: C:/Users/ayazg/go/bin/katana.exe -u http://127.0.0.1:3500 -silent -nc -d 3 -c 30 -rl 100 -jc -timeout 30
+```
+Status: Still "running" after 4+ minutes with 0 crawledUrls
+
+## Relevant Logs (from API output)
+```
+[Nest] 30084 - 8:11:08 PM [LocalExecutorService] Checking if C:/Users/ayazg/go/bin/katana.exe exists: true
+[Nest] 30084 - 8:11:08 PM [PenTestService] Running katana against http://127.0.0.1:3500
+[Nest] 30084 - 8:11:08 PM [KatanaScanner] Katana crawling http://127.0.0.1:3500 in standard mode
+[Nest] 30084 - 8:11:08 PM [LocalExecutorService] Executing: C:/Users/ayazg/go/bin/katana.exe -u http://127.0.0.1:3500 -silent -nc -d 3 -c 30 -rl 100 -jc -timeout 30
+```
+No completion log after this - process hangs.
+
+## Failed Fix Attempt
+Added `-timeout 30` to standard mode. This only sets per-REQUEST timeout, not overall scan timeout. Scan still hangs.
+
+## Suggested Fix Options
+
+### Option 1: Remove -jc flag from standard mode
+In `katana.scanner.ts` line 162, remove `-jc` flag:
+```typescript
+case 'standard':
+  args.push('-d', '3');
+  args.push('-c', '30');
+  args.push('-rl', '100');
+  // Remove: args.push('-jc');  // This causes hanging
+  args.push('-timeout', '30');
+  break;
+```
+
+### Option 2: Add max-duration flag
+Add `-max-duration` flag to limit total scan time:
+```typescript
+args.push('-max-duration', '60');  // 60 second max total
+```
+
+### Option 3: Use executor timeout to kill process
+The `getTimeout()` method returns 300000ms (5 min) for standard mode. Reduce this or ensure the executor actually kills the process on timeout.
+
+## Test Commands
+```bash
+# Login
+curl -c cookies.txt -X POST "http://localhost:3001/auth/login" -H "Content-Type: application/json" -d "{\"tenantSlug\":\"acme-corp\",\"email\":\"admin@acme.com\",\"password\":\"admin123\"}"
+
+# Start scan
+curl -b cookies.txt -X POST "http://localhost:3001/pentest/scans" -H "Content-Type: application/json" -d "{\"targetId\":\"0b54fe5b-911d-449e-b3d7-6d5221c91842\",\"scanners\":[\"katana\"]}"
+
+# Check status
+curl -b cookies.txt "http://localhost:3001/pentest/scans/<scan-id>"
+```
+
+## Target Info
+- URL: http://127.0.0.1:3500
+- Target ID: 0b54fe5b-911d-449e-b3d7-6d5221c91842
+- Type: web_application (Angular app)
+
+---
+
+# SOURCE CODE
+
+## File: apps/api/src/scanners/discovery/katana/katana.scanner.ts
+
+```typescript
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import {
+  IScanner,
+  ScanContext,
+  ScanOutput,
+  NormalizedFinding,
+  ScanOutputWithDiscovery,
+  DiscoveredParam,
+  DiscoveredForm,
+} from '../../interfaces';
+import { LocalExecutorService } from '../../execution';
+
+interface KatanaDiscoveryOutput extends ScanOutputWithDiscovery {
+  discoveredUrls: string[];
+  discoveredParams: DiscoveredParam[];
+  discoveredForms: DiscoveredForm[];
+  jsFiles: string[];
+  totalRequests: number;
+}
+
+type ScanMode = 'quick' | 'standard' | 'comprehensive';
+
+@Injectable()
+export class KatanaScanner implements IScanner {
+  readonly name = 'katana';
+  readonly version = '1.x';
+  readonly supportedLanguages = ['web', 'api'];
+  readonly outputFormat = 'json' as const;
+
+  private readonly logger = new Logger(KatanaScanner.name);
+  private readonly katanaPath: string;
+
+  constructor(
+    private readonly executor: LocalExecutorService,
+    private readonly configService: ConfigService,
+  ) {
+    this.katanaPath = this.configService.get('KATANA_PATH', 'katana');
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return this.executor.isCommandAvailable(this.katanaPath);
+  }
+
+  async getVersion(): Promise<string> {
+    try {
+      const result = await this.executor.execute({
+        command: this.katanaPath,
+        args: ['-version'],
+        cwd: process.cwd(),
+        timeout: 10000,
+      });
+      const versionMatch = result.stdout.match(/v?([\d.]+)/);
+      return versionMatch ? versionMatch[1] : '1.x';
+    } catch {
+      return '1.x';
+    }
+  }
+
+  async scan(context: ScanContext): Promise<KatanaDiscoveryOutput> {
+    const startTime = Date.now();
+    const outputFile = path.join(context.workDir, 'katana-output.jsonl');
+
+    const targetUrls = context.config?.targetUrls as string[] || [];
+    if (targetUrls.length === 0) {
+      this.logger.warn('No target URL configured for Katana scan');
+      return this.emptyOutput(startTime);
+    }
+
+    const targetUrl = targetUrls[0];
+    const scanMode = (context.config?.scanMode as ScanMode) || 'standard';
+
+    this.logger.log(`Katana crawling ${targetUrl} in ${scanMode} mode`);
+
+    const onProgress = context.config?.onProgress as ((progress: { scanner: string; percent: number; phase?: string }) => void) | undefined;
+    const args = this.buildArgs(targetUrl, outputFile, scanMode, context);
+
+    if (onProgress) {
+      onProgress({ scanner: this.name, percent: 5, phase: 'URL Discovery' });
+    }
+
+    try {
+      const result = await this.executor.execute({
+        command: this.katanaPath,
+        args,
+        cwd: context.workDir,
+        timeout: this.getTimeout(scanMode, context.timeout),
+        scanId: context.scanId,
+      });
+
+      if (onProgress) {
+        onProgress({ scanner: this.name, percent: 90, phase: 'Parsing results' });
+      }
+
+      if (result.stdout) {
+        await fs.writeFile(outputFile, result.stdout, 'utf-8');
+      }
+
+      const discovery = await this.parseStdoutUrls(result.stdout, targetUrl);
+
+      if (onProgress) {
+        onProgress({ scanner: this.name, percent: 100, phase: 'Complete' });
+      }
+
+      this.logger.log(`Katana discovered ${discovery.discoveredUrls.length} URLs, ${discovery.discoveredParams.length} params`);
+
+      return {
+        scanner: this.name,
+        exitCode: result.exitCode,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        outputFile,
+        duration: Date.now() - startTime,
+        timedOut: result.timedOut,
+        ...discovery,
+      };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Katana scan failed: ${errMsg}`);
+
+      return {
+        ...this.emptyOutput(startTime),
+        exitCode: 1,
+        stderr: errMsg,
+      };
+    }
+  }
+
+  // *** THIS IS THE PROBLEM AREA - buildArgs() lines 140-203 ***
+  private buildArgs(targetUrl: string, _outputFile: string, scanMode: ScanMode, context: ScanContext): string[] {
+    const args = [
+      '-u', targetUrl,
+      '-silent',
+      '-nc',
+    ];
+
+    switch (scanMode) {
+      case 'quick':
+        args.push('-d', '1');
+        args.push('-c', '10');
+        args.push('-rl', '30');
+        args.push('-timeout', '10');
+        break;
+
+      case 'standard':
+        args.push('-d', '3');
+        args.push('-c', '30');
+        args.push('-rl', '100');
+        args.push('-jc');              // <-- THIS FLAG CAUSES HANGING
+        args.push('-timeout', '30');   // <-- I added this but it's per-request, not total
+        break;
+
+      case 'comprehensive':
+        args.push('-d', '5');
+        args.push('-c', '50');
+        args.push('-rl', '150');
+        args.push('-jc');              // <-- THIS FLAG CAUSES HANGING
+        args.push('-headless');
+        args.push('-xhr');
+        args.push('-form');
+        args.push('-no-scope');
+        args.push('-automatic-form-fill');
+        args.push('-timeout', '60');   // <-- I added this but it's per-request, not total
+        break;
+    }
+
+    const headers = context.config?.headers as Record<string, string> | undefined;
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        args.push('-H', `${key}: ${value}`);
+      }
+    }
+
+    const authConfig = context.config?.authConfig as { cookies?: string } | undefined;
+    if (authConfig?.cookies) {
+      args.push('-H', `Cookie: ${authConfig.cookies}`);
+    }
+
+    const excludePaths = context.config?.excludePaths as string[] | undefined;
+    if (excludePaths && excludePaths.length > 0) {
+      for (const path of excludePaths) {
+        args.push('-ef', path);
+      }
+    }
+
+    return args;
+  }
+
+  private getTimeout(scanMode: ScanMode, defaultTimeout: number): number {
+    switch (scanMode) {
+      case 'quick':
+        return Math.min(defaultTimeout, 120000);
+      case 'standard':
+        return Math.min(defaultTimeout, 300000);  // 5 min - executor should kill after this
+      case 'comprehensive':
+        return defaultTimeout;
+      default:
+        return defaultTimeout;
+    }
+  }
+
+  private async parseStdoutUrls(stdout: string, _baseUrl: string): Promise<{
+    discoveredUrls: string[];
+    discoveredParams: DiscoveredParam[];
+    discoveredForms: DiscoveredForm[];
+    jsFiles: string[];
+    totalRequests: number;
+  }> {
+    const discoveredUrls: string[] = [];
+    const discoveredParams: DiscoveredParam[] = [];
+    const jsFiles: string[] = [];
+    const seenUrls = new Set<string>();
+    const seenParams = new Set<string>();
+
+    const lines = stdout.trim().split('\n').filter(line => line.trim());
+
+    for (const line of lines) {
+      const url = line.trim();
+      if (!url || seenUrls.has(url)) continue;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) continue;
+
+      seenUrls.add(url);
+      discoveredUrls.push(url);
+
+      if (url.match(/\.js(\?|$)/i)) {
+        jsFiles.push(url);
+      }
+
+      try {
+        const parsed = new URL(url);
+        if (parsed.search && parsed.search.length > 1) {
+          const params = new URLSearchParams(parsed.search);
+          for (const [name] of params) {
+            const paramKey = `${parsed.pathname}:${name}`;
+            if (!seenParams.has(paramKey)) {
+              seenParams.add(paramKey);
+              discoveredParams.push({
+                url,
+                method: 'GET',
+                name,
+                type: 'query',
+              });
+            }
+          }
+        }
+      } catch {
+        // Invalid URL
+      }
+    }
+
+    return {
+      discoveredUrls,
+      discoveredParams,
+      discoveredForms: [],
+      jsFiles,
+      totalRequests: discoveredUrls.length,
+    };
+  }
+
+  private emptyOutput(startTime: number): KatanaDiscoveryOutput {
+    return {
+      scanner: this.name,
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+      duration: Date.now() - startTime,
+      timedOut: false,
+      discoveredUrls: [],
+      discoveredParams: [],
+      discoveredForms: [],
+      jsFiles: [],
+      totalRequests: 0,
+    };
+  }
+
+  async parseOutput(_output: ScanOutput): Promise<NormalizedFinding[]> {
+    return [];
+  }
+}
+```
+
+## File: apps/api/src/pentest/pentest.service.ts (relevant sections)
+
+```typescript
+// Constructor - registers scanners (lines 29-43)
+constructor(
+  private readonly prisma: PrismaService,
+  private readonly configService: ConfigService,
+  private readonly executor: LocalExecutorService,
+  private readonly queueService: QueueService,
+) {
+  this.scanners = new Map();
+  this.scanners.set('sqlmap', new SqlmapScanner(this.executor, this.configService));
+  this.scanners.set('sslyze', new SSLyzeScanner(this.executor, this.configService));
+  this.scanners.set('nikto', new NiktoScanner(this.executor, this.configService));
+  this.scanners.set('nuclei', new NucleiScanner(this.executor, this.configService));
+  this.scanners.set('zap', new ZapScanner(this.executor, this.configService));
+  this.scanners.set('katana', new KatanaScanner(this.executor, this.configService));
+}
+
+// executeScan method - calls scanner.scan() (lines 669-819)
+private async executeScan(scanId: string, tenantId: string) {
+  // ... setup code ...
+
+  for (const scannerName of scan.scanners) {
+    const scanner = this.scanners.get(scannerName);
+    if (!scanner) {
+      this.logger.warn(`Scanner ${scannerName} not found, skipping`);
+      continue;
+    }
+
+    // ... availability check ...
+
+    this.logger.log(`Running ${scannerName} against ${scan.target.url}`);
+
+    const context = {
+      workDir,
+      timeout: 300000, // 5 minutes per scanner
+      config: {
+        targetUrls: [scan.target.url],
+        ...(scan.config as object || {}),
+      },
+    };
+
+    // This is where it hangs - scanner.scan() never returns
+    const output = await scanner.scan(context);
+
+    // ... parse results ...
+  }
+}
+```
+
+## Key Issue Summary
+
+The `-jc` flag (JavaScript crawling) in Katana causes infinite hangs on certain targets. The `-timeout` flag only sets per-HTTP-request timeout, NOT total scan duration.
+
+**Recommended fix**: Either:
+1. Remove `-jc` from standard mode
+2. Add `-max-duration 60` flag to limit total crawl time
+3. Fix the executor to actually kill the process when timeout expires

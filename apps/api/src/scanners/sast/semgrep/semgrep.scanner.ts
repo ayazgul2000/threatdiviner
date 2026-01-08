@@ -69,6 +69,8 @@ export class SemgrepScanner implements IScanner {
       args.push('--config', 'auto');
       args.push('--config', 'p/security-audit');
       args.push('--config', 'p/owasp-top-ten');
+      args.push('--config', 'p/secrets');  // Additional secret detection
+      args.push('--config', 'p/ci');       // CI/CD security checks
     }
 
     args.push(

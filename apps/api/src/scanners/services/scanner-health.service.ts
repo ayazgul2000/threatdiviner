@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -22,16 +23,28 @@ interface ScannerConfig {
 export class ScannerHealthService implements OnModuleInit {
   private readonly logger = new Logger(ScannerHealthService.name);
   private readonly scannerStatuses = new Map<string, ScannerStatus>();
+  private readonly scanners: ScannerConfig[];
 
-  private readonly scanners: ScannerConfig[] = [
-    { name: 'semgrep', command: 'semgrep --version' },
-    { name: 'trivy', command: 'trivy --version' },
-    { name: 'gitleaks', command: 'gitleaks version' },
-    { name: 'checkov', command: 'checkov --version' },
-    { name: 'bandit', command: 'bandit --version' },
-    { name: 'gosec', command: 'gosec --version' },
-    { name: 'nuclei', command: 'nuclei --version' },
-  ];
+  constructor(private readonly configService: ConfigService) {
+    // Build scanner configs using environment variables for paths
+    const semgrepPath = this.configService.get('SEMGREP_PATH', 'semgrep');
+    const trivyPath = this.configService.get('TRIVY_PATH', 'trivy');
+    const gitleaksPath = this.configService.get('GITLEAKS_PATH', 'gitleaks');
+    const checkovPath = this.configService.get('CHECKOV_PATH', 'checkov');
+    const banditPath = this.configService.get('BANDIT_PATH', 'bandit');
+    const gosecPath = this.configService.get('GOSEC_PATH', 'gosec');
+    const nucleiPath = this.configService.get('NUCLEI_PATH', 'nuclei');
+
+    this.scanners = [
+      { name: 'semgrep', command: `${semgrepPath} --version` },
+      { name: 'trivy', command: `${trivyPath} --version` },
+      { name: 'gitleaks', command: `${gitleaksPath} version` },
+      { name: 'checkov', command: `${checkovPath} --version` },
+      { name: 'bandit', command: `${banditPath} --version` },
+      { name: 'gosec', command: `${gosecPath} --version` },
+      { name: 'nuclei', command: `"${nucleiPath}" --version` },
+    ];
+  }
 
   async onModuleInit(): Promise<void> {
     await this.checkAllScanners();

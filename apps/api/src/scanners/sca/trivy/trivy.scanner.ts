@@ -60,6 +60,7 @@ export class TrivyScanner implements IScanner {
       '--format', 'sarif',
       '--output', outputFile,
       '--scanners', 'vuln,secret,config',
+      '--include-dev-deps',  // Include devDependencies for comprehensive scanning
       '--skip-dirs', '.git',
       context.workDir,
     ];

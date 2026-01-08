@@ -102,6 +102,10 @@ export class UpdateScanConfigDto {
   @IsArray()
   @IsString({ each: true })
   containerImages?: string[];
+
+  @IsOptional()
+  @IsString()
+  dastScanMode?: 'quick' | 'standard' | 'full';
 }
 
 export class TriggerScanDto {
@@ -111,4 +115,9 @@ export class TriggerScanDto {
   @IsOptional()
   @IsString()
   branch?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  scanners?: string[];
 }

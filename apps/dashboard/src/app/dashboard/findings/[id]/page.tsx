@@ -355,20 +355,20 @@ export default function FindingDetailPage() {
         </CardHeader>
         <CardContent>
           <p className="text-gray-700 dark:text-gray-300">
-            {finding.description || finding.message || finding.title}
+            {finding.message || finding.title}
           </p>
         </CardContent>
       </Card>
 
-      {/* Remediation Card - Show if remediation field exists */}
-      {finding.remediation && (
+      {/* Remediation Card - Show if aiRemediation field exists */}
+      {finding.aiRemediation && (
         <Card variant="bordered">
           <CardHeader>
             <CardTitle>Remediation Guidance</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-              {finding.remediation}
+              {finding.aiRemediation}
             </p>
           </CardContent>
         </Card>
