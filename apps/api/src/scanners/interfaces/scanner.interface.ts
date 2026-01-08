@@ -74,3 +74,62 @@ export interface ScannerConfig {
   customRules?: string[];
   extraArgs?: string[];
 }
+
+/**
+ * Template execution status tracking for Nuclei scanner
+ */
+export type TemplateStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+
+export interface TemplateResult {
+  templateId: string;
+  templatePath?: string;
+  status: TemplateStatus;
+  matchCount: number;
+  errorCount: number;
+  requestCount: number;
+  duration?: number;
+  errors?: string[];
+}
+
+export interface TemplateStats {
+  totalTemplates: number;
+  completedTemplates: number;
+  failedTemplates: number;
+  skippedTemplates: number;
+  totalRequests: number;
+  totalMatches: number;
+  totalErrors: number;
+  templates: TemplateResult[];
+}
+
+export interface ScanOutputWithTemplates extends ScanOutput {
+  templateStats?: TemplateStats;
+  streamedFindings?: NormalizedFinding[]; // Findings collected during real-time streaming
+}
+
+export interface ScanOutputWithFindings extends ScanOutput {
+  findings?: NormalizedFinding[];
+}
+
+/**
+ * Extended output for DAST scanners that discover URLs
+ */
+export interface ScanOutputWithDiscovery extends ScanOutputWithFindings {
+  discoveredUrls?: string[];
+  discoveredForms?: DiscoveredForm[];
+  discoveredParams?: DiscoveredParam[];
+}
+
+export interface DiscoveredForm {
+  url: string;
+  method: string;
+  action: string;
+  fields: string[];
+}
+
+export interface DiscoveredParam {
+  url: string;
+  method: string;
+  name: string;
+  type: 'query' | 'body' | 'header' | 'cookie';
+}

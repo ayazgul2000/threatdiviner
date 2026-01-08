@@ -22,6 +22,7 @@ import { IScanner, NormalizedFinding, ScanContext } from '../../scanners/interfa
 import { BULL_CONNECTION } from '../custom-bull.module';
 import { AiService, TriageRequest } from '../../ai/ai.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { ScanGateway } from '../../scans/scan.gateway';
 
 type ScanStatus = 'pending' | 'queued' | 'cloning' | 'scanning' | 'analyzing' | 'storing' | 'notifying' | 'completed' | 'failed';
 
@@ -52,6 +53,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly aiService: AiService,
     private readonly notificationsService: NotificationsService,
     private readonly prCommentsService: PRCommentsService,
+    private readonly scanGateway: ScanGateway,
     @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
   ) {
     this.aiTriageEnabled = this.configService.get('AI_TRIAGE_ENABLED', 'false') === 'true';
@@ -129,6 +131,9 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       await this.updateCheckRun(job.data, 'in_progress', 'Cloning repository...');
       await job.updateProgress(10);
 
+      // Emit phase: initializing -> cloning
+      this.scanGateway.emitScanPhase(scanId, { phase: 'initializing', percent: 10 });
+
       workDir = await this.cloneRepository(job.data);
       await job.updateProgress(30);
 
@@ -136,6 +141,13 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       await this.updateScanStatus(scanId, 'scanning');
       const languages = await this.gitService.detectLanguages(workDir);
       this.logger.log(`Detected languages: ${JSON.stringify(languages)}`);
+
+      // Emit phase: scanning (with detected languages)
+      this.scanGateway.emitScanPhase(scanId, {
+        phase: 'scanning',
+        percent: 30,
+        detectedTechnologies: Object.keys(languages.languages),
+      });
 
       // 3. Select and run scanners
       await this.updateCheckRun(job.data, 'in_progress', 'Running security scanners...');
@@ -158,6 +170,9 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
         },
       });
       await job.updateProgress(70);
+
+      // Emit phase: scanning complete
+      this.scanGateway.emitScanPhase(scanId, { phase: 'scanning', percent: 70 });
 
       // 4. Process and store findings
       await this.updateScanStatus(scanId, 'analyzing');
@@ -204,6 +219,23 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       await this.completeScan(scanId, storedCount, Date.now() - startTime);
       await job.updateProgress(100);
 
+      // Emit phase: complete
+      this.scanGateway.emitScanPhase(scanId, { phase: 'complete', percent: 100 });
+
+      // Emit scan:complete via WebSocket
+      this.scanGateway.emitScanComplete(scanId, {
+        totalFindings: storedCount,
+        severityBreakdown: {
+          critical: findingsCount.critical,
+          high: findingsCount.high,
+          medium: findingsCount.medium,
+          low: findingsCount.low,
+          info: findingsCount.info,
+        },
+        duration: Date.now() - startTime,
+        status: 'completed',
+      });
+
       // 9. Send Slack notifications
       await this.sendSlackNotification(job.data, findingsCount, Math.round((Date.now() - startTime) / 1000));
 
@@ -213,6 +245,15 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Scan ${scanId} failed: ${error}`);
       await this.failScan(scanId, error instanceof Error ? error.message : 'Unknown error');
       await this.updateCheckRun(job.data, 'completed', 'Scan failed', 'failure');
+
+      // Emit scan:complete with failed status via WebSocket
+      this.scanGateway.emitScanComplete(scanId, {
+        totalFindings: 0,
+        severityBreakdown: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+        duration: Date.now() - startTime,
+        status: 'failed',
+      });
+
       throw error;
     } finally {
       // Always cleanup
@@ -342,6 +383,13 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
         const startTime = Date.now();
         const category = this.getScannerCategory(scanner.name);
 
+        // Emit scanner:start event via WebSocket
+        this.scanGateway.emitScannerStart(scanId, {
+          scanner: scanner.name,
+          label: this.getScannerLabel(scanner.name),
+          phase: 'single',
+        });
+
         // Create scanner result record as "running"
         const scannerResult = await this.prisma.scannerResult.create({
           data: {
@@ -371,11 +419,36 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
                 duration: Date.now() - startTime,
               },
             });
+
+            // Emit scanner:complete for skipped scanner
+            this.scanGateway.emitScannerComplete(scanId, {
+              scanner: scanner.name,
+              label: this.getScannerLabel(scanner.name),
+              findingsCount: 0,
+              duration: Date.now() - startTime,
+              status: 'skipped',
+              error: 'Scanner not available',
+            });
+
             return { findings: [], scannerResultId: scannerResult.id };
           }
 
+          // Emit progress as scanner is starting execution
+          this.scanGateway.emitScannerProgress(scanId, {
+            scanner: scanner.name,
+            phase: 'scanning',
+            percent: 10,
+          });
+
           const output = await scanner.scan(context);
           const duration = Date.now() - startTime;
+
+          // Emit progress as output is being parsed
+          this.scanGateway.emitScannerProgress(scanId, {
+            scanner: scanner.name,
+            phase: 'parsing',
+            percent: 80,
+          });
 
           if (output.timedOut) {
             this.logger.warn(`Scanner ${scanner.name} timed out`);
@@ -389,16 +462,46 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
                 duration,
               },
             });
+
+            // Emit scanner:complete for timed out scanner
+            this.scanGateway.emitScannerComplete(scanId, {
+              scanner: scanner.name,
+              label: this.getScannerLabel(scanner.name),
+              findingsCount: 0,
+              duration,
+              status: 'failed',
+              exitCode: -1,
+              error: 'Scanner timed out',
+            });
+
             return { findings: [], scannerResultId: scannerResult.id };
           }
 
           const findings = await scanner.parseOutput(output);
 
+          // Emit each finding as it's discovered for real-time updates
+          for (const finding of findings) {
+            this.scanGateway.emitScannerFinding(scanId, {
+              scanner: scanner.name,
+              label: this.getScannerLabel(scanner.name),
+              finding: {
+                id: finding.fingerprint || `${scanner.name}-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                severity: finding.severity,
+                title: finding.title,
+                filePath: finding.filePath,
+                url: finding.metadata?.url as string | undefined,
+                cweIds: finding.cweIds.length > 0 ? finding.cweIds : undefined,
+              },
+            });
+          }
+
+          const status = output.exitCode === 0 || output.exitCode === 1 ? 'completed' : 'failed';
+
           // Update scanner result with success
           await this.prisma.scannerResult.update({
             where: { id: scannerResult.id },
             data: {
-              status: output.exitCode === 0 || output.exitCode === 1 ? 'completed' : 'failed',
+              status,
               exitCode: output.exitCode,
               findingsCount: findings.length,
               completedAt: new Date(),
@@ -406,6 +509,18 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
               command: `${scanner.name} scan`,
               errorMessage: output.exitCode > 1 ? output.stderr?.substring(0, 500) : null,
             },
+          });
+
+          // Emit scanner:complete event
+          this.scanGateway.emitScannerComplete(scanId, {
+            scanner: scanner.name,
+            label: this.getScannerLabel(scanner.name),
+            findingsCount: findings.length,
+            duration,
+            status: status as 'completed' | 'failed',
+            exitCode: output.exitCode,
+            command: `${scanner.name} scan`,
+            verboseOutput: output.stdout?.substring(0, 10000),
           });
 
           if (output.exitCode !== 0 && output.exitCode !== 1) {
@@ -424,6 +539,17 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
               duration: Date.now() - startTime,
             },
           });
+
+          // Emit scanner:complete for failed scanner
+          this.scanGateway.emitScannerComplete(scanId, {
+            scanner: scanner.name,
+            label: this.getScannerLabel(scanner.name),
+            findingsCount: 0,
+            duration: Date.now() - startTime,
+            status: 'failed',
+            error: errorMessage.substring(0, 500),
+          });
+
           throw error;
         }
       }),
@@ -439,6 +565,20 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     }
 
     return allFindings;
+  }
+
+  private getScannerLabel(scannerName: string): string {
+    const labels: Record<string, string> = {
+      semgrep: 'SAST Analysis',
+      bandit: 'Python Security',
+      gosec: 'Go Security',
+      trivy: 'Dependency Scan',
+      gitleaks: 'Secret Detection',
+      checkov: 'IaC Security',
+      nuclei: 'DAST Scan',
+      zap: 'Web App Scan',
+    };
+    return labels[scannerName.toLowerCase()] || scannerName;
   }
 
   private async updateScanStatus(scanId: string, status: ScanStatus): Promise<void> {

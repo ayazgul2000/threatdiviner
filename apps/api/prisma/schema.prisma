@@ -1367,22 +1367,38 @@ enum ProjectStatus {
   DELETED
 }
 
-// Penetration Testing Models
+// Penetration Testing / DAST Targets
 model PenTestTarget {
-  id          String        @id @default(uuid())
-  tenantId    String        @map("tenant_id")
-  projectId   String?       @map("project_id")
-  name        String
-  url         String
-  type        String        @default("web") // web, api, network
-  description String?
-  authConfig  Json?         @map("auth_config") // credentials, headers, cookies
-  headers     Json?         @default("{}") // custom headers
-  isActive    Boolean       @default(true) @map("is_active")
-  lastScanAt  DateTime?     @map("last_scan_at")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-  scans       PenTestScan[]
+  id              String        @id @default(uuid())
+  tenantId        String        @map("tenant_id")
+  projectId       String?       @map("project_id")
+  name            String
+  url             String
+  type            String        @default("web_application") // web_application, api_endpoint, network_service
+  description     String?
+
+  // Authentication
+  authType        String?       @map("auth_type") // none, basic, bearer, cookie
+  authCredentials Json?         @map("auth_credentials") // encrypted credentials
+  authConfig      Json?         @map("auth_config") // legacy: credentials, headers, cookies
+  headers         Json?         @default("{}") // custom headers
+
+  // Scan configuration
+  defaultScanners   String[]      @default(["nuclei"]) @map("default_scanners")
+  defaultScanMode   String        @default("standard") @map("default_scan_mode") // quick, standard, comprehensive
+  rateLimitPreset   String        @default("medium") @map("rate_limit_preset") // low, medium, high
+  rateLimitRps      Int?          @map("rate_limit_rps") // deprecated: use rateLimitPreset
+  excludePaths      String[]      @default([]) @map("exclude_paths")
+
+  // Risk tracking
+  riskScore       Int?          @map("risk_score") // 0-100
+  lastScanId      String?       @map("last_scan_id")
+
+  isActive        Boolean       @default(true) @map("is_active")
+  lastScanAt      DateTime?     @map("last_scan_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  scans           PenTestScan[]
 
   @@index([tenantId])
   @@index([projectId])
@@ -1396,8 +1412,10 @@ model PenTestScan {
   status               String           @default("pending") // pending, running, completed, failed, cancelled
   scanners             String[]         @default([]) // sqlmap, nikto, sslyze, zap, nuclei
   config               Json             @default("{}") // scanner-specific config
-  scanPhase            String           @default("both") @map("scan_phase") // discovery, deep, both
+  scanMode             String           @default("standard") @map("scan_mode") // quick, standard, comprehensive
+  scanPhase            String           @default("discovery") @map("scan_phase") // discovery, scanning, complete
   detectedTechnologies String[]         @default([]) @map("detected_technologies") // populated by discovery phase
+  crawledUrls          Int              @default(0) @map("crawled_urls") // count of URLs discovered by Katana
   parentScanId         String?          @map("parent_scan_id") // links deep scan to its discovery scan
   startedAt            DateTime?        @map("started_at")
   completedAt          DateTime?        @map("completed_at")
