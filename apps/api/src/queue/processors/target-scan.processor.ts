@@ -331,13 +331,17 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
         }
 
         const scannerStartTime = Date.now();
+        const isTwoPhase = scannerConfig.name === 'nuclei' && scannerConfig.config?.twoPhase;
 
         // Emit scanner start event with whitelabel name
-        this.scanGateway.emitScannerStart(scanId, {
-          scanner: scannerConfig.name,
-          label: scannerConfig.label,
-          phase: 'scanning',
-        });
+        // Skip for two-phase nuclei - it emits its own start events for each phase
+        if (!isTwoPhase) {
+          this.scanGateway.emitScannerStart(scanId, {
+            scanner: scannerConfig.name,
+            label: scannerConfig.label,
+            phase: 'scanning',
+          });
+        }
 
         try {
           const isAvailable = await scannerInfo.scanner.isAvailable();
@@ -450,6 +454,20 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
                     detectedTechnologies.add(tech);
                     // Emit technology detection event
                     this.scanGateway.emitTechnology(scanId, tech);
+                  }
+                }
+              }
+
+              // Also check metadata.extracted (nuclei http/technologies output)
+              const extracted = finding.metadata?.extracted as string[] | undefined;
+              if (extracted && Array.isArray(extracted)) {
+                for (const item of extracted) {
+                  if (typeof item === 'string' && item.length < 50) {
+                    const tech = item.trim().toLowerCase();
+                    if (tech && !detectedTechnologies.has(tech)) {
+                      detectedTechnologies.add(tech);
+                      this.scanGateway.emitTechnology(scanId, tech);
+                    }
                   }
                 }
               }
