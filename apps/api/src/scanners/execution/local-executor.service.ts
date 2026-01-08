@@ -83,34 +83,55 @@ export class LocalExecutorService {
 
   /**
    * Kill a running process by scanId
+   * Uses process group kill (PGID) to ensure all child processes are terminated
    * On Windows, uses taskkill /T to kill the entire process tree
    */
   killProcess(scanId: string): boolean {
     const proc = this.runningProcesses.get(scanId);
     if (proc && !proc.killed && proc.pid) {
-      this.logger.log(`Killing process for scan ${scanId} (PID: ${proc.pid})`);
+      this.logger.log(`Killing process group for scan ${scanId} (PID: ${proc.pid})`);
 
-      if (process.platform === 'win32') {
-        // On Windows, use taskkill with /T flag to kill entire process tree
-        // This ensures child processes (like nuclei.exe spawned by cmd.exe) are also killed
-        const { execSync } = require('child_process');
-        try {
-          execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore' });
-          this.logger.log(`Killed process tree for PID ${proc.pid}`);
-        } catch (e) {
-          this.logger.warn(`taskkill failed for PID ${proc.pid}: ${e}`);
-        }
-      } else {
-        // On Unix, use process group kill
-        proc.kill('SIGTERM');
-        setTimeout(() => {
-          if (!proc.killed) {
-            proc.kill('SIGKILL');
+      try {
+        if (process.platform === 'win32') {
+          // On Windows, use taskkill with /T flag to kill entire process tree
+          const { execSync } = require('child_process');
+          try {
+            execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore' });
+            this.logger.log(`Killed process tree for PID ${proc.pid}`);
+          } catch (e) {
+            this.logger.warn(`taskkill failed for PID ${proc.pid}: ${e}`);
           }
-        }, 3000);
-      }
+        } else {
+          // On Unix, kill the entire process group using negative PID
+          // This kills all processes spawned by the tool (Nuclei, ZAP, etc.)
+          try {
+            process.kill(-proc.pid, 'SIGTERM');
+            this.logger.log(`Sent SIGTERM to process group ${proc.pid}`);
 
-      this.runningProcesses.delete(scanId);
+            // Force kill after 3 seconds if still running
+            const pid = proc.pid;
+            setTimeout(() => {
+              try {
+                if (pid) process.kill(-pid, 'SIGKILL');
+                this.logger.log(`Sent SIGKILL to process group ${pid}`);
+              } catch {
+                // Process already dead, ignore
+              }
+            }, 3000);
+          } catch (e) {
+            // Fallback to regular kill if process group kill fails
+            this.logger.warn(`Process group kill failed, using regular kill: ${e}`);
+            proc.kill('SIGTERM');
+            setTimeout(() => {
+              if (!proc.killed) {
+                proc.kill('SIGKILL');
+              }
+            }, 3000);
+          }
+        }
+      } finally {
+        this.runningProcesses.delete(scanId);
+      }
       return true;
     }
     return false;
@@ -178,6 +199,10 @@ export class LocalExecutorService {
         shell: useShell,
         // stdin: ignore (no input needed), stdout/stderr: pipe for capture
         stdio: ['ignore', 'pipe', 'pipe'],
+        // Use detached mode on Unix to create a process group (PGID)
+        // This allows killing all child processes with process.kill(-pid)
+        // Tools like Nuclei/ZAP spawn sub-processes that won't die otherwise
+        detached: process.platform !== 'win32',
       });
 
       // Track process for cancellation if scanId provided
@@ -218,7 +243,7 @@ export class LocalExecutorService {
       // Only set timeout if a positive value was provided
       const timeoutId = timeout && timeout > 0 ? setTimeout(() => {
         timedOut = true;
-        this.logger.warn(`Process timed out after ${timeout}ms, killing...`);
+        this.logger.warn(`Process timed out after ${timeout}ms, killing process group...`);
 
         if (process.platform === 'win32' && childProcess.pid) {
           // On Windows, use taskkill to kill process tree
@@ -230,13 +255,22 @@ export class LocalExecutorService {
             this.logger.warn(`taskkill failed on timeout: ${e}`);
             childProcess.kill();
           }
-        } else {
-          childProcess.kill('SIGTERM');
-          setTimeout(() => {
-            if (!childProcess.killed) {
-              childProcess.kill('SIGKILL');
-            }
-          }, 5000);
+        } else if (childProcess.pid) {
+          // On Unix, kill the entire process group using negative PID
+          const pid = childProcess.pid;
+          try {
+            process.kill(-pid, 'SIGTERM');
+            this.logger.log(`Sent SIGTERM to process group ${pid} on timeout`);
+            setTimeout(() => {
+              try {
+                process.kill(-pid, 'SIGKILL');
+              } catch {
+                // Already dead
+              }
+            }, 5000);
+          } catch {
+            childProcess.kill('SIGTERM');
+          }
         }
       }, timeout) : null;
 

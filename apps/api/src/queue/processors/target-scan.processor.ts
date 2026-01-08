@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
+import { createClient, RedisClientType } from 'redis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScanGateway } from '../../scans/scan.gateway';
 import { NucleiScanner } from '../../scanners/dast/nuclei';
@@ -11,7 +12,7 @@ import { ZapScanner } from '../../scanners/dast/zap';
 import { KatanaScanner } from '../../scanners/discovery/katana';
 import { LocalExecutorService } from '../../scanners/execution';
 import { DiscoveredParam } from '../../scanners/interfaces';
-import { QUEUE_NAMES } from '../queue.constants';
+import { QUEUE_NAMES, REDIS_PUBSUB } from '../queue.constants';
 import { TargetScanJobData, FindingsCount } from '../jobs';
 import { BULL_CONNECTION } from '../custom-bull.module';
 import * as path from 'path';
@@ -40,6 +41,11 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TargetScanProcessor.name);
   private worker: Worker | null = null;
   private readonly scanners: Map<string, ScannerInstance>;
+
+  // Redis subscriber for cancellation signals
+  private redisSubscriber: RedisClientType | null = null;
+  // Track active scans for cancellation handling
+  private readonly activeScans = new Map<string, { cancelled: boolean; workDir?: string }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -75,6 +81,9 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       this.logger.log(`Connecting to Redis at ${this.connection.host}:${this.connection.port}...`);
 
+      // Set up Redis subscriber for cancellation signals
+      await this.setupCancellationSubscriber();
+
       this.worker = new Worker(
         QUEUE_NAMES.TARGET_SCAN,
         async (job: Job<TargetScanJobData>) => this.process(job),
@@ -108,11 +117,90 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Set up Redis Pub/Sub subscriber for instant scan cancellation
+   * When API publishes to 'scan-cancellation' channel, we immediately kill the process
+   */
+  private async setupCancellationSubscriber() {
+    try {
+      const redisUrl = `redis://${this.connection.host}:${this.connection.port}`;
+      this.redisSubscriber = createClient({ url: redisUrl }) as RedisClientType;
+
+      this.redisSubscriber.on('error', (err) => {
+        this.logger.error(`Redis subscriber error: ${err}`);
+      });
+
+      await this.redisSubscriber.connect();
+      this.logger.log('Redis cancellation subscriber connected');
+
+      // Subscribe to cancellation channel
+      await this.redisSubscriber.subscribe(REDIS_PUBSUB.SCAN_CANCELLATION, (scanId) => {
+        this.handleCancellation(scanId);
+      });
+
+      this.logger.log(`Subscribed to ${REDIS_PUBSUB.SCAN_CANCELLATION} channel for instant cancellation`);
+    } catch (error) {
+      this.logger.warn(`Failed to set up cancellation subscriber: ${error}`);
+      // Continue without Pub/Sub - fallback to polling (less responsive)
+    }
+  }
+
+  /**
+   * Handle cancellation signal from Redis Pub/Sub
+   * This is called IMMEDIATELY when the API publishes a cancel request
+   */
+  private handleCancellation(scanId: string) {
+    const scanState = this.activeScans.get(scanId);
+    if (scanState) {
+      this.logger.log(`Received cancellation signal for scan ${scanId} - killing process immediately`);
+
+      // Mark as cancelled
+      scanState.cancelled = true;
+
+      // Kill the running process (this kills the entire process group)
+      const killed = this.executor.killProcess(scanId);
+      this.logger.log(`Process kill for ${scanId}: ${killed}`);
+
+      // Cleanup work directory
+      if (scanState.workDir) {
+        fs.rm(scanState.workDir, { recursive: true, force: true }).catch(() => {});
+      }
+
+      // Emit cancelled status to UI
+      this.scanGateway.emitScanComplete(scanId, {
+        totalFindings: 0,
+        severityBreakdown: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+        duration: 0,
+        status: 'cancelled',
+      });
+    } else {
+      this.logger.debug(`Cancellation signal for ${scanId} but scan not active on this worker`);
+    }
+  }
+
   async onModuleDestroy() {
+    // Close Redis subscriber
+    if (this.redisSubscriber) {
+      try {
+        await this.redisSubscriber.unsubscribe(REDIS_PUBSUB.SCAN_CANCELLATION);
+        await this.redisSubscriber.quit();
+        this.logger.log('Redis cancellation subscriber closed');
+      } catch (error) {
+        this.logger.warn(`Error closing Redis subscriber: ${error}`);
+      }
+    }
+
     if (this.worker) {
       await this.worker.close();
       this.logger.log('Target scan worker stopped');
     }
+  }
+
+  /**
+   * Check if scan was cancelled (via Redis Pub/Sub signal)
+   */
+  private isCancelled(scanId: string): boolean {
+    return this.activeScans.get(scanId)?.cancelled ?? false;
   }
 
   async process(job: Job<TargetScanJobData>): Promise<void> {
@@ -120,6 +208,12 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     const startTime = Date.now();
 
     this.logger.log(`Processing ${scanMode} target scan ${scanId} for ${targetName} (${targetUrl})`);
+
+    // Create work directory
+    const workDir = path.join(os.tmpdir(), `target-scan-${scanId}`);
+
+    // Register this scan as active for cancellation handling
+    this.activeScans.set(scanId, { cancelled: false, workDir });
 
     try {
       // PHASE: Initializing
@@ -131,8 +225,6 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
       this.scanGateway.emitScanPhase(scanId, { phase: 'initializing', percent: 0 });
       await job.updateProgress(5);
 
-      // Create work directory
-      const workDir = path.join(os.tmpdir(), `target-scan-${scanId}`);
       await fs.mkdir(workDir, { recursive: true });
       
       this.scanGateway.emitScanPhase(scanId, { phase: 'initializing', percent: 100 });
@@ -211,22 +303,10 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
       // Crawling complete - move to scanning
       this.scanGateway.emitScanPhase(scanId, { phase: 'crawling', percent: 100 });
 
-      // Check if scan was cancelled after discovery
-      const scanCheck = await this.prisma.penTestScan.findUnique({
-        where: { id: scanId },
-        select: { status: true },
-      });
-      if (scanCheck?.status === 'cancelled') {
+      // Check if scan was cancelled (event-driven via Redis Pub/Sub)
+      if (this.isCancelled(scanId)) {
         this.logger.log(`Scan ${scanId} was cancelled after discovery phase`);
-        // Emit cancelled status to UI
-        this.scanGateway.emitScanComplete(scanId, {
-          totalFindings: allFindings.length,
-          severityBreakdown: severityCounts,
-          duration: Math.floor((Date.now() - startTime) / 1000) * 1000,
-          status: 'cancelled',
-          crawledUrls: discoveredUrls.length,
-        });
-        return;
+        return; // Cancellation handler already emitted scan:complete
       }
 
       // PHASE: Scanning - Run mode-specific scanners
@@ -273,22 +353,10 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
             continue;
           }
 
-          // Check if scan was cancelled before running scanner
-          const midScanCheck = await this.prisma.penTestScan.findUnique({
-            where: { id: scanId },
-            select: { status: true },
-          });
-          if (midScanCheck?.status === 'cancelled') {
+          // Check if scan was cancelled (event-driven via Redis Pub/Sub)
+          if (this.isCancelled(scanId)) {
             this.logger.log(`Scan ${scanId} was cancelled, aborting remaining scanners`);
-            // Emit cancelled status to UI
-            this.scanGateway.emitScanComplete(scanId, {
-              totalFindings: allFindings.length,
-              severityBreakdown: severityCounts,
-              duration: Math.floor((Date.now() - startTime) / 1000) * 1000,
-              status: 'cancelled',
-              crawledUrls: discoveredUrls.length,
-            });
-            return;
+            return; // Cancellation handler already emitted scan:complete
           }
 
           this.logger.log(`Running ${scannerConfig.label} (${scannerConfig.name}) against ${targetUrl}`);
@@ -619,6 +687,9 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
 
       this.logger.error(`Target scan ${scanId} failed: ${error}`);
       throw error;
+    } finally {
+      // Clean up active scan tracking
+      this.activeScans.delete(scanId);
     }
   }
 

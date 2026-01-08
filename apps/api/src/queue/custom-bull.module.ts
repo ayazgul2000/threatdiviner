@@ -1,7 +1,8 @@
 import { Module, DynamicModule, Global, Provider, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
-import { QUEUE_NAMES } from './queue.constants';
+import { createClient, RedisClientType } from 'redis';
+import { QUEUE_NAMES, REDIS_PUBSUB } from './queue.constants';
 
 export const BULL_QUEUES = Symbol('BULL_QUEUES');
 export const BULL_CONNECTION = Symbol('BULL_CONNECTION');
@@ -20,6 +21,7 @@ interface QueueInstance {
 @Module({})
 export class CustomBullModule implements OnModuleDestroy {
   private static queues: QueueInstance[] = [];
+  private static redisPublisher: RedisClientType | null = null;
 
   static forRoot(): DynamicModule {
     const connectionProvider: Provider = {
@@ -28,6 +30,21 @@ export class CustomBullModule implements OnModuleDestroy {
         host: configService.get('REDIS_HOST', 'localhost'),
         port: configService.get('REDIS_PORT', 6379),
       }),
+      inject: [ConfigService],
+    };
+
+    // Redis publisher for Pub/Sub (used for scan cancellation signals)
+    const redisPublisherProvider: Provider = {
+      provide: REDIS_PUBSUB.SCAN_CANCELLATION,
+      useFactory: async (configService: ConfigService): Promise<RedisClientType> => {
+        const host = configService.get('REDIS_HOST', 'localhost');
+        const port = configService.get('REDIS_PORT', 6379);
+        const client = createClient({ url: `redis://${host}:${port}` }) as RedisClientType;
+        await client.connect();
+        CustomBullModule.redisPublisher = client;
+        console.log('[CustomBullModule] Redis publisher connected for cancellation signals');
+        return client;
+      },
       inject: [ConfigService],
     };
 
@@ -50,12 +67,22 @@ export class CustomBullModule implements OnModuleDestroy {
 
     return {
       module: CustomBullModule,
-      providers: [connectionProvider, ...queueProviders, allQueuesProvider],
-      exports: [BULL_CONNECTION, BULL_QUEUES, ...queueNames.map((name) => `BullQueue_${name}`)],
+      providers: [connectionProvider, redisPublisherProvider, ...queueProviders, allQueuesProvider],
+      exports: [BULL_CONNECTION, REDIS_PUBSUB.SCAN_CANCELLATION, BULL_QUEUES, ...queueNames.map((name) => `BullQueue_${name}`)],
     };
   }
 
   async onModuleDestroy() {
+    // Close Redis publisher
+    if (CustomBullModule.redisPublisher) {
+      try {
+        await CustomBullModule.redisPublisher.quit();
+      } catch (error) {
+        console.error('Error closing Redis publisher:', error);
+      }
+    }
+
+    // Close queues
     for (const { queue, name } of CustomBullModule.queues) {
       try {
         await queue.close();

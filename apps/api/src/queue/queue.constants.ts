@@ -9,6 +9,14 @@ export const QUEUE_NAMES = {
   CLEANUP: 'cleanup-jobs',
 } as const;
 
+// Redis Pub/Sub for real-time cancellation
+export const REDIS_PUBSUB = {
+  SCAN_CANCELLATION: 'scan-cancellation',
+} as const;
+
+// Injection token for Redis publisher client
+export const REDIS_PUBLISHER = Symbol('REDIS_PUBLISHER');
+
 export const JOB_NAMES = {
   PROCESS_SCAN: 'process-scan',
   PROCESS_TARGET_SCAN: 'process-target-scan',
