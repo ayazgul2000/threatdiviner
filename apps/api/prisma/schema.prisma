@@ -34,6 +34,12 @@ model Tenant {
   scans                   Scan[]
   scmConnections          ScmConnection[]
   users                   User[]
+  // AI Services
+  aiRateLimits            Json?               @map("ai_rate_limits")
+  monthlyAIBudget         Float?              @map("monthly_ai_budget")
+  chatSessions            ChatSession[]
+  aiCostRecords           AICostRecord[]
+  aiUsage                 AIUsage[]
 
   @@map("tenants")
 }
@@ -64,26 +70,84 @@ model Project {
 }
 
 model User {
-  id                 String          @id @default(uuid())
-  tenantId           String          @map("tenant_id")
-  email              String
-  passwordHash       String?         @map("password_hash")
-  role               String          @default("member")
-  createdAt          DateTime        @default(now()) @map("created_at")
-  inviteToken        String?         @unique @map("invite_token")
-  invitedAt          DateTime?       @map("invited_at")
-  invitedBy          String?         @map("invited_by")
-  lastLoginAt        DateTime?       @map("last_login_at")
-  name               String?
-  status             String          @default("active")
-  updatedAt          DateTime        @updatedAt @map("updated_at")
-  apiKeys            ApiKey[]
-  orgMemberships     OrgMember[]
-  projectMemberships ProjectMember[]
-  tenant             Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                  String               @id @default(uuid())
+  tenantId            String               @map("tenant_id")
+  email               String
+  passwordHash        String?              @map("password_hash")
+  role                String               @default("member")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  inviteToken         String?              @unique @map("invite_token")
+  invitedAt           DateTime?            @map("invited_at")
+  invitedBy           String?              @map("invited_by")
+  lastLoginAt         DateTime?            @map("last_login_at")
+  name                String?
+  status              String               @default("active")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  emailVerified       Boolean              @default(false) @map("email_verified")
+  emailVerifiedAt     DateTime?            @map("email_verified_at")
+  mfaEnabled          Boolean              @default(false) @map("mfa_enabled")
+  mfaSecret           String?              @map("mfa_secret")
+  apiKeys             ApiKey[]
+  orgMemberships      OrgMember[]
+  projectMemberships  ProjectMember[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  passwordResetTokens PasswordResetToken[]
+  emailVerifications  EmailVerification[]
+  sessions            UserSession[]
+  chatSessions        ChatSession[]
+  aiCostRecords       AICostRecord[]
 
   @@unique([tenantId, email])
   @@map("users")
+}
+
+// Password reset tokens for secure password recovery
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  token     String // Hashed token
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// Email verification tokens
+model EmailVerification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  email     String // Email being verified (may differ from user's current email)
+  token     String // Hashed token
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("email_verifications")
+}
+
+// User sessions for session management
+model UserSession {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  refreshToken String    @map("refresh_token") // Hashed refresh token
+  userAgent    String?   @map("user_agent")
+  ipAddress    String?   @map("ip_address")
+  lastActiveAt DateTime  @default(now()) @map("last_active_at")
+  expiresAt    DateTime  @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([refreshToken])
+  @@index([userId])
+  @@map("user_sessions")
 }
 
 model OrgMember {
@@ -173,36 +237,36 @@ model ProjectRepoAccess {
 }
 
 model Repository {
-  id                      String            @id @default(uuid())
-  tenantId                String            @map("tenant_id")
-  connectionId            String            @map("connection_id")
-  name                    String
-  fullName                String            @map("full_name")
-  cloneUrl                String            @map("clone_url")
-  htmlUrl                 String            @map("html_url")
-  defaultBranch           String            @default("main") @map("default_branch")
-  language                String?
-  isPrivate               Boolean           @default(true) @map("is_private")
-  isActive                Boolean           @default(true) @map("is_active")
-  lastScanAt              DateTime?         @map("last_scan_at")
-  createdAt               DateTime          @default(now()) @map("created_at")
-  updatedAt               DateTime          @updatedAt @map("updated_at")
-  projectId               String?           @map("project_id")
+  id                     String            @id @default(uuid())
+  tenantId               String            @map("tenant_id")
+  connectionId           String            @map("connection_id")
+  name                   String
+  fullName               String            @map("full_name")
+  cloneUrl               String            @map("clone_url")
+  htmlUrl                String            @map("html_url")
+  defaultBranch          String            @default("main") @map("default_branch")
+  language               String?
+  isPrivate              Boolean           @default(true) @map("is_private")
+  isActive               Boolean           @default(true) @map("is_active")
+  lastScanAt             DateTime?         @map("last_scan_at")
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
+  projectId              String?           @map("project_id")
   // Webhook configuration
-  webhookUrl              String?           @unique @map("webhook_url")
-  webhookSecret           String?           @map("webhook_secret")
-  webhookBranchFilters    String[]          @default([]) @map("webhook_branch_filters")
-  webhookBranchExcludes   String[]          @default([]) @map("webhook_branch_excludes")
-  webhookScannersEnabled  String[]          @default([]) @map("webhook_scanners_enabled")
-  webhookBlockSeverity    String?           @map("webhook_block_severity")
-  webhookDiffOnly         Boolean           @default(true) @map("webhook_diff_only")
-  webhookInlineComments   Boolean           @default(true) @map("webhook_inline_comments")
-  findingBaselines        FindingBaseline[]
-  connection              ScmConnection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  project                 Project?          @relation(fields: [projectId], references: [id])
-  tenant                  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  scanConfig              ScanConfig?
-  scans                   Scan[]
+  webhookUrl             String?           @unique @map("webhook_url")
+  webhookSecret          String?           @map("webhook_secret")
+  webhookBranchFilters   String[]          @default([]) @map("webhook_branch_filters")
+  webhookBranchExcludes  String[]          @default([]) @map("webhook_branch_excludes")
+  webhookScannersEnabled String[]          @default([]) @map("webhook_scanners_enabled")
+  webhookBlockSeverity   String?           @map("webhook_block_severity")
+  webhookDiffOnly        Boolean           @default(true) @map("webhook_diff_only")
+  webhookInlineComments  Boolean           @default(true) @map("webhook_inline_comments")
+  findingBaselines       FindingBaseline[]
+  connection             ScmConnection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  project                Project?          @relation(fields: [projectId], references: [id])
+  tenant                 Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scanConfig             ScanConfig?
+  scans                  Scan[]
 
   @@unique([tenantId, fullName])
   @@index([tenantId])
@@ -1163,7 +1227,7 @@ model VulnerabilityAlert {
   cveId            String    @map("cve_id")
   title            String
   description      String?
-  severity         String    // critical, high, medium, low, unknown
+  severity         String // critical, high, medium, low, unknown
   cvssScore        Float?    @map("cvss_score")
   epssScore        Float?    @map("epss_score")
   isKev            Boolean   @default(false) @map("is_kev")
@@ -1401,36 +1465,36 @@ enum ProjectStatus {
 
 // Penetration Testing / DAST Targets
 model PenTestTarget {
-  id              String        @id @default(uuid())
-  tenantId        String        @map("tenant_id")
-  projectId       String?       @map("project_id")
-  name            String
-  url             String
-  type            String        @default("web_application") // web_application, api_endpoint, network_service
-  description     String?
+  id          String  @id @default(uuid())
+  tenantId    String  @map("tenant_id")
+  projectId   String? @map("project_id")
+  name        String
+  url         String
+  type        String  @default("web_application") // web_application, api_endpoint, network_service
+  description String?
 
   // Authentication
-  authType        String?       @map("auth_type") // none, basic, bearer, cookie
-  authCredentials Json?         @map("auth_credentials") // encrypted credentials
-  authConfig      Json?         @map("auth_config") // legacy: credentials, headers, cookies
-  headers         Json?         @default("{}") // custom headers
+  authType        String? @map("auth_type") // none, basic, bearer, cookie
+  authCredentials Json?   @map("auth_credentials") // encrypted credentials
+  authConfig      Json?   @map("auth_config") // legacy: credentials, headers, cookies
+  headers         Json?   @default("{}") // custom headers
 
   // Scan configuration
-  defaultScanners   String[]      @default(["nuclei"]) @map("default_scanners")
-  defaultScanMode   String        @default("standard") @map("default_scan_mode") // quick, standard, comprehensive
-  rateLimitPreset   String        @default("medium") @map("rate_limit_preset") // low, medium, high
-  rateLimitRps      Int?          @map("rate_limit_rps") // deprecated: use rateLimitPreset
-  excludePaths      String[]      @default([]) @map("exclude_paths")
+  defaultScanners String[] @default(["nuclei"]) @map("default_scanners")
+  defaultScanMode String   @default("standard") @map("default_scan_mode") // quick, standard, comprehensive
+  rateLimitPreset String   @default("medium") @map("rate_limit_preset") // low, medium, high
+  rateLimitRps    Int?     @map("rate_limit_rps") // deprecated: use rateLimitPreset
+  excludePaths    String[] @default([]) @map("exclude_paths")
 
   // Risk tracking
-  riskScore       Int?          @map("risk_score") // 0-100
-  lastScanId      String?       @map("last_scan_id")
+  riskScore  Int?    @map("risk_score") // 0-100
+  lastScanId String? @map("last_scan_id")
 
-  isActive        Boolean       @default(true) @map("is_active")
-  lastScanAt      DateTime?     @map("last_scan_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  scans           PenTestScan[]
+  isActive   Boolean       @default(true) @map("is_active")
+  lastScanAt DateTime?     @map("last_scan_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  scans      PenTestScan[]
 
   @@index([tenantId])
   @@index([projectId])
@@ -1510,19 +1574,18 @@ model PenTestFinding {
   @@map("pentest_findings")
 }
 
-
 // AI Triage Log - tracks AI decisions for audit
 model AiTriageLog {
-  id              String   @id @default(uuid())
-  findingId       String   @map("finding_id")
-  status          String   // confirmed, false_positive, needs_review, suppressed
-  confidence      String   // high, medium, low
-  reasoning       String
-  adjustedSeverity String? @map("adjusted_severity")
-  provider        String   // claude, gemini, fallback
-  inputTokens     Int      @default(0) @map("input_tokens")
-  outputTokens    Int      @default(0) @map("output_tokens")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid())
+  findingId        String   @map("finding_id")
+  status           String // confirmed, false_positive, needs_review, suppressed
+  confidence       String // high, medium, low
+  reasoning        String
+  adjustedSeverity String?  @map("adjusted_severity")
+  provider         String // claude, gemini, fallback
+  inputTokens      Int      @default(0) @map("input_tokens")
+  outputTokens     Int      @default(0) @map("output_tokens")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   @@index([findingId])
   @@index([provider])
@@ -1530,52 +1593,35 @@ model AiTriageLog {
   @@map("ai_triage_logs")
 }
 
-// AI Usage Tracking - daily token usage per tenant
-model AiUsage {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  date        DateTime @db.Date
-  provider    String   // claude, gemini
-  model       String
-  inputTokens Int      @default(0) @map("input_tokens")
-  outputTokens Int     @default(0) @map("output_tokens")
-  requestCount Int     @default(0) @map("request_count")
-  costEstimate Float?  @map("cost_estimate")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+// AI Usage Tracking - daily token usage per tenant/provider/model
+model AiUsageDetailed {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  date         DateTime @db.Date
+  provider     String // claude, gemini
+  model        String
+  inputTokens  Int      @default(0) @map("input_tokens")
+  outputTokens Int      @default(0) @map("output_tokens")
+  requestCount Int      @default(0) @map("request_count")
+  costEstimate Float?   @map("cost_estimate")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@unique([tenantId, date, provider, model])
   @@index([tenantId])
   @@index([date])
-  @@map("ai_usage")
+  @@map("ai_usage_detailed")
 }
-
 
 // ============================================================================
 // KNOWLEDGE BASE MODELS
 // ============================================================================
+// NOTE: Cwe, AttackTactic, and AttackTechnique models are defined earlier in the schema
+// (around lines 658, 777, and 790) with proper relations. Do not duplicate them here.
 
-// CWE - Common Weakness Enumeration
-model Cwe {
-  id                    Int      @id @default(autoincrement())
-  cweId                 String   @unique @map("cwe_id")
-  name                  String
-  description           String?
-  extendedDescription   String?  @map("extended_description")
-  relatedWeaknesses     Json     @default("{}") @map("related_weaknesses")
-  commonConsequences    Json     @default("{}") @map("common_consequences")
-  detectionMethods      Json     @default("{}") @map("detection_methods")
-  potentialMitigations  Json     @default("{}") @map("potential_mitigations")
-  affectedResources     String[] @default([]) @map("affected_resources")
-  likelihoodOfExploit   String?  @map("likelihood_of_exploit")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
-
-  @@index([cweId])
-  @@map("cwes")
-}
-
-// CAPEC - Common Attack Pattern Enumeration
+// CAPEC - Common Attack Pattern Enumeration (alternative model with different structure)
+// NOTE: CapecPattern model is defined at line 829 with different fields
+// This Capec model provides a simplified structure for the knowledge sync service
 model Capec {
   id                String   @id @default(uuid())
   capecId           String   @unique @map("capec_id")
@@ -1597,56 +1643,23 @@ model Capec {
   @@map("capecs")
 }
 
-// MITRE ATT&CK Technique
-model AttackTechnique {
-  id          String   @id @default(uuid())
-  techniqueId String   @unique @map("technique_id")
-  name        String
-  description String?
-  tactics     String[] @default([])
-  platforms   String[] @default([])
-  dataSources String[] @default([]) @map("data_sources")
-  detection   String?
-  mitigations String[] @default([])
-  url         String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  @@index([techniqueId])
-  @@map("attack_techniques")
-}
-
-// MITRE ATT&CK Tactic
-model AttackTactic {
-  id          String   @id @default(uuid())
-  tacticId    String   @unique @map("tactic_id")
-  name        String
-  description String?
-  shortName   String?  @map("short_name")
-  url         String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  @@index([tacticId])
-  @@map("attack_tactics")
-}
-
 // Remediation Playbook
 model Playbook {
-  id              Int           @id @default(autoincrement())
-  slug            String        @unique
+  id              Int              @id @default(autoincrement())
+  slug            String           @unique
   title           String
   summary         String
-  rootCause       String?       @map("root_cause")
-  fixPattern      String        @map("fix_pattern")
-  testingGuidance String?       @map("testing_guidance")
-  references      Json          @default("[]")
-  relatedCwes     String[]      @default([]) @map("related_cwes")
-  tags            String[]      @default([])
+  rootCause       String?          @map("root_cause")
+  fixPattern      String           @map("fix_pattern")
+  testingGuidance String?          @map("testing_guidance")
+  references      Json             @default("[]")
+  relatedCwes     String[]         @default([]) @map("related_cwes")
+  tags            String[]         @default([])
   codeExamples    CodeExample[]
   chunks          PlaybookChunk[]
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  scannerMappings ScannerMapping[]
 
   @@index([relatedCwes])
   @@index([tags])
@@ -1704,15 +1717,15 @@ model OwaspCheatsheet {
 
 // RAG Knowledge Chunks
 model KnowledgeChunk {
-  id        String   @id @default(uuid())
+  id        String                       @id @default(uuid())
   source    String
-  sourceId  String?  @map("source_id")
+  sourceId  String?                      @map("source_id")
   title     String?
   content   String
   embedding Unsupported("vector(1536)")?
-  metadata  Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  metadata  Json                         @default("{}")
+  createdAt DateTime                     @default(now()) @map("created_at")
+  updatedAt DateTime                     @updatedAt @map("updated_at")
 
   @@unique([source, sourceId])
   @@index([source])
@@ -1721,14 +1734,98 @@ model KnowledgeChunk {
 
 // Playbook RAG Chunks
 model PlaybookChunk {
-  id         String   @id @default(uuid())
-  playbookId Int      @map("playbook_id")
+  id         String                       @id @default(uuid())
+  playbookId Int                          @map("playbook_id")
   section    String?
   content    String
   embedding  Unsupported("vector(1536)")?
-  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now()) @map("created_at")
+  playbook   Playbook                     @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  createdAt  DateTime                     @default(now()) @map("created_at")
 
   @@index([playbookId])
   @@map("playbook_chunks")
+}
+
+// ===================== AI Services Models =====================
+
+// AI Chat Sessions
+model ChatSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tenantId  String   @map("tenant_id")
+  title     String   @default("New Chat")
+  messages  Json     @default("[]") // ChatMessage[]
+  context   Json? // ChatContext
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([updatedAt])
+  @@map("chat_sessions")
+}
+
+// AI Cost Records for attribution
+model AICostRecord {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  userId       String?  @map("user_id")
+  feature      String // AIFeature enum: triage, fix-generation, chat, etc.
+  provider     String // claude, gemini, openai, etc.
+  model        String // specific model name
+  inputTokens  Int      @map("input_tokens")
+  outputTokens Int      @map("output_tokens")
+  cost         Float // cost in USD
+  metadata     Json? // additional context
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([feature])
+  @@index([createdAt])
+  @@map("ai_cost_records")
+}
+
+// AI Usage Daily Aggregation
+model AIUsage {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  date         DateTime @db.Date
+  requestCount Int      @default(0) @map("request_count")
+  tokenCount   Int      @default(0) @map("token_count")
+  cost         Float    @default(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date], name: "tenantId_date")
+  @@index([tenantId])
+  @@index([date])
+  @@map("ai_usage")
+}
+
+// Integrations for SCM, Notifications, Ticketing
+model Integration {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  type         String // github, gitlab, slack, jira, pagerduty, webhook, etc.
+  name         String
+  status       String    @default("pending") // connected, error, pending, disabled
+  config       Json      @default("{}") // encrypted/masked sensitive config
+  lastSync     DateTime? @map("last_sync")
+  errorMessage String?   @map("error_message")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, type])
+  @@index([tenantId])
+  @@index([type])
+  @@map("integrations")
 }

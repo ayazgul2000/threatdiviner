@@ -16,6 +16,12 @@ import { PermissionsGuard } from './permissions/permissions.guard';
 import { AltanicheAuthConfig } from './interfaces';
 import { AUTH_CONFIG } from './auth.constants';
 
+// Extended auth services
+import { PasswordResetService } from './services/password-reset.service';
+import { EmailVerificationService } from './services/email-verification.service';
+import { MfaService } from './services/mfa.service';
+import { SessionService } from './services/session.service';
+
 export interface AuthModuleOptions {
   /**
    * If true, registers the auth controller
@@ -74,6 +80,11 @@ export class AuthModule implements NestModule {
       AuthService,
       JwtStrategy,
       PermissionsGuard,
+      // Extended auth services
+      PasswordResetService,
+      EmailVerificationService,
+      MfaService,
+      SessionService,
     ];
 
     if (options.config.multiTenant !== false && options.config.setTenantContext) {
@@ -93,7 +104,16 @@ export class AuthModule implements NestModule {
       ],
       controllers: options.useController !== false ? [AuthController] : [],
       providers,
-      exports: [AuthService, JwtModule, AUTH_CONFIG, PermissionsGuard],
+      exports: [
+        AuthService,
+        JwtModule,
+        AUTH_CONFIG,
+        PermissionsGuard,
+        PasswordResetService,
+        EmailVerificationService,
+        MfaService,
+        SessionService,
+      ],
     };
   }
 
@@ -139,8 +159,22 @@ export class AuthModule implements NestModule {
         JwtStrategy,
         TenantMiddleware,
         PermissionsGuard,
+        // Extended auth services
+        PasswordResetService,
+        EmailVerificationService,
+        MfaService,
+        SessionService,
       ],
-      exports: [AuthService, JwtService, AUTH_CONFIG, PermissionsGuard],
+      exports: [
+        AuthService,
+        JwtService,
+        AUTH_CONFIG,
+        PermissionsGuard,
+        PasswordResetService,
+        EmailVerificationService,
+        MfaService,
+        SessionService,
+      ],
     };
   }
 

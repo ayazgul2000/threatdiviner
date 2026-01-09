@@ -799,6 +799,129 @@ export const settingsApi = {
     fetchApi<any>('/settings/threat-intel', { method: 'PUT', body: JSON.stringify(data) }),
 };
 
+// ==================== Chat API ====================
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  metadata?: {
+    model?: string;
+    tokens?: number;
+    toolCalls?: string[];
+  };
+}
+
+export interface ChatSession {
+  id: string;
+  userId: string;
+  tenantId: string;
+  title: string;
+  messages: ChatMessage[];
+  context?: ChatContext;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatContext {
+  findingIds?: string[];
+  scanId?: string;
+  repositoryId?: string;
+  threatModelId?: string;
+  cweIds?: string[];
+  cveIds?: string[];
+  owaspCategories?: string[];
+  customContext?: string;
+}
+
+export interface SendMessageResult {
+  messageId: string;
+  response: string;
+  model: string;
+  tokens?: {
+    input: number;
+    output: number;
+  };
+}
+
+export interface ChatStatus {
+  available: boolean;
+  providers: Array<{
+    name: string;
+    displayName: string;
+    available: boolean;
+  }>;
+  models: Array<{
+    id: string;
+    name: string;
+    provider: string;
+  }>;
+}
+
+export interface NlqResult {
+  query: string;
+  intent: string;
+  results: any[];
+  sql?: string;
+  explanation?: string;
+}
+
+export const chatApi = {
+  // Status
+  getStatus: () => fetchApi<ChatStatus>('/chat/status'),
+
+  // Sessions
+  createSession: (title?: string, context?: ChatContext) =>
+    fetchApi<ChatSession>('/chat/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ title, context }),
+    }),
+
+  listSessions: (limit = 20, offset = 0) =>
+    fetchApi<{ sessions: Pick<ChatSession, 'id' | 'title' | 'createdAt' | 'updatedAt'>[]; total: number }>(
+      `/chat/sessions?limit=${limit}&offset=${offset}`
+    ),
+
+  getSession: (sessionId: string) =>
+    fetchApi<ChatSession>(`/chat/sessions/${sessionId}`),
+
+  deleteSession: (sessionId: string) =>
+    fetchApi<void>(`/chat/sessions/${sessionId}`, { method: 'DELETE' }),
+
+  clearSessions: () =>
+    fetchApi<{ deleted: number }>('/chat/sessions', { method: 'DELETE' }),
+
+  // Messages
+  sendMessage: (sessionId: string, message: string, context?: ChatContext) =>
+    fetchApi<SendMessageResult>(`/chat/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ message, context }),
+    }),
+
+  // Quick question (no session needed)
+  quickQuestion: (message: string, context?: ChatContext) =>
+    fetchApi<{ response: string; model: string; sessionId: string }>('/chat/quick', {
+      method: 'POST',
+      body: JSON.stringify({ message, context }),
+    }),
+
+  // Stream message (returns EventSource URL)
+  getStreamUrl: (sessionId: string, message: string) =>
+    `${API_URL}/chat/sessions/${sessionId}/stream?message=${encodeURIComponent(message)}`,
+};
+
+// ==================== NLQ API ====================
+export const nlqApi = {
+  query: (query: string) =>
+    fetchApi<NlqResult>('/chat/nlq', {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    }),
+
+  getSuggestions: () =>
+    fetchApi<{ suggestions: string[] }>('/chat/nlq/suggestions'),
+};
+
 // ==================== Projects API ====================
 export interface Project {
   id: string;

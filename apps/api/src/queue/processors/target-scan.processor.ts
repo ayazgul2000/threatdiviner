@@ -4,7 +4,8 @@ import { Job, Worker } from 'bullmq';
 import { createClient, RedisClientType } from 'redis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScanGateway } from '../../scans/scan.gateway';
-import { NucleiScanner } from '../../scanners/dast/nuclei';
+// Note: Nuclei is currently disabled - keeping import for potential future use
+// import { NucleiScanner } from '../../scanners/dast/nuclei';
 import { NiktoScanner } from '../../scanners/pentest/nikto';
 import { SqlmapScanner } from '../../scanners/pentest/sqlmap';
 import { SSLyzeScanner } from '../../scanners/pentest/sslyze';
@@ -13,7 +14,7 @@ import { KatanaScanner } from '../../scanners/discovery/katana';
 import { LocalExecutorService } from '../../scanners/execution';
 import { DiscoveredParam } from '../../scanners/interfaces';
 import { QUEUE_NAMES, REDIS_PUBSUB } from '../queue.constants';
-import { TargetScanJobData, TargetScanConfig, FindingsCount } from '../jobs';
+import { TargetScanJobData, FindingsCount } from '../jobs';
 import { BULL_CONNECTION } from '../custom-bull.module';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -55,10 +56,10 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
   ) {
     // Initialize all scanners with whitelabel display names
+    // Note: Nuclei is currently disabled
     this.scanners = new Map();
 
     const katana = new KatanaScanner(this.executor, this.configService);
-    const nuclei = new NucleiScanner(this.executor, this.configService);
     const nikto = new NiktoScanner(this.executor, this.configService);
     const sqlmap = new SqlmapScanner(this.executor, this.configService);
     const sslyze = new SSLyzeScanner(this.executor, this.configService);
@@ -67,8 +68,7 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     // Discovery scanners
     this.scanners.set('katana', { name: 'katana', scanner: katana, category: 'discovery', label: 'URL Discovery' });
 
-    // DAST scanners
-    this.scanners.set('nuclei', { name: 'nuclei', scanner: nuclei, category: 'dast', label: 'Vulnerability Detection' });
+    // DAST scanners (Nuclei disabled - using ZAP for vulnerability scanning)
     this.scanners.set('zap', { name: 'zap', scanner: zap, category: 'dast', label: 'Web Application Testing' });
 
     // Pentest scanners
@@ -335,17 +335,13 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
         }
 
         const scannerStartTime = Date.now();
-        const isTwoPhase = scannerConfig.name === 'nuclei' && scannerConfig.config?.twoPhase;
 
         // Emit scanner start event with whitelabel name
-        // Skip for two-phase nuclei - it emits its own start events for each phase
-        if (!isTwoPhase) {
-          this.scanGateway.emitScannerStart(scanId, {
-            scanner: scannerConfig.name,
-            label: scannerConfig.label,
-            phase: 'scanning',
-          });
-        }
+        this.scanGateway.emitScannerStart(scanId, {
+          scanner: scannerConfig.name,
+          label: scannerConfig.label,
+          phase: 'scanning',
+        });
 
         try {
           const isAvailable = await scannerInfo.scanner.isAvailable();
@@ -480,42 +476,6 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
             }
           };
 
-          // ============ TWO-PHASE NUCLEI HANDLING ============
-          // For quick/standard modes, run two-phase scan: discovery → focused
-          this.logger.log(`[DEBUG] Scanner: ${scannerConfig.name}, config: ${JSON.stringify(scannerConfig.config)}`);
-          if (scannerConfig.name === 'nuclei' && scannerConfig.config?.twoPhase) {
-            this.logger.log(`[TWO-PHASE] Running two-phase Nuclei scan for ${scanMode} mode (discovery → focused)`);
-
-            const twoPhaseResult = await this.runTwoPhaseNucleiScan(
-              scanId,
-              tenantId,
-              targetUrl,
-              discoveredUrls.length > 0 ? [...new Set([targetUrl, ...discoveredUrls])] : [targetUrl],
-              workDir,
-              scanMode,
-              config,
-              {
-                onProgress: createProgressCallback(scannerConfig.name),
-                onLog,
-                onFinding,
-                onTemplateEvent,
-              },
-              detectedTechnologies,
-              allFindings,
-              storedFingerprints,
-            );
-
-            // NOTE: Findings are already stored via onFinding callback during scan
-            // Just log the results - no need to store again
-            this.logger.log(`Two-phase Nuclei complete: ${twoPhaseResult.findings.length} findings in ${twoPhaseResult.duration}ms`);
-            this.logger.log(`Detected technologies: ${Array.from(detectedTechnologies).join(', ') || 'none'}`);
-
-            // Update job progress and continue to next scanner
-            await job.updateProgress(20 + (i + 1) * progressPerScanner);
-            continue;
-          }
-          // ============ END TWO-PHASE HANDLING ============
-
           // Build target URLs for this scanner
           // Use discovered URLs if available, otherwise just base URL
           const targetUrlsForScanner = discoveredUrls.length > 0
@@ -523,9 +483,7 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
             : [targetUrl];
 
           // Build scan context with mode-specific scanner config
-          // Nuclei has internal per-request timeouts, so don't impose external timeout
-          // Other scanners get 5-minute default
-          const scannerTimeout = scannerConfig.name === 'nuclei' ? 0 : (config.timeout || 300000);
+          const scannerTimeout = config.timeout || 300000;
           const context = {
             scanId,
             workDir,
@@ -800,26 +758,26 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Get list of scanners for a given scan mode
+   *
+   * Note: Nuclei is currently disabled. URL discovery uses Katana + ZAP spider,
+   * then ZAP performs the vulnerability scanning.
    */
   private getScannersForMode(mode: ScanMode): ScannerForMode[] {
     switch (mode) {
       case 'quick':
         return [
-          // Two-phase nuclei: discovery (tech detection) → focused (tech-specific vulns)
-          { name: 'nuclei', label: 'Vulnerability Detection', config: { twoPhase: true } },
+          // Quick mode: SSL/TLS check only, discovery already done via Katana
           { name: 'sslyze', label: 'SSL/TLS Analysis' },
         ];
       case 'standard':
         return [
-          // Two-phase nuclei: discovery (tech detection) → focused (tech-specific vulns)
-          { name: 'nuclei', label: 'Vulnerability Detection', config: { twoPhase: true } },
+          // Standard mode: ZAP active scan on discovered URLs + SSL check
           { name: 'sslyze', label: 'SSL/TLS Analysis' },
-          { name: 'zap', label: 'Web Application Testing', config: { passiveOnly: true } },
+          { name: 'zap', label: 'Web Application Testing', config: { passiveOnly: false } },
         ];
       case 'comprehensive':
         return [
-          // Full nuclei scan (all templates) for comprehensive mode
-          { name: 'nuclei', label: 'Vulnerability Detection', config: { scanPhase: 'full' } },
+          // Full mode: All scanners except Nuclei
           { name: 'sslyze', label: 'SSL/TLS Analysis' },
           { name: 'zap', label: 'Web Application Testing', config: { passiveOnly: false } },
           { name: 'sqlmap', label: 'SQL Injection Testing' },
@@ -831,8 +789,8 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Run discovery phase - Katana crawl (and ZAP spider for comprehensive mode)
-   * Returns discovered URLs and params for use by subsequent scanners
+   * Run discovery phase - Katana crawl + ZAP spider for standard/comprehensive modes
+   * URLs are rationalized (deduplicated, normalized) before being passed to scanners
    */
   private async runDiscoveryPhase(
     scanMode: ScanMode,
@@ -851,6 +809,7 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     onProgress?: (progress: { scanner: string; percent: number; phase?: string }) => void,
   ): Promise<{ discoveredUrls: string[]; discoveredParams: DiscoveredParam[]; jsFiles: string[] }> {
     const katana = this.scanners.get('katana')!;
+    const zap = this.scanners.get('zap')!;
 
     // Build base context for Katana
     const katanaContext = {
@@ -870,258 +829,226 @@ export class TargetScanProcessor implements OnModuleInit, OnModuleDestroy {
     // Emit discovery start
     this.scanGateway.emitScannerStart(scanId, {
       scanner: 'katana',
+      label: 'URL Discovery',
       phase: 'discovery',
     });
 
-    if (scanMode === 'comprehensive') {
-      // Run Katana and ZAP spider in parallel, merge results
-      this.logger.log('Comprehensive mode: running Katana and ZAP spider in parallel');
-
-      const zap = this.scanners.get('zap')!;
-      const zapContext = {
-        scanId,
-        workDir,
-        timeout: 300000,
-        config: {
-          targetUrls: [targetUrl],
-          headers: config.headers,
-          onProgress,
-        },
-      };
-
-      // Emit ZAP spider start too
-      this.scanGateway.emitScannerStart(scanId, {
-        scanner: 'zap',
-        phase: 'discovery',
-      });
-
-      const [katanaOutput, zapOutput] = await Promise.all([
-        katana.scanner.scan(katanaContext),
-        zap.scanner.spiderOnly(zapContext),
-      ]);
-
-      // Merge and dedupe URLs
-      const katanaUrls = katanaOutput.discoveredUrls || [];
-      const zapUrls = zapOutput.discoveredUrls || [];
-      const combinedUrls = [...new Set([...katanaUrls, ...zapUrls])];
-
-      // Merge params (Katana has more detailed param info)
-      const discoveredParams = katanaOutput.discoveredParams || [];
-
-      this.logger.log(`Discovery complete: Katana=${katanaUrls.length}, ZAP=${zapUrls.length}, Combined=${combinedUrls.length}`);
-
-      // Emit discovery complete events
-      this.scanGateway.emitScannerComplete(scanId, {
-        scanner: 'katana',
-        findingsCount: 0,
-        duration: katanaOutput.duration,
-        status: 'completed',
-      });
-      this.scanGateway.emitScannerComplete(scanId, {
-        scanner: 'zap',
-        findingsCount: 0,
-        duration: zapOutput.duration,
-        status: 'completed',
-      });
-
-      return { discoveredUrls: combinedUrls, discoveredParams, jsFiles: katanaOutput.jsFiles || [] };
-    } else {
-      // Quick/Standard: Katana only
+    if (scanMode === 'quick') {
+      // Quick mode: Katana only for fast discovery
       const katanaOutput = await katana.scanner.scan(katanaContext);
       const discoveredUrls = katanaOutput.discoveredUrls || [];
       const discoveredParams = katanaOutput.discoveredParams || [];
       const jsFiles = katanaOutput.jsFiles || [];
 
-      this.logger.log(`Katana discovery complete: ${discoveredUrls.length} URLs, ${discoveredParams.length} params`);
+      // Rationalize URLs
+      const rationalizedUrls = this.rationalizeUrls(discoveredUrls, targetUrl);
+
+      this.logger.log(`Quick discovery complete: ${discoveredUrls.length} raw URLs -> ${rationalizedUrls.length} rationalized`);
 
       // Emit discovery complete
       this.scanGateway.emitScannerComplete(scanId, {
         scanner: 'katana',
+        label: 'URL Discovery',
         findingsCount: 0,
         duration: katanaOutput.duration,
         status: 'completed',
       });
 
-      return { discoveredUrls, discoveredParams, jsFiles };
+      return { discoveredUrls: rationalizedUrls, discoveredParams, jsFiles };
+    }
+
+    // Standard and Comprehensive modes: Run Katana and ZAP spider in parallel
+    this.logger.log(`${scanMode} mode: running Katana and ZAP spider in parallel for comprehensive URL discovery`);
+
+    const zapContext = {
+      scanId,
+      workDir,
+      timeout: scanMode === 'standard' ? 180000 : 300000,
+      config: {
+        targetUrls: [targetUrl],
+        headers: config.headers,
+        authConfig: config.authConfig,
+        onProgress,
+      },
+    };
+
+    // Emit ZAP spider start too
+    this.scanGateway.emitScannerStart(scanId, {
+      scanner: 'zap',
+      label: 'ZAP Spider',
+      phase: 'discovery',
+    });
+
+    // Run both crawlers in parallel
+    const [katanaOutput, zapOutput] = await Promise.all([
+      katana.scanner.scan(katanaContext),
+      zap.scanner.spiderOnly(zapContext).catch((err: Error) => {
+        this.logger.warn(`ZAP spider failed: ${err.message}, continuing with Katana URLs only`);
+        return { discoveredUrls: [], duration: 0 };
+      }),
+    ]);
+
+    // Collect all URLs
+    const katanaUrls = katanaOutput.discoveredUrls || [];
+    const zapUrls = zapOutput.discoveredUrls || [];
+
+    this.logger.log(`Raw URL counts - Katana: ${katanaUrls.length}, ZAP Spider: ${zapUrls.length}`);
+
+    // Combine and rationalize URLs
+    const allUrls = [...katanaUrls, ...zapUrls];
+    const rationalizedUrls = this.rationalizeUrls(allUrls, targetUrl);
+
+    // Merge params (Katana has more detailed param info)
+    const discoveredParams = katanaOutput.discoveredParams || [];
+
+    this.logger.log(`Discovery complete: ${allUrls.length} raw URLs -> ${rationalizedUrls.length} rationalized URLs`);
+
+    // Emit discovery complete events
+    this.scanGateway.emitScannerComplete(scanId, {
+      scanner: 'katana',
+      label: 'URL Discovery',
+      findingsCount: 0,
+      duration: katanaOutput.duration,
+      status: 'completed',
+    });
+    this.scanGateway.emitScannerComplete(scanId, {
+      scanner: 'zap',
+      label: 'ZAP Spider',
+      findingsCount: 0,
+      duration: zapOutput.duration || 0,
+      status: zapOutput.discoveredUrls ? 'completed' : 'skipped',
+    });
+
+    return { discoveredUrls: rationalizedUrls, discoveredParams, jsFiles: katanaOutput.jsFiles || [] };
+  }
+
+  /**
+   * Rationalize URLs - deduplicate, normalize, and remove duplicates that differ only in trivial ways
+   * This reduces scan time by avoiding scanning the same endpoint multiple times
+   */
+  private rationalizeUrls(urls: string[], baseUrl: string): string[] {
+    const seen = new Set<string>();
+    const rationalized: string[] = [];
+
+    // Always include the base URL first
+    const baseNormalized = this.normalizeUrl(baseUrl);
+    if (baseNormalized) {
+      seen.add(this.getUrlSignature(baseNormalized));
+      rationalized.push(baseNormalized);
+    }
+
+    for (const url of urls) {
+      try {
+        const normalized = this.normalizeUrl(url);
+        if (!normalized) continue;
+
+        // Get a signature that ignores trivial differences
+        const signature = this.getUrlSignature(normalized);
+
+        // Skip if we've seen this signature
+        if (seen.has(signature)) continue;
+        seen.add(signature);
+
+        // Skip static assets that are unlikely to have vulnerabilities
+        if (this.isStaticAsset(normalized)) continue;
+
+        rationalized.push(normalized);
+      } catch {
+        // Skip invalid URLs
+      }
+    }
+
+    // Sort URLs for consistent ordering (base paths first, then by depth)
+    rationalized.sort((a, b) => {
+      const depthA = (a.match(/\//g) || []).length;
+      const depthB = (b.match(/\//g) || []).length;
+      if (depthA !== depthB) return depthA - depthB;
+      return a.localeCompare(b);
+    });
+
+    return rationalized;
+  }
+
+  /**
+   * Normalize a URL - remove fragments, sort query params, lowercase host
+   */
+  private normalizeUrl(urlString: string): string | null {
+    try {
+      const url = new URL(urlString);
+
+      // Remove fragment
+      url.hash = '';
+
+      // Sort query parameters for consistent comparison
+      const params = new URLSearchParams(url.search);
+      const sortedParams = new URLSearchParams([...params.entries()].sort());
+      url.search = sortedParams.toString();
+
+      // Lowercase the hostname
+      url.hostname = url.hostname.toLowerCase();
+
+      // Remove default ports
+      if ((url.protocol === 'http:' && url.port === '80') ||
+          (url.protocol === 'https:' && url.port === '443')) {
+        url.port = '';
+      }
+
+      // Remove trailing slash from path (except for root)
+      if (url.pathname.length > 1 && url.pathname.endsWith('/')) {
+        url.pathname = url.pathname.slice(0, -1);
+      }
+
+      return url.toString();
+    } catch {
+      return null;
     }
   }
 
   /**
-   * Run two-phase Nuclei scan: Discovery → Focused
-   *
-   * Phase 1 (Discovery): Fast tech detection using http/technologies templates
-   * Phase 2 (Focused): Run tech-specific vulnerability templates based on detected stack
-   *
-   * This optimizes scan time by only running relevant vulnerability checks
-   * instead of scanning with ALL templates.
+   * Get a signature for a URL that ignores trivial differences
+   * URLs with the same signature are considered duplicates
    */
-  private async runTwoPhaseNucleiScan(
-    scanId: string,
-    _tenantId: string,
-    _targetUrl: string,
-    targetUrls: string[],
-    workDir: string,
-    scanMode: string,
-    config: TargetScanConfig,
-    callbacks: {
-      onProgress: (progress: { scanner: string; percent: number; phase?: string }) => void;
-      onLog: (line: string, stream: 'stdout' | 'stderr') => void;
-      onFinding: (finding: any) => Promise<void>;
-      onTemplateEvent: (event: any) => void;
-    },
-    detectedTechnologies: Set<string>,
-    _allFindings: any[],
-    storedFingerprints: Set<string>,
-  ): Promise<{ findings: any[]; duration: number; templateStats?: any }> {
-    const nucleiScanner = this.scanners.get('nuclei')!.scanner as NucleiScanner;
-    const startTime = Date.now();
-    let totalFindings: any[] = [];
+  private getUrlSignature(url: string): string {
+    try {
+      const parsed = new URL(url);
 
-    // ============ PHASE 1: DISCOVERY ============
-    this.logger.log(`[Two-Phase Nuclei] Starting Phase 1: Technology Discovery`);
+      // Create signature from: host + path + sorted param names (not values)
+      // This way /api/users?id=1 and /api/users?id=2 are treated as the same endpoint
+      const paramNames = [...new URLSearchParams(parsed.search).keys()].sort().join(',');
 
-    // Emit discovery phase start
-    this.scanGateway.emitScanPhase(scanId, {
-      phase: 'scanning',
-      percent: 10,
-      detectedTechnologies: [],
-    });
+      // Normalize path segments - replace numeric IDs with placeholder
+      // e.g., /api/users/123/profile -> /api/users/{id}/profile
+      const normalizedPath = parsed.pathname
+        .split('/')
+        .map(segment => {
+          // Replace pure numeric segments (likely IDs)
+          if (/^\d+$/.test(segment)) return '{id}';
+          // Replace UUID-like segments
+          if (/^[a-f0-9-]{36}$/i.test(segment)) return '{uuid}';
+          // Replace hash-like segments (32+ hex chars)
+          if (/^[a-f0-9]{32,}$/i.test(segment)) return '{hash}';
+          return segment;
+        })
+        .join('/');
 
-    this.scanGateway.emitScannerStart(scanId, {
-      scanner: 'nuclei',
-      label: 'Tech Discovery',
-      phase: 'discovery',
-    });
-
-    const discoveryContext = {
-      scanId,
-      workDir,
-      timeout: 0, // No external timeout for nuclei
-      excludePaths: (config.excludePaths as string[]) || [],
-      languages: ['web'],
-      config: {
-        targetUrls,
-        scanMode,
-        scanPhase: 'discovery',
-        authType: config.authType,
-        authCredentials: config.authCredentials,
-        headers: config.headers,
-        rateLimitPreset: config.rateLimitPreset || 'medium',
-        excludePaths: config.excludePaths,
-        onProgress: (p: any) => callbacks.onProgress({ ...p, phase: 'Tech Discovery' }),
-        onLog: callbacks.onLog,
-        onTemplateEvent: callbacks.onTemplateEvent,
-        onFinding: callbacks.onFinding,
-      },
-    };
-
-    const discoveryOutput = await nucleiScanner.scan(discoveryContext);
-    const discoveryFindings = await nucleiScanner.parseOutput(discoveryOutput);
-
-    // Store discovery findings to DB
-    for (const finding of discoveryFindings) {
-      if (finding.fingerprint && storedFingerprints.has(finding.fingerprint)) continue;
-      if (finding.fingerprint) storedFingerprints.add(finding.fingerprint);
-      totalFindings.push(finding);
-      // Store to DB via callback (real-time streaming may have missed some)
-      await callbacks.onFinding(finding);
+      return `${parsed.host}${normalizedPath}?${paramNames}`;
+    } catch {
+      return url;
     }
+  }
 
-    // Parse detected technologies from discovery findings
-    const parsedTechs = nucleiScanner.parseTechnologies(discoveryFindings);
-    parsedTechs.forEach(tech => detectedTechnologies.add(tech));
+  /**
+   * Check if URL points to a static asset that's unlikely to have vulnerabilities
+   */
+  private isStaticAsset(url: string): boolean {
+    const staticExtensions = [
+      '.css', '.js', '.map', '.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg',
+      '.woff', '.woff2', '.ttf', '.eot', '.otf',
+      '.mp3', '.mp4', '.webm', '.ogg', '.wav',
+      '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+    ];
 
-    const discoveryDuration = Date.now() - startTime;
-    this.logger.log(`[Two-Phase Nuclei] Discovery complete: ${discoveryFindings.length} findings, ${parsedTechs.length} technologies detected: ${parsedTechs.join(', ')}`);
-
-    // Emit discovery complete
-    this.scanGateway.emitScannerComplete(scanId, {
-      scanner: 'nuclei',
-      label: 'Tech Discovery',
-      findingsCount: discoveryFindings.length,
-      duration: discoveryDuration,
-      status: 'completed',
-    });
-
-    // Emit technologies detected
-    this.scanGateway.emitScanPhase(scanId, {
-      phase: 'scanning',
-      percent: 40,
-      detectedTechnologies: Array.from(detectedTechnologies),
-      focusedTemplateCount: nucleiScanner.getFocusedTemplates(parsedTechs).length,
-    });
-
-    // Check for cancellation between phases
-    if (this.isCancelled(scanId)) {
-      this.logger.log(`[Two-Phase Nuclei] Cancelled after discovery phase`);
-      return { findings: totalFindings, duration: Date.now() - startTime };
-    }
-
-    // ============ PHASE 2: FOCUSED VULNERABILITY SCAN ============
-    if (parsedTechs.length === 0) {
-      this.logger.log(`[Two-Phase Nuclei] No technologies detected, skipping focused phase`);
-      return { findings: totalFindings, duration: Date.now() - startTime };
-    }
-
-    const focusedTemplates = nucleiScanner.getFocusedTemplates(parsedTechs);
-    this.logger.log(`[Two-Phase Nuclei] Starting Phase 2: Focused scan with ${focusedTemplates.length} templates for [${parsedTechs.join(', ')}]`);
-
-    this.scanGateway.emitScannerStart(scanId, {
-      scanner: 'nuclei',
-      label: 'Vulnerability Scan',
-      phase: 'focused',
-    });
-
-    const focusedContext = {
-      scanId,
-      workDir,
-      timeout: 0,
-      excludePaths: (config.excludePaths as string[]) || [],
-      languages: ['web'],
-      config: {
-        targetUrls,
-        scanMode,
-        scanPhase: 'focused',
-        detectedTechnologies: parsedTechs,
-        authType: config.authType,
-        authCredentials: config.authCredentials,
-        headers: config.headers,
-        rateLimitPreset: config.rateLimitPreset || 'medium',
-        excludePaths: config.excludePaths,
-        onProgress: (p: any) => callbacks.onProgress({ ...p, phase: 'Vulnerability Scan' }),
-        onLog: callbacks.onLog,
-        onTemplateEvent: callbacks.onTemplateEvent,
-        onFinding: callbacks.onFinding,
-      },
-    };
-
-    const focusedOutput = await nucleiScanner.scan(focusedContext);
-    const focusedFindings = await nucleiScanner.parseOutput(focusedOutput);
-
-    // Store focused findings
-    for (const finding of focusedFindings) {
-      if (finding.fingerprint && storedFingerprints.has(finding.fingerprint)) continue;
-      if (finding.fingerprint) storedFingerprints.add(finding.fingerprint);
-      totalFindings.push(finding);
-    }
-
-    const totalDuration = Date.now() - startTime;
-    this.logger.log(`[Two-Phase Nuclei] Focused scan complete: ${focusedFindings.length} findings in ${totalDuration}ms total`);
-
-    // Emit focused phase complete
-    this.scanGateway.emitScannerComplete(scanId, {
-      scanner: 'nuclei',
-      label: 'Vulnerability Scan',
-      findingsCount: focusedFindings.length,
-      duration: totalDuration - discoveryDuration,
-      status: 'completed',
-      templateStats: (focusedOutput as any).templateStats,
-    });
-
-    return {
-      findings: totalFindings,
-      duration: totalDuration,
-      templateStats: (focusedOutput as any).templateStats,
-    };
+    const lowerUrl = url.toLowerCase();
+    return staticExtensions.some(ext => lowerUrl.endsWith(ext));
   }
 }

@@ -110,7 +110,14 @@
       "Bash(node:*)",
       "Bash(pm2 stop:*)",
       "Bash(git checkout:*)",
-      "Bash(cmd //c \"taskkill /F /IM node.exe\")"
+      "Bash(cmd //c \"taskkill /F /IM node.exe\")",
+      "Bash(tree:*)",
+      "Bash(xargs basename:*)",
+      "Bash(ls:*)",
+      "Bash(done)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(set DATABASE_URL=postgresql://x:x@localhost:5432/x:*)"
     ]
   }
 }

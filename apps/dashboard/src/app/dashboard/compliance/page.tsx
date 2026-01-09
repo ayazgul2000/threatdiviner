@@ -18,6 +18,18 @@ interface ControlStatus {
   highFindings: number;
 }
 
+interface ComplianceScore {
+  framework: string; // This is the ID
+  frameworkName: string;
+  version: string;
+  overallScore: number;
+  passedControls: number;
+  failedControls: number;
+  totalControls: number;
+  controlStatus: ControlStatus[];
+}
+
+// Transformed for UI display
 interface Framework {
   id: string;
   name: string;
@@ -31,8 +43,22 @@ interface Framework {
 }
 
 interface ComplianceData {
-  frameworks: Framework[];
+  tenantId: string;
+  generatedAt: string;
+  frameworks: ComplianceScore[];
 }
+
+// Map framework IDs to tiers
+const FRAMEWORK_TIERS: Record<string, 'free' | 'growth' | 'scale'> = {
+  'owasp-2021': 'free',
+  'cwe-top-25': 'free',
+  'essential-eight': 'free',
+  'soc2': 'growth',
+  'pci-dss': 'growth',
+  'hipaa': 'scale',
+  'gdpr': 'growth',
+  'iso27001': 'scale',
+};
 
 const TIER_BADGES: Record<string, { label: string; className: string }> = {
   free: { label: 'Free', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
@@ -63,7 +89,7 @@ export default function CompliancePage() {
         });
 
         if (res.ok) {
-          const data = await res.json();
+          const data: ComplianceData = await res.json();
           setComplianceData(data);
         }
       } catch (error) {
@@ -76,7 +102,18 @@ export default function CompliancePage() {
     loadComplianceData();
   }, [currentProject]);
 
-  const frameworks = complianceData?.frameworks || [];
+  // Transform API response to UI Framework format
+  const frameworks: Framework[] = (complianceData?.frameworks || []).map((score) => ({
+    id: score.framework,
+    name: score.frameworkName,
+    version: score.version,
+    tier: FRAMEWORK_TIERS[score.framework] || 'free',
+    score: score.overallScore,
+    passedControls: score.passedControls,
+    failedControls: score.failedControls,
+    totalControls: score.totalControls,
+    controlStatus: score.controlStatus,
+  }));
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600 dark:text-green-400';

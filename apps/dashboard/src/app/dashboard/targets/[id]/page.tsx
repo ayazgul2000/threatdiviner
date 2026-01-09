@@ -66,6 +66,19 @@ interface ScanHistory {
   scanners: string[];
 }
 
+interface Finding {
+  id: string;
+  title: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  category: string;
+  status: 'open' | 'confirmed' | 'resolved' | 'false_positive';
+  description?: string;
+  location?: string;
+  cweId?: string;
+  scanId: string;
+  createdAt: string;
+}
+
 const TARGET_TYPE_ICONS = {
   web_application: Globe,
   api_endpoint: Server,
@@ -133,8 +146,11 @@ export default function TargetDetailPage() {
 
   const [target, setTarget] = useState<Target | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistory[]>([]);
+  const [findings, setFindings] = useState<Finding[]>([]);
+  const [loadingFindings, setLoadingFindings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'scans' | 'findings'>('overview');
+  const [findingsFilter, setFindingsFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all');
 
   // Scan modal state
   const [showScanModal, setShowScanModal] = useState(false);
@@ -199,6 +215,33 @@ export default function TargetDetailPage() {
       setScanHistory([]);
     }
   };
+
+  const loadFindings = async () => {
+    setLoadingFindings(true);
+    try {
+      const res = await fetch(`${API_URL}/targets/${targetId}/findings`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFindings(data.findings || data || []);
+      } else {
+        setFindings([]);
+      }
+    } catch (error) {
+      console.error('Failed to load findings:', error);
+      setFindings([]);
+    } finally {
+      setLoadingFindings(false);
+    }
+  };
+
+  // Load findings when switching to findings tab
+  useEffect(() => {
+    if (activeTab === 'findings' && targetId && findings.length === 0) {
+      loadFindings();
+    }
+  }, [activeTab, targetId]);
 
   const handleStartScan = async () => {
     setStartingScan(true);
@@ -541,14 +584,122 @@ export default function TargetDetailPage() {
       )}
 
       {activeTab === 'findings' && (
-        <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
-          <FileText className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
-            Findings View Coming Soon
-          </h3>
-          <p className="text-slate-600 dark:text-slate-400">
-            Aggregated findings from all scans will be displayed here.
-          </p>
+        <div className="space-y-4">
+          {/* Findings Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600 dark:text-slate-400">Filter:</span>
+            {(['all', 'critical', 'high', 'medium', 'low'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setFindingsFilter(filter)}
+                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                  findingsFilter === filter
+                    ? filter === 'critical' ? 'bg-red-600 text-white' :
+                      filter === 'high' ? 'bg-orange-600 text-white' :
+                      filter === 'medium' ? 'bg-yellow-600 text-white' :
+                      filter === 'low' ? 'bg-blue-600 text-white' :
+                      'bg-slate-600 text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {loadingFindings ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : findings.length === 0 ? (
+            <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
+              <Shield className="w-12 h-12 mx-auto text-green-500 mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+                No Findings
+              </h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-4">
+                {scanHistory.length === 0
+                  ? 'Run a scan to discover security findings.'
+                  : 'No security findings detected. Great job!'}
+              </p>
+              {scanHistory.length === 0 && (
+                <button
+                  onClick={() => setShowScanModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Play className="w-4 h-4" />
+                  Start Scan
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-slate-50 dark:bg-slate-900">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Finding</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Severity</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Category</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Location</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {findings
+                    .filter(f => findingsFilter === 'all' || f.severity === findingsFilter)
+                    .map((finding) => (
+                    <tr
+                      key={finding.id}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer"
+                      onClick={() => router.push(`/dashboard/findings/${finding.id}`)}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-slate-900 dark:text-white">{finding.title}</div>
+                        {finding.cweId && (
+                          <span className="text-xs text-slate-500">{finding.cweId}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${
+                          finding.severity === 'critical' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                          finding.severity === 'high' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                          finding.severity === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          finding.severity === 'low' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                          'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-400'
+                        }`}>
+                          {finding.severity.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
+                        {finding.category}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 text-sm ${
+                          finding.status === 'open' ? 'text-yellow-600' :
+                          finding.status === 'confirmed' ? 'text-red-600' :
+                          finding.status === 'resolved' ? 'text-green-600' :
+                          'text-slate-500'
+                        }`}>
+                          {finding.status === 'open' && <Clock className="w-4 h-4" />}
+                          {finding.status === 'confirmed' && <AlertTriangle className="w-4 h-4" />}
+                          {finding.status === 'resolved' && <CheckCircle className="w-4 h-4" />}
+                          {finding.status.charAt(0).toUpperCase() + finding.status.slice(1).replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-600 dark:text-slate-300 text-sm font-mono max-w-[200px] truncate">
+                        {finding.location || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {findings.filter(f => findingsFilter === 'all' || f.severity === findingsFilter).length === 0 && (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  No findings match the selected filter.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

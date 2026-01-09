@@ -24,6 +24,10 @@ import {
   ChevronRight,
   LogOut,
   Scan,
+  Bot,
+  Sparkles,
+  MessageSquare,
+  Brain,
 } from 'lucide-react';
 
 type MenuItem = {
@@ -45,6 +49,18 @@ type MenuConfigItem = MenuSection;
 // New menu structure per v3.0 spec
 function getMenuConfig(): MenuConfigItem[] {
   return [
+    // ═══ AI ASSISTANT ═══
+    {
+      type: 'section',
+      label: 'AI Assistant',
+      icon: Sparkles,
+      defaultExpanded: true,
+      items: [
+        { href: '/dashboard/chat', label: 'AI Chat', icon: MessageSquare },
+        { href: '/dashboard/threat-modeling', label: 'Threat Modeling', icon: Brain },
+      ],
+    },
+
     // ═══ SECURITY SCANNING ═══
     {
       type: 'section',
