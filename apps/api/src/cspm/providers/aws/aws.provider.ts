@@ -1,3 +1,6 @@
+// apps/api/src/cspm/providers/aws/aws.provider.ts
+// AWS cloud provider - stubbed for deployment without AWS SDK
+
 import { Injectable, Logger } from '@nestjs/common';
 
 export interface AwsCredentials {
@@ -13,141 +16,93 @@ export interface AwsResource {
   resourceId: string;
   resourceType: string;
   region: string;
+  name?: string;
   tags: Record<string, string>;
+  metadata?: Record<string, any>;
+}
+
+export interface SecurityFinding {
+  id: string;
+  service: string;
+  resourceArn: string;
+  resourceType: string;
+  region: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  title: string;
+  description: string;
+  remediation: string;
+  compliance: string[];
+  status: 'open' | 'resolved';
 }
 
 @Injectable()
 export class AwsProvider {
   private readonly logger = new Logger(AwsProvider.name);
 
-
-  /**
-   * Validate AWS credentials by calling STS GetCallerIdentity
-   */
-  async validateCredentials(credentials: Record<string, string>): Promise<boolean> {
+  async validateCredentials(credentials: AwsCredentials): Promise<{
+    valid: boolean;
+    accountId?: string;
+    userId?: string;
+    arn?: string;
+    error?: string;
+  }> {
     try {
       const { accessKeyId, secretAccessKey } = credentials;
-
       if (!accessKeyId || !secretAccessKey) {
-        return false;
+        return { valid: false, error: 'Missing credentials' };
       }
 
-      // In production, would call AWS STS GetCallerIdentity
-      // For now, basic format validation
-      if (!accessKeyId.match(/^AKIA[0-9A-Z]{16}$/) &&
-          !accessKeyId.match(/^ASIA[0-9A-Z]{16}$/)) {
-        return false;
+      // Basic format validation
+      if (!accessKeyId.match(/^(AKIA|ASIA)[0-9A-Z]{16}$/)) {
+        return { valid: false, error: 'Invalid access key format' };
       }
 
-      this.logger.log('AWS credentials validated');
-      return true;
-    } catch (error) {
-      this.logger.error(`AWS credential validation failed: ${error}`);
-      return false;
+      this.logger.log('AWS credentials validated (stub mode)');
+      return {
+        valid: true,
+        accountId: 'XXXXXXXXXXXX',
+        arn: `arn:aws:iam::XXXXXXXXXXXX:user/stub`,
+      };
+    } catch (error: any) {
+      return { valid: false, error: error.message };
     }
   }
 
-  /**
-   * List all regions enabled for the account
-   */
-  async listRegions(_credentials: AwsCredentials): Promise<string[]> {
-    // Default enabled regions
+  async assumeRole(
+    _credentials: AwsCredentials,
+    _roleArn: string,
+    _externalId?: string,
+  ): Promise<AwsCredentials | null> {
+    this.logger.warn('assumeRole called but AWS SDK not available');
+    return null;
+  }
+
+  async listRegions(): Promise<string[]> {
     return [
-      'us-east-1',
-      'us-east-2',
-      'us-west-1',
-      'us-west-2',
-      'eu-west-1',
-      'eu-west-2',
-      'eu-central-1',
-      'ap-northeast-1',
-      'ap-southeast-1',
-      'ap-southeast-2',
+      'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
+      'eu-west-1', 'eu-west-2', 'eu-central-1',
+      'ap-northeast-1', 'ap-southeast-1', 'ap-southeast-2',
     ];
   }
 
-  /**
-   * Get account info
-   */
-  async getAccountInfo(_credentials: AwsCredentials): Promise<{
-    accountId: string;
-    accountAlias?: string;
-    arn: string;
-  }> {
-    // In production, would call STS GetCallerIdentity and IAM ListAccountAliases
-    return {
-      accountId: 'XXXXXXXXXXXX',
-      arn: 'arn:aws:iam::XXXXXXXXXXXX:root',
-    };
-  }
-
-  /**
-   * List S3 buckets for security audit
-   */
-  async listS3Buckets(
-    _credentials: AwsCredentials,
-  ): Promise<AwsResource[]> {
-    // In production, would call S3 ListBuckets
+  async fullScan(_credentials: AwsCredentials, _regions?: string[]): Promise<SecurityFinding[]> {
+    this.logger.warn('fullScan called but AWS SDK not available - returning empty results');
     return [];
   }
 
-  /**
-   * List EC2 instances for security audit
-   */
-  async listEc2Instances(
-    _credentials: AwsCredentials,
-    _region: string,
-  ): Promise<AwsResource[]> {
-    // In production, would call EC2 DescribeInstances
+  async scanS3Buckets(_credentials: AwsCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * List IAM users for security audit
-   */
-  async listIamUsers(
-    _credentials: AwsCredentials,
-  ): Promise<AwsResource[]> {
-    // In production, would call IAM ListUsers
+  async scanIAM(_credentials: AwsCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * List Security Groups for audit
-   */
-  async listSecurityGroups(
-    _credentials: AwsCredentials,
-    _region: string,
-  ): Promise<AwsResource[]> {
-    // In production, would call EC2 DescribeSecurityGroups
+  async scanEC2(_credentials: AwsCredentials, _region: string): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * Check if CloudTrail is enabled
-   */
-  async checkCloudTrail(
-    _credentials: AwsCredentials,
-    _region: string,
-  ): Promise<{ enabled: boolean; multiRegion: boolean; logValidation: boolean }> {
-    // In production, would call CloudTrail DescribeTrails
-    return {
-      enabled: false,
-      multiRegion: false,
-      logValidation: false,
-    };
-  }
-
-  /**
-   * Check GuardDuty status
-   */
-  async checkGuardDuty(
-    _credentials: AwsCredentials,
-    _region: string,
-  ): Promise<{ enabled: boolean; detectorId?: string }> {
-    // In production, would call GuardDuty ListDetectors
-    return {
-      enabled: false,
-    };
+  async scanCloudTrail(_credentials: AwsCredentials, _region: string): Promise<SecurityFinding[]> {
+    return [];
   }
 }

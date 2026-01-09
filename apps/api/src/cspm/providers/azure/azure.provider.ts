@@ -1,3 +1,6 @@
+// apps/api/src/cspm/providers/azure/azure.provider.ts
+// Azure cloud provider - stubbed for deployment without Azure SDK
+
 import { Injectable, Logger } from '@nestjs/common';
 
 export interface AzureCredentials {
@@ -7,133 +10,60 @@ export interface AzureCredentials {
   subscriptionId: string;
 }
 
-export interface AzureResource {
+export interface SecurityFinding {
   id: string;
-  name: string;
-  type: string;
+  service: string;
+  resourceId: string;
+  resourceType: string;
   location: string;
-  resourceGroup: string;
-  tags: Record<string, string>;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  title: string;
+  description: string;
+  remediation: string;
+  compliance: string[];
+  status: 'open' | 'resolved';
 }
 
 @Injectable()
 export class AzureProvider {
   private readonly logger = new Logger(AzureProvider.name);
 
-
-  /**
-   * Validate Azure credentials by getting an access token
-   */
-  async validateCredentials(credentials: Record<string, string>): Promise<boolean> {
+  async validateCredentials(credentials: AzureCredentials): Promise<{
+    valid: boolean;
+    subscriptionName?: string;
+    error?: string;
+  }> {
     try {
       const { tenantId, clientId, clientSecret, subscriptionId } = credentials;
-
       if (!tenantId || !clientId || !clientSecret || !subscriptionId) {
-        return false;
+        return { valid: false, error: 'Missing credentials' };
       }
 
-      // Basic GUID format validation
-      const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!guidRegex.test(tenantId) || !guidRegex.test(clientId) || !guidRegex.test(subscriptionId)) {
-        return false;
-      }
-
-      this.logger.log('Azure credentials validated');
-      return true;
-    } catch (error) {
-      this.logger.error(`Azure credential validation failed: ${error}`);
-      return false;
+      this.logger.log('Azure credentials validated (stub mode)');
+      return { valid: true, subscriptionName: 'Stub Subscription' };
+    } catch (error: any) {
+      return { valid: false, error: error.message };
     }
   }
 
-  /**
-   * List all subscriptions
-   */
-  async listSubscriptions(credentials: AzureCredentials): Promise<Array<{
-    subscriptionId: string;
-    displayName: string;
-    state: string;
-  }>> {
-    // In production, would call Azure Resource Management API
-    return [
-      {
-        subscriptionId: credentials.subscriptionId,
-        displayName: 'Default Subscription',
-        state: 'Enabled',
-      },
-    ];
-  }
-
-  /**
-   * List all resource groups
-   */
-  async listResourceGroups(
-    _credentials: AzureCredentials,
-  ): Promise<Array<{ name: string; location: string }>> {
-    // In production, would call Azure Resource Management API
+  async fullScan(_credentials: AzureCredentials): Promise<SecurityFinding[]> {
+    this.logger.warn('fullScan called but Azure SDK not available');
     return [];
   }
 
-  /**
-   * List storage accounts for security audit
-   */
-  async listStorageAccounts(
-    _credentials: AzureCredentials,
-  ): Promise<AzureResource[]> {
-    // In production, would call Azure Storage Management API
+  async scanStorageAccounts(_credentials: AzureCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * List virtual machines for security audit
-   */
-  async listVirtualMachines(
-    _credentials: AzureCredentials,
-  ): Promise<AzureResource[]> {
-    // In production, would call Azure Compute Management API
+  async scanVirtualMachines(_credentials: AzureCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * List network security groups
-   */
-  async listNetworkSecurityGroups(
-    _credentials: AzureCredentials,
-  ): Promise<AzureResource[]> {
-    // In production, would call Azure Network Management API
+  async scanNetworkSecurityGroups(_credentials: AzureCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * Check Azure Security Center status
-   */
-  async checkSecurityCenter(
-    _credentials: AzureCredentials,
-  ): Promise<{ enabled: boolean; tier: string }> {
-    // In production, would call Azure Security Center API
-    return {
-      enabled: false,
-      tier: 'Free',
-    };
-  }
-
-  /**
-   * Check Key Vault configuration
-   */
-  async listKeyVaults(
-    _credentials: AzureCredentials,
-  ): Promise<AzureResource[]> {
-    // In production, would call Azure Key Vault Management API
-    return [];
-  }
-
-  /**
-   * Get Azure AD conditional access policies
-   */
-  async listConditionalAccessPolicies(
-    _credentials: AzureCredentials,
-  ): Promise<Array<{ id: string; displayName: string; state: string }>> {
-    // In production, would call Microsoft Graph API
+  async scanKeyVaults(_credentials: AzureCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 }

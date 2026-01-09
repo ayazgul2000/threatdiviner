@@ -1,3 +1,6 @@
+// apps/api/src/cspm/providers/gcp/gcp.provider.ts
+// GCP cloud provider - stubbed for deployment without GCP SDK
+
 import { Injectable, Logger } from '@nestjs/common';
 
 export interface GcpCredentials {
@@ -6,153 +9,68 @@ export interface GcpCredentials {
   privateKey: string;
 }
 
-export interface GcpResource {
-  selfLink: string;
-  name: string;
+export interface SecurityFinding {
+  id: string;
+  service: string;
+  resourceName: string;
   resourceType: string;
-  zone?: string;
-  region?: string;
-  labels: Record<string, string>;
+  location: string;
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  title: string;
+  description: string;
+  remediation: string;
+  compliance: string[];
+  status: 'open' | 'resolved';
 }
 
 @Injectable()
 export class GcpProvider {
   private readonly logger = new Logger(GcpProvider.name);
 
-
-  /**
-   * Validate GCP credentials by calling IAM testIamPermissions
-   */
-  async validateCredentials(credentials: Record<string, string>): Promise<boolean> {
+  async validateCredentials(credentials: GcpCredentials): Promise<{
+    valid: boolean;
+    projectId?: string;
+    error?: string;
+  }> {
     try {
       const { projectId, clientEmail, privateKey } = credentials;
-
       if (!projectId || !clientEmail || !privateKey) {
-        return false;
+        return { valid: false, error: 'Missing credentials' };
       }
 
-      // Basic format validation
-      if (!clientEmail.endsWith('.iam.gserviceaccount.com')) {
-        return false;
-      }
-
-      if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
-        return false;
-      }
-
-      this.logger.log('GCP credentials validated');
-      return true;
-    } catch (error) {
-      this.logger.error(`GCP credential validation failed: ${error}`);
-      return false;
+      this.logger.log('GCP credentials validated (stub mode)');
+      return { valid: true, projectId };
+    } catch (error: any) {
+      return { valid: false, error: error.message };
     }
   }
 
-  /**
-   * List all projects accessible with credentials
-   */
-  async listProjects(credentials: GcpCredentials): Promise<Array<{
-    projectId: string;
-    name: string;
-    state: string;
-  }>> {
-    // In production, would call Resource Manager API
-    return [
-      {
-        projectId: credentials.projectId,
-        name: 'Default Project',
-        state: 'ACTIVE',
-      },
-    ];
-  }
-
-  /**
-   * List all regions
-   */
-  async listRegions(_credentials: GcpCredentials): Promise<string[]> {
-    return [
-      'us-central1',
-      'us-east1',
-      'us-west1',
-      'europe-west1',
-      'asia-east1',
-    ];
-  }
-
-  /**
-   * List Compute Engine instances
-   */
-  async listComputeInstances(
-    _credentials: GcpCredentials,
-    _zone?: string,
-  ): Promise<GcpResource[]> {
-    // In production, would call Compute Engine API
+  async fullScan(_credentials: GcpCredentials): Promise<SecurityFinding[]> {
+    this.logger.warn('fullScan called but GCP SDK not available');
     return [];
   }
 
-  /**
-   * List Cloud Storage buckets
-   */
-  async listStorageBuckets(
-    _credentials: GcpCredentials,
-  ): Promise<GcpResource[]> {
-    // In production, would call Cloud Storage API
+  async scanStorageBuckets(_credentials: GcpCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * List VPC firewall rules
-   */
-  async listFirewallRules(
-    _credentials: GcpCredentials,
-  ): Promise<GcpResource[]> {
-    // In production, would call Compute Engine API
+  async scanComputeInstances(_credentials: GcpCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * List IAM service accounts
-   */
-  async listServiceAccounts(
-    _credentials: GcpCredentials,
-  ): Promise<GcpResource[]> {
-    // In production, would call IAM API
+  async scanFirewallRules(_credentials: GcpCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 
-  /**
-   * Check Cloud Audit Logs configuration
-   */
-  async checkAuditLogs(
-    _credentials: GcpCredentials,
-  ): Promise<{ enabled: boolean; dataAccess: boolean }> {
-    // In production, would call Cloud Resource Manager API
-    return {
-      enabled: false,
-      dataAccess: false,
-    };
+  async scanIAM(_credentials: GcpCredentials): Promise<SecurityFinding[]> {
+    return [];
   }
 
-  /**
-   * Check Security Command Center status
-   */
-  async checkSecurityCommandCenter(
-    _credentials: GcpCredentials,
-  ): Promise<{ enabled: boolean; tier: string }> {
-    // In production, would call Security Command Center API
-    return {
-      enabled: false,
-      tier: 'Standard',
-    };
+  async scanCloudSQL(_credentials: GcpCredentials): Promise<SecurityFinding[]> {
+    return [];
   }
 
-  /**
-   * List Cloud KMS keys
-   */
-  async listKmsKeys(
-    _credentials: GcpCredentials,
-  ): Promise<GcpResource[]> {
-    // In production, would call Cloud KMS API
+  async scanLogging(_credentials: GcpCredentials): Promise<SecurityFinding[]> {
     return [];
   }
 }

@@ -8,246 +8,135 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { JwtAuthGuard, CurrentUser } from '../libs/auth';
-import { AiService, TriageRequest } from './ai.service';
+import { JwtAuthGuard } from '../libs/auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../libs/auth/decorators/current-user.decorator';
+import { SmartTriageService } from './services/smart-triage.service';
+import { FixGeneratorService } from './services/fix-generator.service';
+import { ThreatGeneratorService } from './services/threat-generator.service';
 import { PrismaService } from '../prisma/prisma.service';
+
+interface AuthenticatedUser {
+  id: string;
+  tenantId: string;
+}
 
 interface TriageFindingDto {
   codeContext?: string;
-  repositoryContext?: {
-    name: string;
-    language: string;
-    framework?: string;
-  };
+  repositoryContext?: { name: string; language: string; framework?: string };
 }
 
-interface BatchTriageDto {
-  findingIds: string[];
+interface GenerateFixDto {
+  vulnerableCode: string;
+  language: string;
+  framework?: string;
 }
 
-interface TriageResponse {
-  id: string;
-  aiAnalysis: string | null;
-  aiConfidence: number | null;
-  aiSeverity: string | null;
-  aiFalsePositive: boolean | null;
-  aiExploitability: string | null;
-  aiRemediation: string | null;
-  aiTriagedAt: Date | null;
+interface GenerateThreatsDto {
+  projectName: string;
+  components: { name: string; type: string; technology?: string }[];
+  dataFlows: { source: string; target: string; dataType?: string; encrypted?: boolean }[];
+  trustBoundaries?: string[];
 }
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
 export class AiController {
   constructor(
-    private readonly aiService: AiService,
+    private readonly triageService: SmartTriageService,
+    private readonly fixService: FixGeneratorService,
+    private readonly threatService: ThreatGeneratorService,
     private readonly prisma: PrismaService,
   ) {}
 
-  @Get('status')
-  async getStatus(): Promise<{ available: boolean; model: string }> {
-    const available = await this.aiService.isAvailable();
-    return {
-      available,
-      model: available ? 'claude-sonnet-4-20250514' : 'none',
-    };
-  }
-
   @Post('triage/:findingId')
   async triageFinding(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('findingId') findingId: string,
     @Body() dto: TriageFindingDto,
-    @CurrentUser() user: { tenantId: string },
-  ): Promise<TriageResponse> {
-    // Find the finding
+  ) {
     const finding = await this.prisma.finding.findFirst({
-      where: {
-        id: findingId,
-        tenantId: user.tenantId,
-      },
-      include: {
-        scan: {
-          include: {
-            repository: true,
-          },
-        },
-      },
+      where: { id: findingId, tenantId: user.tenantId },
     });
 
-    if (!finding) {
-      throw new NotFoundException('Finding not found');
-    }
+    if (!finding) throw new NotFoundException('Finding not found');
 
-    // Build triage request
-    const request: TriageRequest = {
-      finding: {
-        id: finding.id,
-        title: finding.title,
-        description: finding.description || '',
-        severity: finding.severity,
-        ruleId: finding.ruleId,
-        filePath: finding.filePath,
-        startLine: finding.startLine || 0,
-        snippet: finding.snippet || undefined,
-        cweId: finding.cweId || undefined,
-      },
-      codeContext: dto.codeContext,
-      repositoryContext: dto.repositoryContext || {
-        name: finding.scan.repository.name,
-        language: finding.scan.repository.language || 'unknown',
-      },
-    };
+    const result = await this.triageService.triageFinding({
+      id: finding.id,
+      title: finding.title,
+      description: finding.description || '',
+      severity: finding.severity,
+      scanner: finding.scanner,
+      ruleId: finding.ruleId || '',
+      filePath: finding.filePath || '',
+      lineNumber: finding.startLine || undefined,
+      codeSnippet: dto.codeContext || finding.snippet || undefined,
+      cweId: finding.cweId || undefined,
+    }, dto.repositoryContext);
 
-    // Run AI triage
-    const result = await this.aiService.triageFinding(request);
-
-    if (!result) {
-      throw new BadRequestException('AI triage failed - check API key configuration');
-    }
-
-    // Update finding with AI triage results
-    const updated = await this.prisma.finding.update({
-      where: { id: finding.id },
+    // Update finding with triage result
+    await this.prisma.finding.update({
+      where: { id: findingId },
       data: {
-        aiAnalysis: result.analysis,
-        aiConfidence: result.confidence,
-        aiSeverity: result.suggestedSeverity,
-        aiFalsePositive: result.isLikelyFalsePositive,
-        aiExploitability: result.exploitability,
-        aiRemediation: result.remediation,
+        status: result.status === 'confirmed' ? 'confirmed' : result.status === 'false_positive' ? 'false_positive' : 'needs_review',
+        aiAnalysis: result.reasoning,
+        aiConfidence: result.confidence === 'high' ? 0.9 : result.confidence === 'medium' ? 0.7 : 0.5,
+        aiSeverity: result.adjustedSeverity,
+        aiFalsePositive: result.status === 'false_positive',
         aiTriagedAt: new Date(),
       },
     });
 
-    return {
-      id: updated.id,
-      aiAnalysis: updated.aiAnalysis,
-      aiConfidence: updated.aiConfidence,
-      aiSeverity: updated.aiSeverity,
-      aiFalsePositive: updated.aiFalsePositive,
-      aiExploitability: updated.aiExploitability,
-      aiRemediation: updated.aiRemediation,
-      aiTriagedAt: updated.aiTriagedAt,
-    };
+    return result;
   }
 
-  @Post('triage/batch')
-  async batchTriage(
-    @Body() dto: BatchTriageDto,
-    @CurrentUser() user: { tenantId: string },
-  ): Promise<{ processed: number; results: TriageResponse[] }> {
-    if (!dto.findingIds || dto.findingIds.length === 0) {
-      throw new BadRequestException('findingIds array is required');
-    }
-
-    if (dto.findingIds.length > 50) {
-      throw new BadRequestException('Maximum 50 findings per batch');
-    }
-
-    // Find all findings
-    const findings = await this.prisma.finding.findMany({
-      where: {
-        id: { in: dto.findingIds },
-        tenantId: user.tenantId,
-      },
-      include: {
-        scan: {
-          include: {
-            repository: true,
-          },
-        },
-      },
-    });
-
-    if (findings.length === 0) {
-      throw new NotFoundException('No findings found');
-    }
-
-    // Build triage requests
-    const requests: TriageRequest[] = findings.map((f) => ({
-      finding: {
-        id: f.id,
-        title: f.title,
-        description: f.description || '',
-        severity: f.severity,
-        ruleId: f.ruleId,
-        filePath: f.filePath,
-        startLine: f.startLine || 0,
-        snippet: f.snippet || undefined,
-        cweId: f.cweId || undefined,
-      },
-      repositoryContext: {
-        name: f.scan.repository.name,
-        language: f.scan.repository.language || 'unknown',
-      },
-    }));
-
-    // Run batch triage
-    const triageResults = await this.aiService.batchTriageFindings(requests);
-
-    // Update findings with results
-    const results: TriageResponse[] = [];
-    for (const finding of findings) {
-      const result = triageResults.get(finding.id);
-      if (result) {
-        const updated = await this.prisma.finding.update({
-          where: { id: finding.id },
-          data: {
-            aiAnalysis: result.analysis,
-            aiConfidence: result.confidence,
-            aiSeverity: result.suggestedSeverity,
-            aiFalsePositive: result.isLikelyFalsePositive,
-            aiExploitability: result.exploitability,
-            aiRemediation: result.remediation,
-            aiTriagedAt: new Date(),
-          },
-        });
-
-        results.push({
-          id: updated.id,
-          aiAnalysis: updated.aiAnalysis,
-          aiConfidence: updated.aiConfidence,
-          aiSeverity: updated.aiSeverity,
-          aiFalsePositive: updated.aiFalsePositive,
-          aiExploitability: updated.aiExploitability,
-          aiRemediation: updated.aiRemediation,
-          aiTriagedAt: updated.aiTriagedAt,
-        });
-      }
-    }
-
-    return {
-      processed: results.length,
-      results,
-    };
-  }
-
-  @Get('triage/:findingId')
-  async getTriageResult(
+  @Post('fix/:findingId')
+  async generateFix(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('findingId') findingId: string,
-    @CurrentUser() user: { tenantId: string },
-  ): Promise<TriageResponse> {
+    @Body() dto: GenerateFixDto,
+  ) {
     const finding = await this.prisma.finding.findFirst({
-      where: {
-        id: findingId,
-        tenantId: user.tenantId,
-      },
-      select: {
-        id: true,
-        aiAnalysis: true,
-        aiConfidence: true,
-        aiSeverity: true,
-        aiFalsePositive: true,
-        aiExploitability: true,
-        aiRemediation: true,
-        aiTriagedAt: true,
-      },
+      where: { id: findingId, tenantId: user.tenantId },
     });
 
-    if (!finding) {
-      throw new NotFoundException('Finding not found');
+    if (!finding) throw new NotFoundException('Finding not found');
+
+    return this.fixService.generateFix({
+      findingId: finding.id,
+      title: finding.title,
+      description: finding.description || '',
+      cweId: finding.cweId || undefined,
+      vulnerableCode: dto.vulnerableCode,
+      filePath: finding.filePath || '',
+      language: dto.language,
+      framework: dto.framework,
+    });
+  }
+
+  @Post('threats/generate')
+  async generateThreats(
+    @CurrentUser() _user: AuthenticatedUser,
+    @Body() dto: GenerateThreatsDto,
+  ) {
+    if (!dto.components?.length) {
+      throw new BadRequestException('At least one component required');
     }
 
-    return finding;
+    return this.threatService.generateThreats({
+      projectName: dto.projectName,
+      components: dto.components,
+      dataFlows: dto.dataFlows || [],
+      trustBoundaries: dto.trustBoundaries,
+    });
+  }
+
+  @Get('usage')
+  async getUsage(@CurrentUser() user: AuthenticatedUser) {
+    // AI usage tracking - placeholder until AiUsage model is migrated
+    return {
+      daily: [],
+      totals: { inputTokens: 0, outputTokens: 0, requests: 0, cost: 0 },
+      message: 'AI usage tracking requires database migration',
+    };
   }
 }

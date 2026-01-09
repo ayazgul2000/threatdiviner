@@ -1157,6 +1157,38 @@ model SbomComponentVuln {
   @@map("sbom_component_vulns")
 }
 
+model VulnerabilityAlert {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  cveId            String    @map("cve_id")
+  title            String
+  description      String?
+  severity         String    // critical, high, medium, low, unknown
+  cvssScore        Float?    @map("cvss_score")
+  epssScore        Float?    @map("epss_score")
+  isKev            Boolean   @default(false) @map("is_kev")
+  isZeroDay        Boolean   @default(false) @map("is_zero_day")
+  publishedDate    DateTime? @map("published_date")
+  affectedPackages Json      @default("[]") @map("affected_packages")
+  status           String    @default("open") // open, acknowledged, resolved, suppressed
+  acknowledgedAt   DateTime? @map("acknowledged_at")
+  acknowledgedBy   String?   @map("acknowledged_by")
+  resolvedAt       DateTime? @map("resolved_at")
+  resolvedBy       String?   @map("resolved_by")
+  notes            String?
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, cveId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([severity])
+  @@index([isZeroDay])
+  @@index([isKev])
+  @@map("vulnerability_alerts")
+}
+
 model ContainerRegistry {
   id             String           @id @default(uuid())
   tenantId       String           @map("tenant_id")
@@ -1476,4 +1508,227 @@ model PenTestFinding {
   @@index([status])
   @@index([scanner])
   @@map("pentest_findings")
+}
+
+
+// AI Triage Log - tracks AI decisions for audit
+model AiTriageLog {
+  id              String   @id @default(uuid())
+  findingId       String   @map("finding_id")
+  status          String   // confirmed, false_positive, needs_review, suppressed
+  confidence      String   // high, medium, low
+  reasoning       String
+  adjustedSeverity String? @map("adjusted_severity")
+  provider        String   // claude, gemini, fallback
+  inputTokens     Int      @default(0) @map("input_tokens")
+  outputTokens    Int      @default(0) @map("output_tokens")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([findingId])
+  @@index([provider])
+  @@index([createdAt])
+  @@map("ai_triage_logs")
+}
+
+// AI Usage Tracking - daily token usage per tenant
+model AiUsage {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  date        DateTime @db.Date
+  provider    String   // claude, gemini
+  model       String
+  inputTokens Int      @default(0) @map("input_tokens")
+  outputTokens Int     @default(0) @map("output_tokens")
+  requestCount Int     @default(0) @map("request_count")
+  costEstimate Float?  @map("cost_estimate")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, date, provider, model])
+  @@index([tenantId])
+  @@index([date])
+  @@map("ai_usage")
+}
+
+
+// ============================================================================
+// KNOWLEDGE BASE MODELS
+// ============================================================================
+
+// CWE - Common Weakness Enumeration
+model Cwe {
+  id                    Int      @id @default(autoincrement())
+  cweId                 String   @unique @map("cwe_id")
+  name                  String
+  description           String?
+  extendedDescription   String?  @map("extended_description")
+  relatedWeaknesses     Json     @default("{}") @map("related_weaknesses")
+  commonConsequences    Json     @default("{}") @map("common_consequences")
+  detectionMethods      Json     @default("{}") @map("detection_methods")
+  potentialMitigations  Json     @default("{}") @map("potential_mitigations")
+  affectedResources     String[] @default([]) @map("affected_resources")
+  likelihoodOfExploit   String?  @map("likelihood_of_exploit")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@index([cweId])
+  @@map("cwes")
+}
+
+// CAPEC - Common Attack Pattern Enumeration
+model Capec {
+  id                String   @id @default(uuid())
+  capecId           String   @unique @map("capec_id")
+  name              String
+  description       String?
+  attackSteps       Json     @default("{}") @map("attack_steps")
+  prerequisites     String[] @default([])
+  skillsRequired    Json     @default("{}") @map("skills_required")
+  resourcesRequired String[] @default([]) @map("resources_required")
+  indicators        Json     @default("{}")
+  consequences      Json     @default("{}")
+  mitigations       Json     @default("{}")
+  relatedCwes       String[] @default([]) @map("related_cwes")
+  severity          String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([capecId])
+  @@map("capecs")
+}
+
+// MITRE ATT&CK Technique
+model AttackTechnique {
+  id          String   @id @default(uuid())
+  techniqueId String   @unique @map("technique_id")
+  name        String
+  description String?
+  tactics     String[] @default([])
+  platforms   String[] @default([])
+  dataSources String[] @default([]) @map("data_sources")
+  detection   String?
+  mitigations String[] @default([])
+  url         String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([techniqueId])
+  @@map("attack_techniques")
+}
+
+// MITRE ATT&CK Tactic
+model AttackTactic {
+  id          String   @id @default(uuid())
+  tacticId    String   @unique @map("tactic_id")
+  name        String
+  description String?
+  shortName   String?  @map("short_name")
+  url         String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tacticId])
+  @@map("attack_tactics")
+}
+
+// Remediation Playbook
+model Playbook {
+  id              Int           @id @default(autoincrement())
+  slug            String        @unique
+  title           String
+  summary         String
+  rootCause       String?       @map("root_cause")
+  fixPattern      String        @map("fix_pattern")
+  testingGuidance String?       @map("testing_guidance")
+  references      Json          @default("[]")
+  relatedCwes     String[]      @default([]) @map("related_cwes")
+  tags            String[]      @default([])
+  codeExamples    CodeExample[]
+  chunks          PlaybookChunk[]
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@index([relatedCwes])
+  @@index([tags])
+  @@map("playbooks")
+}
+
+// Code examples for playbooks
+model CodeExample {
+  id             Int      @id @default(autoincrement())
+  playbookId     Int      @map("playbook_id")
+  language       String
+  framework      String?
+  vulnerableCode String   @map("vulnerable_code")
+  fixedCode      String   @map("fixed_code")
+  explanation    String?
+  dependencies   Json     @default("[]")
+  playbook       Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([playbookId])
+  @@index([language, framework])
+  @@map("code_examples")
+}
+
+// Scanner rule to playbook mapping
+model ScannerMapping {
+  id                Int       @id @default(autoincrement())
+  scanner           String
+  ruleId            String    @map("rule_id")
+  cweId             String?   @map("cwe_id")
+  playbookId        Int?      @map("playbook_id")
+  severityOverride  String?   @map("severity_override")
+  falsePositiveRate Float?    @map("false_positive_rate")
+  notes             String?
+  playbook          Playbook? @relation(fields: [playbookId], references: [id])
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@unique([scanner, ruleId])
+  @@index([scanner, ruleId])
+  @@map("scanner_mappings")
+}
+
+// OWASP Cheatsheet
+model OwaspCheatsheet {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  title     String
+  content   String
+  sections  Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("owasp_cheatsheets")
+}
+
+// RAG Knowledge Chunks
+model KnowledgeChunk {
+  id        String   @id @default(uuid())
+  source    String
+  sourceId  String?  @map("source_id")
+  title     String?
+  content   String
+  embedding Unsupported("vector(1536)")?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([source, sourceId])
+  @@index([source])
+  @@map("knowledge_chunks")
+}
+
+// Playbook RAG Chunks
+model PlaybookChunk {
+  id         String   @id @default(uuid())
+  playbookId Int      @map("playbook_id")
+  section    String?
+  content    String
+  embedding  Unsupported("vector(1536)")?
+  playbook   Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([playbookId])
+  @@map("playbook_chunks")
 }

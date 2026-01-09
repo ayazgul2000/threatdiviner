@@ -9,7 +9,7 @@ import { ScmModule } from './scm/scm.module';
 import { CustomBullModule } from './queue/custom-bull.module';
 import { QueueModule } from './queue/queue.module';
 import { ScannersModule } from './scanners/scanners.module';
-import { AiModule } from './ai/ai.module';
+import { AIModule } from './ai/ai.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { PlatformModule } from './platform/platform.module';
@@ -82,7 +82,7 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     ScmModule,
     QueueModule,
     ScannersModule,
-    AiModule,
+    AIModule,
     NotificationsModule,
     ReportingModule,
     PlatformModule,

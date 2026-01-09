@@ -1,0 +1,6 @@
+http://127.0.0.1:3500
+http://127.0.0.1:3500/runtime.js
+http://127.0.0.1:3500/polyfills.js
+http://127.0.0.1:3500/main.js
+http://127.0.0.1:3500/styles.css
+http://127.0.0.1:3500/vendor.js

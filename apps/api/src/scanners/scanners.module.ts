@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ScmModule } from '../scm/scm.module';
 import { QueueModule } from '../queue/queue.module';
-import { AiModule } from '../ai/ai.module';
+import { AIModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ScansModule } from '../scans/scans.module';
 
@@ -46,7 +46,7 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 import { TargetScanProcessor } from '../queue/processors/target-scan.processor';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule, ScansModule, forwardRef(() => NotificationsModule)],
+  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AIModule, ScansModule, forwardRef(() => NotificationsModule)],
   providers: [
     // Utils
     GitService,

@@ -20,7 +20,7 @@ import { QUEUE_NAMES } from '../queue.constants';
 import { ScanJobData, NotifyJobData, FindingsCount } from '../jobs';
 import { IScanner, NormalizedFinding, ScanContext } from '../../scanners/interfaces';
 import { BULL_CONNECTION } from '../custom-bull.module';
-import { AiService, TriageRequest } from '../../ai/ai.service';
+import { SmartTriageService } from '../../ai/services/smart-triage.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { ScanGateway } from '../../scans/scan.gateway';
 
@@ -50,7 +50,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly diffFilterService: DiffFilterService,
     private readonly queueService: QueueService,
     private readonly githubProvider: GitHubProvider,
-    private readonly aiService: AiService,
+    private readonly triageService: SmartTriageService,
     private readonly notificationsService: NotificationsService,
     private readonly prCommentsService: PRCommentsService,
     private readonly scanGateway: ScanGateway,
@@ -702,13 +702,6 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     data: ScanJobData,
   ): Promise<void> {
     try {
-      // Check if AI is available
-      const isAvailable = await this.aiService.isAvailable();
-      if (!isAvailable) {
-        this.logger.warn('AI triage not available - skipping auto-triage');
-        return;
-      }
-
       // Get the repository info for context
       const repository = await this.prisma.repository.findUnique({
         where: { id: repositoryId },
@@ -720,13 +713,10 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
         where: {
           scanId,
           severity: { in: ['critical', 'high'] },
-          aiTriagedAt: null, // Not already triaged
+          aiTriagedAt: null,
         },
         take: this.aiTriageBatchSize,
-        orderBy: [
-          { severity: 'asc' }, // critical first (alphabetical)
-          { createdAt: 'asc' },
-        ],
+        orderBy: [{ severity: 'asc' }, { createdAt: 'asc' }],
       });
 
       if (findings.length === 0) {
@@ -736,52 +726,45 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
 
       this.logger.log(`Auto-triaging ${findings.length} high/critical findings...`);
 
-      // Build triage requests
-      const requests: TriageRequest[] = findings.map((f) => ({
-        finding: {
-          id: f.id,
-          title: f.title,
-          description: f.description || '',
-          severity: f.severity,
-          ruleId: f.ruleId,
-          filePath: f.filePath,
-          startLine: f.startLine || 0,
-          snippet: f.snippet || undefined,
-          cweId: f.cweId || undefined,
-        },
-        repositoryContext: {
-          name: repository?.name || data.fullName,
-          language: repository?.language || 'unknown',
-        },
+      const tenantContext = {
+        name: repository?.name || data.fullName,
+        language: repository?.language || 'unknown',
+      };
+
+      // Use new SmartTriageService batch method
+      const findingContexts = findings.map((f) => ({
+        id: f.id,
+        title: f.title,
+        description: f.description || '',
+        severity: f.severity,
+        scanner: f.scanner,
+        ruleId: f.ruleId || '',
+        filePath: f.filePath || '',
+        lineNumber: f.startLine || undefined,
+        codeSnippet: f.snippet || undefined,
+        cweId: f.cweId || undefined,
       }));
 
-      // Run batch triage
-      const results = await this.aiService.batchTriageFindings(requests);
+      const results = await this.triageService.triageBatch(findingContexts, tenantContext);
 
       // Update findings with AI triage results
       let triaged = 0;
-      for (const finding of findings) {
-        const result = results.get(finding.id);
-        if (result) {
-          await this.prisma.finding.update({
-            where: { id: finding.id },
-            data: {
-              aiAnalysis: result.analysis,
-              aiConfidence: result.confidence,
-              aiSeverity: result.suggestedSeverity,
-              aiFalsePositive: result.isLikelyFalsePositive,
-              aiExploitability: result.exploitability,
-              aiRemediation: result.remediation,
-              aiTriagedAt: new Date(),
-            },
-          });
-          triaged++;
-        }
+      for (const result of results) {
+        await this.prisma.finding.update({
+          where: { id: result.findingId },
+          data: {
+            aiAnalysis: result.reasoning,
+            aiConfidence: result.confidence === 'high' ? 0.9 : result.confidence === 'medium' ? 0.7 : 0.5,
+            aiSeverity: result.adjustedSeverity,
+            aiFalsePositive: result.status === 'false_positive',
+            aiTriagedAt: new Date(),
+          },
+        });
+        triaged++;
       }
 
       this.logger.log(`Auto-triaged ${triaged} findings`);
     } catch (error) {
-      // Log but don't fail the scan if AI triage fails
       this.logger.error(`Auto-triage failed: ${error}`);
     }
   }

@@ -179,13 +179,17 @@ export class CspmService {
     credentials: Record<string, string>,
   ): Promise<boolean> {
     try {
+      let result: { valid: boolean };
       switch (provider) {
         case 'aws':
-          return this.awsProvider.validateCredentials(credentials);
+          result = await this.awsProvider.validateCredentials(credentials as any);
+          return result.valid;
         case 'azure':
-          return this.azureProvider.validateCredentials(credentials);
+          result = await this.azureProvider.validateCredentials(credentials as any);
+          return result.valid;
         case 'gcp':
-          return this.gcpProvider.validateCredentials(credentials);
+          result = await this.gcpProvider.validateCredentials(credentials as any);
+          return result.valid;
         default:
           return false;
       }
