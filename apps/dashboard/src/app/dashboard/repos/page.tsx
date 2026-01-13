@@ -22,6 +22,7 @@ async function fetchBranches(repositoryId: string): Promise<any[]> {
 }
 
 async function fetchPullRequests(repositoryId: string): Promise<any[]> {
+  console.log('Fetching PRs for:', repositoryId);
   const res = await fetch(`${API_BASE}/scm/repositories/${repositoryId}/pulls?state=all&limit=100`, { credentials: 'include' });
   if (!res.ok) return []; // Return empty if endpoint not available yet
   const data = await res.json();
@@ -125,13 +126,14 @@ function transformBranches(apiBranches: any[], scans: any[], pulls: any[]): Bran
   // Create PR lookup by source branch (most recent merged PR for each source)
   const prBySourceBranch: Record<string, any> = {};
   pulls
-    .filter(pr => pr.status === 'merged')
+    .filter(pr => pr.state === 'merged')
     .sort((a, b) => new Date(b.mergedAt || b.updatedAt).getTime() - new Date(a.mergedAt || a.updatedAt).getTime())
     .forEach(pr => {
-      if (!prBySourceBranch[pr.sourceBranch]) {
-        prBySourceBranch[pr.sourceBranch] = pr;
+      if (!prBySourceBranch[pr.headBranch]) {
+        prBySourceBranch[pr.headBranch] = pr;
       }
     });
+  console.log('PR lookup:', prBySourceBranch);
 
   return apiBranches.map((b, index) => {
     const branchName = typeof b === 'string' ? b : b.name;
@@ -179,9 +181,10 @@ function transformBranches(apiBranches: any[], scans: any[], pulls: any[]): Bran
     let mergeType: 'pr' | 'direct' | 'bypass' | undefined;
     
     if (mergedPR) {
-      mergedTo = mergedPR.targetBranch;
+      mergedTo = mergedPR.baseBranch;
       mergeType = 'pr';
     }
+    console.log('Branch:', branchName, 'mergedTo:', mergedTo);
 
     return {
       id: branchName,
@@ -663,7 +666,8 @@ export default function RepoSecurityView() {
         fetchScans(currentProject.id, repoId),
         fetchFindings(currentProject.id, repoId),
       ]);
-      
+      console.log('PRs received:', pulls);
+
       const transformedBranches = transformBranches(branches, scans, pulls);
       const healthScore = calculateHealthScore(findings);
       

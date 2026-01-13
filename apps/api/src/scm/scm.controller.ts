@@ -199,6 +199,23 @@ export class ScmController {
     return { branches };
   }
 
+  @Get('repositories/:repositoryId/pulls')
+  @UseGuards(JwtAuthGuard)
+  async getPullRequests(
+    @CurrentUser() user: { tenantId: string },
+    @Param('repositoryId') repositoryId: string,
+    @Query('state') state: 'open' | 'closed' | 'merged' | 'all' = 'all',
+    @Query('limit') limit?: string,
+  ) {
+    const pulls = await this.scmService.getPullRequests(
+      user.tenantId,
+      repositoryId,
+      state,
+      limit ? parseInt(limit, 10) : 50,
+    );
+    return { pulls };
+  }
+
   @Get('repositories/:repositoryId/languages')
   @UseGuards(JwtAuthGuard)
   async getLanguages(

@@ -8,6 +8,7 @@ import {
   ScmCommit,
   ScmBranch,
   ScmLanguages,
+  ScmPullRequest,
   OAuthTokenResponse,
 } from './scm-provider.interface';
 
@@ -518,6 +519,33 @@ export class GitHubProvider implements ScmProvider {
     );
 
     return response;
+  }
+
+  async getPullRequests(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    state: 'open' | 'closed' | 'merged' | 'all' = 'all',
+    limit: number = 50,
+  ): Promise<ScmPullRequest[]> {
+    const ghState = state === 'merged' ? 'closed' : state === 'all' ? 'all' : state;
+    const perPage = Math.min(limit, 100);
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/pulls?state=${ghState}&per_page=${perPage}&sort=updated&direction=desc`,
+    );
+    return response
+      .filter((pr: any) => state !== 'merged' || pr.merged_at)
+      .slice(0, limit)
+      .map((pr: any) => ({
+        number: pr.number,
+        title: pr.title,
+        state: pr.merged_at ? 'merged' : pr.state,
+        htmlUrl: pr.html_url,
+        headSha: pr.head.sha,
+        baseBranch: pr.base.ref,
+        headBranch: pr.head.ref,
+      }));
   }
 
   getAuthenticatedCloneUrl(accessToken: string, cloneUrl: string): string {

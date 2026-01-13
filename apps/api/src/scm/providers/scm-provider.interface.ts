@@ -107,6 +107,15 @@ export interface ScmProvider {
     output?: { title: string; summary: string; text?: string },
   ): Promise<void>;
 
+  // Pull requests
+  getPullRequests(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    state?: 'open' | 'closed' | 'merged' | 'all',
+    limit?: number,
+  ): Promise<ScmPullRequest[]>;
+
   // Clone URL with auth
   getAuthenticatedCloneUrl(accessToken: string, cloneUrl: string): string;
 
