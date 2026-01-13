@@ -103,7 +103,12 @@
       "Bash(pm2 status:*)",
       "Bash(pm2 save:*)",
       "Bash(pm2 startup:*)",
-      "Bash(pm2-startup install:*)"
+      "Bash(pm2-startup install:*)",
+      "Bash(test:*)",
+      "Bash(pnpm --dir \"C:/Dev/threatdiviner-v0.2.0/apps/api\" start:dev)",
+      "Bash(pnpm --dir \"C:/Dev/threatdiviner-v0.2.0/apps/dashboard\" dev)",
+      "Bash(pnpm run start:dev:*)",
+      "Bash(pnpm run dev:*)"
     ]
   }
 }
