@@ -740,7 +740,6 @@ export class ScmService {
           select: {
             fullName: true,
             htmlUrl: true,
-            scanConfig: true,
           },
         },
         _count: {
@@ -778,23 +777,12 @@ export class ScmService {
         // Extract unique scanners that had findings
         const scannersWithFindings = scannerStats.map((s) => s.scanner).filter(Boolean);
 
-        // Use stored scanners from scan record, fallback to config-based for old scans
-        let enabledScanners = scan.scanners || [];
-        if (enabledScanners.length === 0) {
-          // Fallback for old scans without scanners field
-          const config = scan.repository?.scanConfig;
-          if (config?.enableSast) enabledScanners.push('semgrep');
-          if (config?.enableSca) enabledScanners.push('trivy');
-          if (config?.enableSecrets) enabledScanners.push('gitleaks');
-          if (config?.enableIac) enabledScanners.push('checkov');
-        }
-
         return {
           ...scan,
           findingsCount: stats.total,
           stats,
           scannersWithFindings,
-          enabledScanners: enabledScanners.length > 0 ? enabledScanners : ['semgrep', 'trivy', 'gitleaks'],
+          // scanners field is stored directly on scan record - no fallback for old scans
         };
       }),
     );

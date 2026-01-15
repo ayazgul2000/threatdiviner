@@ -74,25 +74,27 @@ function ScansTab({ scans, onScanClick }: { scans: any[]; onScanClick: (id: stri
 
   const getScannerIcons = (scan: any) => {
     const isRunning = scan.status === 'running' || scan.status === 'pending' || scan.status === 'queued';
-    // Use enabledScanners from config, fallback to scanners with findings
-    const enabledScanners = scan.enabledScanners || scan.scanners || [];
+    // Only use scanners stored directly on the scan record - don't infer from settings
+    const scanners = scan.scanners || [];
+
+    // If no scanners stored (old scan), show blank
+    if (scanners.length === 0) {
+      return <span className="text-xs text-gray-400">—</span>;
+    }
 
     return (
       <div className="flex items-center gap-1">
-        {enabledScanners.includes('semgrep') && (
+        {scanners.includes('semgrep') && (
           <FileCode className={`w-4 h-4 text-violet-600 ${isRunning ? 'animate-pulse' : ''}`} title="SAST (Semgrep)" />
         )}
-        {enabledScanners.includes('trivy') && (
+        {scanners.includes('trivy') && (
           <Package className={`w-4 h-4 text-orange-600 ${isRunning ? 'animate-pulse' : ''}`} title="SCA (Trivy)" />
         )}
-        {enabledScanners.includes('gitleaks') && (
+        {scanners.includes('gitleaks') && (
           <Key className={`w-4 h-4 text-rose-600 ${isRunning ? 'animate-pulse' : ''}`} title="Secrets (Gitleaks)" />
         )}
-        {enabledScanners.includes('checkov') && (
+        {scanners.includes('checkov') && (
           <Cloud className={`w-4 h-4 text-sky-600 ${isRunning ? 'animate-pulse' : ''}`} title="IaC (Checkov)" />
-        )}
-        {enabledScanners.length === 0 && (
-          <span className="text-xs text-gray-400">—</span>
         )}
       </div>
     );

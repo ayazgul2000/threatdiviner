@@ -137,10 +137,10 @@ function BranchCard({ branch, onClick }: { branch: Branch; onClick: () => void }
   const showAlert = !hasScan;
 
   return (
-    <div 
+    <div
       data-branch-id={branch.id}
       onClick={onClick}
-      className={`w-56 p-2.5 rounded-lg border shadow-sm bg-white cursor-pointer hover:border-indigo-300 transition-colors ${
+      className={`w-56 p-2.5 rounded-lg border shadow-sm bg-white cursor-pointer hover:border-indigo-300 transition-colors relative z-10 ${
         showAlert ? 'border-rose-200 bg-rose-50/30' : 'border-gray-200'
       }`}
     >
