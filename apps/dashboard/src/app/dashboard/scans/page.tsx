@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { Search, Calendar, X } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -29,9 +30,17 @@ type TriggerFilter = 'all' | 'push' | 'pull_request' | 'manual' | 'schedule';
 export default function ScansPage() {
   const { currentProject } = useProject();
   const [scans, setScans] = useState<Scan[]>([]);
+  const [repositories, setRepositories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [repoFilter, setRepoFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [triggerFilter, setTriggerFilter] = useState<TriggerFilter>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const toastCtx = useToast();
 
@@ -41,11 +50,18 @@ export default function ScansPage() {
       return;
     }
 
-    const fetchScans = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch(`${API_URL}/scm/scans?projectId=${currentProject.id}`, { credentials: 'include' });
-        const data = res.ok ? await res.json() : [];
-        setScans(Array.isArray(data) ? data : []);
+        const [scansRes, reposRes] = await Promise.all([
+          fetch(`${API_URL}/scm/scans?projectId=${currentProject.id}`, { credentials: 'include' }),
+          fetch(`${API_URL}/scm/repositories?projectId=${currentProject.id}`, { credentials: 'include' }),
+        ]);
+        
+        const scansData = scansRes.ok ? await scansRes.json() : [];
+        const reposData = reposRes.ok ? await reposRes.json() : [];
+        
+        setScans(Array.isArray(scansData) ? scansData : scansData.scans || []);
+        setRepositories(Array.isArray(reposData) ? reposData : reposData.repositories || []);
       } catch (err) {
         toastCtx.error('Error', 'Failed to load scans');
       } finally {
@@ -53,18 +69,76 @@ export default function ScansPage() {
       }
     };
 
-    fetchScans();
+    fetchData();
 
     // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchScans, 30000);
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [currentProject]);
 
-  const filteredScans = scans.filter(scan => {
-    if (statusFilter !== 'all' && scan.status !== statusFilter) return false;
-    if (triggerFilter !== 'all' && scan.trigger !== triggerFilter) return false;
-    return true;
-  });
+  // Get unique branches from scans
+  const availableBranches = useMemo(() => {
+    const branches = new Set(scans.map(s => s.branch || 'main'));
+    return Array.from(branches).sort();
+  }, [scans]);
+
+  // Filter scans
+  const filteredScans = useMemo(() => {
+    return scans.filter(scan => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const repoName = (scan.repository?.fullName || '').toLowerCase();
+        const branch = (scan.branch || '').toLowerCase();
+        const commit = (scan.commitSha || '').toLowerCase();
+        if (!repoName.includes(query) && !branch.includes(query) && !commit.includes(query)) {
+          return false;
+        }
+      }
+      
+      // Repo filter
+      if (repoFilter !== 'all' && scan.repositoryId !== repoFilter) return false;
+      
+      // Branch filter
+      if (branchFilter !== 'all' && (scan.branch || 'main') !== branchFilter) return false;
+      
+      // Status filter
+      if (statusFilter !== 'all' && scan.status !== statusFilter) return false;
+      
+      // Trigger filter
+      if (triggerFilter !== 'all') {
+        const scanTrigger = (scan.trigger || scan.triggerEvent || '').toLowerCase();
+        if (scanTrigger !== triggerFilter) return false;
+      }
+      
+      // Date filter
+      if (dateFrom) {
+        const scanDate = new Date(scan.startedAt || scan.createdAt);
+        if (scanDate < new Date(dateFrom)) return false;
+      }
+      if (dateTo) {
+        const scanDate = new Date(scan.startedAt || scan.createdAt);
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59);
+        if (scanDate > toDate) return false;
+      }
+      
+      return true;
+    });
+  }, [scans, searchQuery, repoFilter, branchFilter, statusFilter, triggerFilter, dateFrom, dateTo]);
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setRepoFilter('all');
+    setBranchFilter('all');
+    setStatusFilter('all');
+    setTriggerFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const hasActiveFilters = searchQuery || repoFilter !== 'all' || branchFilter !== 'all' || 
+    statusFilter !== 'all' || triggerFilter !== 'all' || dateFrom || dateTo;
 
   const formatDuration = (ms: number | null) => {
     if (!ms) return '-';
@@ -104,18 +178,6 @@ export default function ScansPage() {
     }
   };
 
-  const getStatusCounts = () => {
-    return {
-      all: scans.length,
-      pending: scans.filter(s => s.status === 'pending').length,
-      running: scans.filter(s => s.status === 'running').length,
-      completed: scans.filter(s => s.status === 'completed').length,
-      failed: scans.filter(s => s.status === 'failed').length,
-    };
-  };
-
-  const statusCounts = getStatusCounts();
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -154,54 +216,106 @@ export default function ScansPage() {
     <div className="space-y-6">
       <PageHeader
         title="Scans"
-        description="View and monitor security scan runs across all repositories"
+        description={`${filteredScans.length} of ${scans.length} scans`}
         breadcrumbs={[{ label: 'Scans' }]}
       />
 
-      {/* Status Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {(['all', 'running', 'pending', 'completed', 'failed'] as StatusFilter[]).map((status) => (
-          <button
-            key={status}
-            onClick={() => setStatusFilter(status)}
-            className={`p-4 rounded-lg border transition-all ${
-              statusFilter === status
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300'
-            }`}
-          >
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {statusCounts[status]}
-            </div>
-            <div className="text-sm text-gray-500 capitalize">{status === 'all' ? 'Total' : status}</div>
-          </button>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">Trigger:</span>
-          <div className="flex gap-1">
-            {(['all', 'push', 'pull_request', 'manual', 'schedule'] as TriggerFilter[]).map((trigger) => (
-              <button
-                key={trigger}
-                onClick={() => setTriggerFilter(trigger)}
-                className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                  triggerFilter === trigger
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                {trigger === 'all' ? 'All' : trigger === 'pull_request' ? 'PR' : trigger.charAt(0).toUpperCase() + trigger.slice(1)}
-              </button>
-            ))}
+      {/* Filters Bar */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search repo, branch, commit..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+            />
           </div>
+
+          {/* Repository */}
+          <select
+            value={repoFilter}
+            onChange={(e) => setRepoFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="all">All Repositories</option>
+            {repositories.map(repo => (
+              <option key={repo.id} value={repo.id}>{repo.fullName || repo.name}</option>
+            ))}
+          </select>
+
+          {/* Branch */}
+          <select
+            value={branchFilter}
+            onChange={(e) => setBranchFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="all">All Branches</option>
+            {availableBranches.map(branch => (
+              <option key={branch} value={branch}>{branch}</option>
+            ))}
+          </select>
+
+          {/* Status */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="all">All Status</option>
+            <option value="running">Running</option>
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+          </select>
+
+          {/* Trigger */}
+          <select
+            value={triggerFilter}
+            onChange={(e) => setTriggerFilter(e.target.value as TriggerFilter)}
+            className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="all">All Triggers</option>
+            <option value="push">Push</option>
+            <option value="pull_request">PR</option>
+            <option value="manual">Manual</option>
+            <option value="schedule">Schedule</option>
+          </select>
+
+          {/* Date From */}
+          <div className="flex items-center gap-1">
+            <Calendar className="w-4 h-4 text-gray-400" />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-2 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+              placeholder="From"
+            />
+            <span className="text-gray-400">-</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-2 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+              placeholder="To"
+            />
+          </div>
+
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+            >
+              <X className="w-4 h-4" />
+              Clear
+            </button>
+          )}
         </div>
-        <div className="flex-1" />
-        <span className="text-sm text-gray-500">
-          Showing {filteredScans.length} of {scans.length} scans
-        </span>
       </div>
 
       {/* Scans Table */}
@@ -255,9 +369,9 @@ export default function ScansPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
-                          {scan.trigger && getTriggerIcon(scan.trigger)}
+                          {getTriggerIcon(scan.trigger || scan.triggerEvent || 'manual')}
                           <span className="capitalize text-sm">
-                            {scan.trigger === 'pull_request' ? 'PR' : scan.trigger || 'manual'}
+                            {(scan.trigger || scan.triggerEvent || 'manual') === 'pull_request' ? 'PR' : (scan.trigger || scan.triggerEvent || 'manual')}
                           </span>
                         </div>
                       </TableCell>

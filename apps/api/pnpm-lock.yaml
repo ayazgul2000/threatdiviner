@@ -56,6 +56,9 @@ importers:
       '@types/pdfkit':
         specifier: ^0.17.4
         version: 0.17.4
+      adm-zip:
+        specifier: ^0.5.16
+        version: 0.5.16
       axios:
         specifier: ^1.6.0
         version: 1.13.2
@@ -132,6 +135,9 @@ importers:
       '@nestjs/testing':
         specifier: ^10.4.0
         version: 10.4.20(@nestjs/common@10.4.20(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.20)(@nestjs/platform-express@10.4.20)
+      '@types/adm-zip':
+        specifier: ^0.5.7
+        version: 0.5.7
       '@types/bcrypt':
         specifier: ^6.0.0
         version: 6.0.0
@@ -1189,6 +1195,9 @@ packages:
   '@tsconfig/node16@1.0.4':
     resolution: {integrity: sha512-vxhUy4J8lyeyinH7Azl1pdd43GJhZH/tP2weN8TntQblOY+A0XbT8DJk1/oCPuOOyg/Ja757rG0CgHcWC8OfMA==}
 
+  '@types/adm-zip@0.5.7':
+    resolution: {integrity: sha512-DNEs/QvmyRLurdQPChqq0Md4zGvPwHerAJYWk9l2jCbD1VPpnzRJorOdiq4zsw09NFbYnhfsoEhWtxIzXpn2yw==}
+
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
 
@@ -1469,6 +1478,10 @@ packages:
     resolution: {integrity: sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg==}
     engines: {node: '>=0.4.0'}
     hasBin: true
+
+  adm-zip@0.5.16:
+    resolution: {integrity: sha512-TGw5yVi4saajsSEgz25grObGHEUaDrniwvA2qwSC060KfqGPdglhvPMA2lPIoxs3PQIItj2iag35fONcQqgUaQ==}
+    engines: {node: '>=12.0'}
 
   ajv-formats@2.1.1:
     resolution: {integrity: sha512-Wx0Kx52hxE7C18hkMEggYlEifqWZtYaRgouJor+WMdPnQyEK13vgEWyVNup7SoeeoLMsr4kf5h6dOW11I15MUA==}
@@ -5713,6 +5726,10 @@ snapshots:
 
   '@tsconfig/node16@1.0.4': {}
 
+  '@types/adm-zip@0.5.7':
+    dependencies:
+      '@types/node': 20.19.27
+
   '@types/babel__core@7.20.5':
     dependencies:
       '@babel/parser': 7.28.5
@@ -6082,6 +6099,8 @@ snapshots:
       acorn: 8.15.0
 
   acorn@8.15.0: {}
+
+  adm-zip@0.5.16: {}
 
   ajv-formats@2.1.1(ajv@8.12.0):
     optionalDependencies:

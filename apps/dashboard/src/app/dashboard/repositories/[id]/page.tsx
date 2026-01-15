@@ -163,7 +163,7 @@ export default function RepositoryDetailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ repositoryId: id }),
+        body: JSON.stringify({ repositoryId: id, branch: repository?.defaultBranch }),
       });
 
       if (!res.ok) {
@@ -354,7 +354,7 @@ export default function RepositoryDetailPage() {
                 View Source
               </Button>
             </a>
-            <Link href={`/dashboard/repositories/${id}/settings`}>
+            <Link href={`/dashboard/repos/${id}/settings`}>
               <Button variant="outline">
                 <svg
                   className="w-4 h-4 mr-2"

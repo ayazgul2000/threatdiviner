@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useProject } from '@/contexts/project-context';
 import {
   Button,
@@ -32,7 +33,10 @@ type StatusFilter = '' | 'open' | 'fixed' | 'ignored' | 'false_positive';
 
 export default function FindingsPage() {
   const { currentProject } = useProject();
+  const searchParams = useSearchParams();
+  const scanIdParam = searchParams.get('scanId');
   const [findings, setFindings] = useState<Finding[]>([]);
+  const [scanInfo, setScanInfo] = useState<{ repoName: string; branch: string; repoId: string; openCount: number; closedCount: number } | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
@@ -58,6 +62,13 @@ export default function FindingsPage() {
     return Array.from(scanners).sort();
   }, [findings]);
 
+  // Calculate open/closed counts
+  const findingCounts = useMemo(() => {
+    const open = findings.filter(f => f.status === 'open').length;
+    const closed = findings.filter(f => ['fixed', 'ignored', 'false_positive'].includes(f.status)).length;
+    return { open, closed, total: findings.length };
+  }, [findings]);
+
   // Check if AI triage is available
   useEffect(() => {
     aiApi.getStatus()
@@ -75,11 +86,43 @@ export default function FindingsPage() {
       const filterParams: Record<string, string> = {};
       if (filters.severity) filterParams.severity = filters.severity;
       if (filters.status) filterParams.status = filters.status;
+      if (scanIdParam) filterParams.scanId = scanIdParam;
 
       const data = await findingsApi.list({ ...filterParams, projectId: currentProject.id });
       setFindings(data.findings || []);
       setTotal(data.total || 0);
       setSelectedIds(new Set());
+
+      // Fetch scan info if filtering by scanId (only on first load, not on filter changes)
+      if (scanIdParam && !scanInfo) {
+        try {
+          const scanRes = await fetch(`${API_URL}/scm/scans/${scanIdParam}`, { credentials: 'include' });
+          if (scanRes.ok) {
+            const scanData = await scanRes.json();
+            const scan = scanData.scan || scanData;
+            if (scan.repositoryId) {
+              const repoRes = await fetch(`${API_URL}/scm/repositories/${scan.repositoryId}`, { credentials: 'include' });
+              if (repoRes.ok) {
+                const repoData = await repoRes.json();
+                const repo = repoData.repository || repoData;
+                // Calculate total open/closed from all findings for this scan
+                const allFindings = data.findings || [];
+                const openCount = allFindings.filter((f: Finding) => f.status === 'open').length;
+                const closedCount = allFindings.filter((f: Finding) => ['fixed', 'ignored', 'false_positive'].includes(f.status)).length;
+                setScanInfo({
+                  repoName: repo.fullName || repo.name,
+                  branch: scan.branch || 'main',
+                  repoId: scan.repositoryId,
+                  openCount,
+                  closedCount,
+                });
+              }
+            }
+          }
+        } catch (e) { /* ignore */ }
+      } else if (!scanIdParam) {
+        setScanInfo(null);
+      }
     } catch (err) {
       toastCtx.error('Error', 'Failed to load findings');
     } finally {
@@ -89,7 +132,7 @@ export default function FindingsPage() {
 
   useEffect(() => {
     fetchFindings();
-  }, [filters.severity, filters.status, currentProject]);
+  }, [filters.severity, filters.status, currentProject, scanIdParam]);
 
   // Filter by scanner client-side (API doesn't support it)
   const filteredFindings = useMemo(() => {
@@ -99,12 +142,33 @@ export default function FindingsPage() {
 
   const handleStatusChange = async (findingId: string, status: Finding['status']) => {
     try {
+      const oldFinding = findings.find(f => f.id === findingId);
       await findingsApi.updateStatus(findingId, status);
       setFindings(findings.map(f =>
         f.id === findingId ? { ...f, status } : f
       ));
       if (selectedFinding?.id === findingId) {
         setSelectedFinding({ ...selectedFinding, status });
+      }
+      // Update scanInfo counts when status changes
+      if (scanInfo && oldFinding) {
+        const wasOpen = oldFinding.status === 'open';
+        const wasClosed = ['fixed', 'ignored', 'false_positive'].includes(oldFinding.status);
+        const isNowOpen = status === 'open';
+        const isNowClosed = ['fixed', 'ignored', 'false_positive'].includes(status);
+
+        let newOpenCount = scanInfo.openCount;
+        let newClosedCount = scanInfo.closedCount;
+
+        if (wasOpen && isNowClosed) {
+          newOpenCount--;
+          newClosedCount++;
+        } else if (wasClosed && isNowOpen) {
+          newOpenCount++;
+          newClosedCount--;
+        }
+
+        setScanInfo({ ...scanInfo, openCount: newOpenCount, closedCount: newClosedCount });
       }
       toastCtx.success('Status Updated', `Finding marked as ${status.replace('_', ' ')}`);
     } catch (err) {
@@ -116,6 +180,19 @@ export default function FindingsPage() {
     if (selectedIds.size === 0) return;
 
     try {
+      // Calculate count changes before update
+      let openDelta = 0;
+      let closedDelta = 0;
+      const isNowOpen = status === 'open';
+      const isNowClosed = ['fixed', 'ignored', 'false_positive'].includes(status);
+
+      findings.filter(f => selectedIds.has(f.id)).forEach(f => {
+        const wasOpen = f.status === 'open';
+        const wasClosed = ['fixed', 'ignored', 'false_positive'].includes(f.status);
+        if (wasOpen && isNowClosed) { openDelta--; closedDelta++; }
+        else if (wasClosed && isNowOpen) { openDelta++; closedDelta--; }
+      });
+
       const promises = Array.from(selectedIds).map(id =>
         findingsApi.updateStatus(id, status)
       );
@@ -125,6 +202,16 @@ export default function FindingsPage() {
         selectedIds.has(f.id) ? { ...f, status } : f
       ));
       setSelectedIds(new Set());
+
+      // Update scanInfo counts
+      if (scanInfo) {
+        setScanInfo({
+          ...scanInfo,
+          openCount: scanInfo.openCount + openDelta,
+          closedCount: scanInfo.closedCount + closedDelta,
+        });
+      }
+
       toastCtx.success('Bulk Update Complete', `${promises.length} findings marked as ${status.replace('_', ' ')}`);
     } catch (err) {
       toastCtx.error('Error', 'Some updates failed');
@@ -280,11 +367,27 @@ export default function FindingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Findings"
-        description={`${total} security findings across all repositories`}
-        breadcrumbs={[{ label: 'Findings' }]}
-      />
+      <div className="flex items-center gap-4">
+        {scanInfo && (
+          <Link
+            href={`/dashboard/repos/${scanInfo.repoId}/branch/${encodeURIComponent(scanInfo.branch)}`}
+            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </Link>
+        )}
+        <PageHeader
+          title={scanInfo ? `Findings for ${scanInfo.repoName}` : 'Findings'}
+          description={
+            scanInfo
+              ? `Branch: ${scanInfo.branch} • ${scanInfo.openCount} open, ${scanInfo.closedCount} resolved`
+              : `${findingCounts.open} open, ${findingCounts.closed} resolved of ${findingCounts.total} total`
+          }
+          breadcrumbs={[{ label: 'Findings' }]}
+        />
+      </div>
 
       {/* Severity Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -523,22 +626,142 @@ export default function FindingsPage() {
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rule ID</h4>
                     <code className="text-sm" title={selectedFinding.ruleId}>{getShortRuleId(selectedFinding.ruleId)}</code>
                   </div>
-                  {selectedFinding.cwe?.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CWE</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedFinding.cwe.map((cwe) => (
-                          <Badge key={cwe} variant="info" size="sm">{cwe}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CWE</h4>
+                    {selectedFinding.cwe?.[0] ? (
+                      <a
+                        href={`https://cwe.mitre.org/data/definitions/${selectedFinding.cwe[0].replace(/\D/g, '')}.html`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-md text-sm font-medium hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                      >
+                        CWE-{selectedFinding.cwe[0].replace(/\D/g, '')}
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    ) : (
+                      <span className="text-gray-400 text-sm">Unknown</span>
+                    )}
+                  </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</h4>
                     <Badge variant={getStatusColor(selectedFinding.status)}>
                       {selectedFinding.status.replace('_', ' ')}
                     </Badge>
                   </div>
+                </div>
+
+                {/* Attack & Defense Chain - from stored enrichment data */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Attack & Defense Chain</h4>
+
+                  {!selectedFinding.enrichedAt && !selectedFinding.cwe?.length && (
+                    <p className="text-sm text-gray-500">No CWE classification available for this finding</p>
+                  )}
+
+                  {!selectedFinding.enrichedAt && selectedFinding.cwe?.length > 0 && (
+                    <p className="text-sm text-gray-500">Finding not yet enriched. Run a new scan to populate enrichment data.</p>
+                  )}
+
+                  {selectedFinding.enrichedAt && (
+                    <>
+                      <div className="grid grid-cols-3 gap-3">
+                        {/* CAPEC - Attack Pattern */}
+                        {selectedFinding.cweData?.capecIds?.[0] ? (
+                          <a
+                            href={`https://capec.mitre.org/data/definitions/${selectedFinding.cweData.capecIds[0].replace('CAPEC-', '')}.html`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">{selectedFinding.cweData.capecIds[0]}</span>
+                              <svg className="w-3 h-3 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </div>
+                            <p className="text-xs text-rose-700 dark:text-rose-300 font-medium">Attack Pattern</p>
+                            <p className="text-xs text-rose-500 dark:text-rose-400 mt-1">CAPEC</p>
+                          </a>
+                        ) : (
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <p className="text-xs text-gray-500">No CAPEC mapping</p>
+                          </div>
+                        )}
+
+                        {/* ATT&CK - Technique */}
+                        {selectedFinding.attackTechniques?.[0] ? (
+                          <a
+                            href={`https://attack.mitre.org/techniques/${selectedFinding.attackTechniques[0].id.replace('.', '/')}/`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{selectedFinding.attackTechniques[0].id}</span>
+                              <svg className="w-3 h-3 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </div>
+                            <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">{selectedFinding.attackTechniques[0].name}</p>
+                            <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">ATT&CK Technique</p>
+                          </a>
+                        ) : (
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <p className="text-xs text-gray-500">No ATT&CK mapping</p>
+                          </div>
+                        )}
+
+                        {/* OWASP Category */}
+                        {selectedFinding.owaspCategory ? (
+                          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{selectedFinding.owaspCategory}</span>
+                            </div>
+                            <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-1">OWASP Top 10</p>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <p className="text-xs text-gray-500">No OWASP mapping</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* CWE Description */}
+                      {selectedFinding.cweData?.description && (
+                        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <svg className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div>
+                              <h5 className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">{selectedFinding.cweData.name}</h5>
+                              <p className="text-xs text-blue-600 dark:text-blue-400 line-clamp-3">{selectedFinding.cweData.description}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Compliance Badges */}
+                      {selectedFinding.complianceControls && selectedFinding.complianceControls.length > 0 && (
+                        <div className="mt-3">
+                          <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Compliance Mapping</h5>
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedFinding.complianceControls.map((mapping) => (
+                              <span
+                                key={`${mapping.frameworkId}-${mapping.controlId}`}
+                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                title={mapping.controlName}
+                              >
+                                {mapping.frameworkId}: {mapping.controlId}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 {/* AI Triage Section */}
@@ -633,3 +856,7 @@ export default function FindingsPage() {
     </div>
   );
 }
+
+
+
+

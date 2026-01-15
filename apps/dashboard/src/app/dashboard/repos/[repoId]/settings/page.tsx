@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Card,
@@ -53,7 +53,10 @@ const TIMEZONES = [
 export default function RepositorySettingsPage() {
   const params = useParams();
   const router = useRouter();
-  const repositoryId = params.id as string;
+  const searchParams = useSearchParams();
+  const repoId = params.repoId as string;
+  const fromBranch = searchParams.get('from') === 'branch';
+  const branchId = searchParams.get('branchId');
 
   const [repository, setRepository] = useState<Repository | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +70,9 @@ export default function RepositorySettingsPage() {
   // Schedule configuration
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('daily');
+  const [scheduleTime, setScheduleTime] = useState('00:00');
+  const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState('0'); // 0 = Sunday
+  const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState('1');
   const [customCron, setCustomCron] = useState('0 0 * * *');
   const [timezone, setTimezone] = useState('UTC');
 
@@ -87,7 +93,7 @@ export default function RepositorySettingsPage() {
   useEffect(() => {
     const fetchRepository = async () => {
       try {
-        const repo = await repositoriesApi.get(repositoryId);
+        const repo = await repositoriesApi.get(repoId);
         setRepository(repo);
 
         // Load existing scan config if available
@@ -113,7 +119,7 @@ export default function RepositorySettingsPage() {
     };
 
     fetchRepository();
-  }, [repositoryId]);
+  }, [repoId]);
 
   const handleToggleScanner = (scannerId: string) => {
     setScanners(scanners.map(s =>
@@ -143,15 +149,16 @@ export default function RepositorySettingsPage() {
       // Determine schedule pattern
       let schedulePattern: string | null = null;
       if (scheduleEnabled) {
+        const [hour, minute] = scheduleTime.split(':').map(Number);
         switch (scheduleFrequency) {
           case 'daily':
-            schedulePattern = '0 0 * * *';
+            schedulePattern = `${minute} ${hour} * * *`;
             break;
           case 'weekly':
-            schedulePattern = '0 0 * * 0';
+            schedulePattern = `${minute} ${hour} * * ${scheduleDayOfWeek}`;
             break;
           case 'monthly':
-            schedulePattern = '0 0 1 * *';
+            schedulePattern = `${minute} ${hour} ${scheduleDayOfMonth} * *`;
             break;
           case 'custom':
             schedulePattern = customCron;
@@ -159,7 +166,7 @@ export default function RepositorySettingsPage() {
         }
       }
 
-      await repositoriesApi.updateConfig(repositoryId, {
+      await repositoriesApi.updateConfig(repoId, {
         enabled: true,
         scanOnPush: true,
         scanOnPr: prSettings.inlineComments,
@@ -169,9 +176,13 @@ export default function RepositorySettingsPage() {
       });
 
       setSuccess('Settings saved successfully');
-      // Navigate back to repository page after short delay
+      // Navigate back to the page we came from after short delay
       setTimeout(() => {
-        router.push(`/dashboard/repos/${repositoryId}`);
+        if (fromBranch && branchId) {
+          router.push(`/dashboard/repos/${repoId}/branch/${branchId}`);
+        } else {
+          router.push(`/dashboard/repos/${repoId}`);
+        }
       }, 1000);
     } catch (err) {
       console.error('Failed to save settings:', err);
@@ -209,7 +220,7 @@ export default function RepositorySettingsPage() {
         <div>
           <div className="flex items-center gap-3">
             <Link
-              href={`/dashboard/repos/${repositoryId}`}
+              href={fromBranch && branchId ? `/dashboard/repos/${repoId}/branch/${branchId}` : `/dashboard/repos/${repoId}`}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -337,6 +348,59 @@ export default function RepositorySettingsPage() {
                   </select>
                 </div>
 
+                {scheduleFrequency !== 'custom' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Time
+                    </label>
+                    <input
+                      type="time"
+                      value={scheduleTime}
+                      onChange={(e) => setScheduleTime(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {scheduleFrequency === 'weekly' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Day of Week
+                    </label>
+                    <select
+                      value={scheduleDayOfWeek}
+                      onChange={(e) => setScheduleDayOfWeek(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    >
+                      <option value="0">Sunday</option>
+                      <option value="1">Monday</option>
+                      <option value="2">Tuesday</option>
+                      <option value="3">Wednesday</option>
+                      <option value="4">Thursday</option>
+                      <option value="5">Friday</option>
+                      <option value="6">Saturday</option>
+                    </select>
+                  </div>
+                )}
+
+                {scheduleFrequency === 'monthly' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Day of Month
+                    </label>
+                    <select
+                      value={scheduleDayOfMonth}
+                      onChange={(e) => setScheduleDayOfMonth(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    >
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                        <option key={day} value={day.toString()}>{day}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Days 1-28 to ensure consistency across months</p>
+                  </div>
+                )}
+
                 {scheduleFrequency === 'custom' && (
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -358,56 +422,58 @@ export default function RepositorySettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Branch Configuration */}
-      <Card variant="bordered">
-        <CardHeader>
-          <CardTitle>Branch Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">Default Branch</p>
-              <code className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded text-sm">
-                {repository.defaultBranch}
-              </code>
-            </div>
+      {/* Branch Configuration - only show for repo settings, not branch settings */}
+      {!fromBranch && (
+        <Card variant="bordered">
+          <CardHeader>
+            <CardTitle>Branch Configuration</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">Default Branch</p>
+                <code className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded text-sm">
+                  {repository.defaultBranch}
+                </code>
+              </div>
 
-            <div>
-              <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">Auto-scan Branches</p>
-              <p className="text-xs text-gray-500 mb-2">Automatically scan these branches on push</p>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {autoScanBranches.map((branch) => (
-                  <span
-                    key={branch}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm"
-                  >
-                    {branch}
-                    <button
-                      onClick={() => handleRemoveBranch(branch)}
-                      className="text-gray-400 hover:text-red-500"
+              <div>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">Auto-scan Branches</p>
+                <p className="text-xs text-gray-500 mb-2">Automatically scan these branches on push</p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {autoScanBranches.map((branch) => (
+                    <span
+                      key={branch}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newBranch}
-                  onChange={(e) => setNewBranch(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddBranch()}
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                  placeholder="Add branch name"
-                />
-                <Button variant="outline" onClick={handleAddBranch}>Add</Button>
+                      {branch}
+                      <button
+                        onClick={() => handleRemoveBranch(branch)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newBranch}
+                    onChange={(e) => setNewBranch(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddBranch()}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    placeholder="Add branch name"
+                  />
+                  <Button variant="outline" onClick={handleAddBranch}>Add</Button>
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* AI Triage */}
       <Card variant="bordered">
@@ -433,54 +499,56 @@ export default function RepositorySettingsPage() {
         </CardContent>
       </Card>
 
-      {/* PR Settings */}
-      <Card variant="bordered">
-        <CardHeader>
-          <CardTitle>Pull Request Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prSettings.inlineComments}
-                onChange={(e) => setPrSettings({ ...prSettings, inlineComments: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Post inline comments on PRs</span>
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prSettings.diffOnlyMode}
-                onChange={(e) => setPrSettings({ ...prSettings, diffOnlyMode: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Diff-only mode (only scan changed lines)</span>
-            </label>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Block PR on Severity
+      {/* PR Settings - only show for repo settings, not branch settings */}
+      {!fromBranch && (
+        <Card variant="bordered">
+          <CardHeader>
+            <CardTitle>Pull Request Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={prSettings.inlineComments}
+                  onChange={(e) => setPrSettings({ ...prSettings, inlineComments: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Post inline comments on PRs</span>
               </label>
-              <select
-                value={prSettings.blockOnSeverity}
-                onChange={(e) => setPrSettings({ ...prSettings, blockOnSeverity: e.target.value as typeof prSettings.blockOnSeverity })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="none">None (Do not block)</option>
-                <option value="critical">Critical only</option>
-                <option value="high">High and above</option>
-                <option value="medium">Medium and above</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Prevent PR merge if findings of this severity or higher are detected
-              </p>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={prSettings.diffOnlyMode}
+                  onChange={(e) => setPrSettings({ ...prSettings, diffOnlyMode: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Diff-only mode (only scan changed lines)</span>
+              </label>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Block PR on Severity
+                </label>
+                <select
+                  value={prSettings.blockOnSeverity}
+                  onChange={(e) => setPrSettings({ ...prSettings, blockOnSeverity: e.target.value as typeof prSettings.blockOnSeverity })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="none">None (Do not block)</option>
+                  <option value="critical">Critical only</option>
+                  <option value="high">High and above</option>
+                  <option value="medium">Medium and above</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Prevent PR merge if findings of this severity or higher are detected
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Save Button */}
       <div className="flex justify-end">

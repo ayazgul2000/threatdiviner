@@ -664,6 +664,7 @@ export class ScmService {
           select: {
             fullName: true,
             htmlUrl: true,
+            scanConfig: true,
           },
         },
         findings: {
@@ -676,7 +677,47 @@ export class ScmService {
       throw new NotFoundException('Scan not found');
     }
 
-    return scan;
+    // Count findings by scanner type
+    const scannerCounts = await this.prisma.finding.groupBy({
+      by: ['scanner'],
+      where: { scanId },
+      _count: { id: true },
+    });
+
+    const findingsCount: Record<string, number> = {
+      sast: 0,
+      sca: 0,
+      secrets: 0,
+      iac: 0,
+      dast: 0,
+    };
+
+    for (const item of scannerCounts) {
+      const scanner = item.scanner.toLowerCase();
+      if (scanner === 'semgrep' || scanner === 'bandit' || scanner === 'gosec') {
+        findingsCount.sast += item._count.id;
+      } else if (scanner === 'trivy') {
+        findingsCount.sca += item._count.id;
+      } else if (scanner === 'gitleaks') {
+        findingsCount.secrets += item._count.id;
+      } else if (scanner === 'checkov') {
+        findingsCount.iac += item._count.id;
+      } else if (scanner === 'nuclei') {
+        findingsCount.dast += item._count.id;
+      }
+    }
+
+    // Flatten scanConfig for easier frontend access
+    const scanConfig = scan.repository?.scanConfig;
+    return {
+      ...scan,
+      sastEnabled: scanConfig?.enableSast ?? true,
+      scaEnabled: scanConfig?.enableSca ?? true,
+      secretsEnabled: scanConfig?.enableSecrets ?? true,
+      iacEnabled: scanConfig?.enableIac ?? true,
+      dastEnabled: scanConfig?.enableDast ?? false,
+      findingsCount,
+    };
   }
 
   async listScans(tenantId: string, repositoryId?: string, limit = 50, projectId?: string) {
@@ -774,7 +815,10 @@ export class ScmService {
       this.prisma.finding.count({ where }),
     ]);
 
-    return { findings, total };
+    // Transform findings to match frontend expected format
+    const transformedFindings = findings.map((f) => this.transformFinding(f));
+
+    return { findings: transformedFindings, total };
   }
 
   async getFinding(tenantId: string, findingId: string) {
@@ -797,7 +841,25 @@ export class ScmService {
       throw new NotFoundException('Finding not found');
     }
 
-    return finding;
+    return this.transformFinding(finding);
+  }
+
+  /**
+   * Transform finding from DB format to API response format
+   * Maps cweId/owasp (strings) to cwe/owasp (arrays) for frontend compatibility
+   */
+  private transformFinding(finding: any) {
+    const { cweId, owasp, cveId, ...rest } = finding;
+    return {
+      ...rest,
+      cwe: cweId ? [cweId] : [],
+      cve: cveId ? [cveId] : [],
+      owaspIds: owasp ? [owasp] : [],
+      // Keep originals for backward compatibility
+      cweId,
+      cveId,
+      owasp,
+    };
   }
 
   async updateFindingStatus(tenantId: string, findingId: string, status: string) {

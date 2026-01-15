@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { GitBranch, AlertTriangle, ChevronRight, ChevronDown, GitMerge, Shield, Star, FileCode, Package, Key, Cloud, GitPullRequest, Upload, AlertOctagon, ScanSearch, CheckCircle2, X, User, Clock, GitCommit, CheckCircle, XCircle, MessageSquare, Loader2, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { GitBranch, AlertTriangle, ChevronRight, ChevronDown, GitMerge, Shield, Star, FileCode, Package, Key, Cloud, GitPullRequest, Upload, AlertOctagon, ScanSearch, CheckCircle2, X, User, Clock, GitCommit, CheckCircle, XCircle, Loader2, RefreshCw, LayoutGrid, List, ExternalLink, Calendar, Activity } from 'lucide-react';
 import { useProject } from '@/contexts/project-context';
 
 // ============ API FUNCTIONS ============
@@ -22,9 +23,8 @@ async function fetchBranches(repositoryId: string): Promise<any[]> {
 }
 
 async function fetchPullRequests(repositoryId: string): Promise<any[]> {
-  console.log('Fetching PRs for:', repositoryId);
   const res = await fetch(`${API_BASE}/scm/repositories/${repositoryId}/pulls?state=all&limit=100`, { credentials: 'include' });
-  if (!res.ok) return []; // Return empty if endpoint not available yet
+  if (!res.ok) return [];
   const data = await res.json();
   return data.pulls || data || [];
 }
@@ -111,11 +111,14 @@ interface Repo {
   findings: Finding;
   branches: Branch[];
   isLoading?: boolean;
+  lastScan?: string;
+  branchCount?: number;
+  provider?: string;
+  url?: string;
 }
 
 // ============ HELPER: Transform API data to UI format ============
 function transformBranches(apiBranches: any[], scans: any[], pulls: any[]): Branch[] {
-  // Create scan lookup by branch
   const scansByBranch: Record<string, any[]> = {};
   scans.forEach(scan => {
     const branch = scan.branch || 'main';
@@ -123,17 +126,16 @@ function transformBranches(apiBranches: any[], scans: any[], pulls: any[]): Bran
     scansByBranch[branch].push(scan);
   });
 
-  // Create PR lookup by source branch (most recent merged PR for each source)
   const prBySourceBranch: Record<string, any> = {};
   pulls
     .filter(pr => pr.state === 'merged')
     .sort((a, b) => new Date(b.mergedAt || b.updatedAt).getTime() - new Date(a.mergedAt || a.updatedAt).getTime())
     .forEach(pr => {
-      if (!prBySourceBranch[pr.headBranch]) {
-        prBySourceBranch[pr.headBranch] = pr;
+      const sourceBranch = pr.headBranch || pr.sourceBranch;
+      if (sourceBranch && !prBySourceBranch[sourceBranch]) {
+        prBySourceBranch[sourceBranch] = pr;
       }
     });
-  console.log('PR lookup:', prBySourceBranch);
 
   return apiBranches.map((b, index) => {
     const branchName = typeof b === 'string' ? b : b.name;
@@ -141,7 +143,6 @@ function transformBranches(apiBranches: any[], scans: any[], pulls: any[]): Bran
     const latestScan = branchScans[0];
     const mergedPR = prBySourceBranch[branchName];
     
-    // Determine scan types from latest scan
     const scanTypes: string[] = [];
     if (latestScan) {
       if (latestScan.sastEnabled || latestScan.scanners?.includes('semgrep')) scanTypes.push('sast');
@@ -157,34 +158,31 @@ function transformBranches(apiBranches: any[], scans: any[], pulls: any[]): Bran
     const isDefaultBranch = branchName === 'main' || branchName === 'master';
     const isProtectedBranch = isDefaultBranch || branchName === 'develop' || branchName === 'development';
 
-    // Build PR detail if we have a merged PR from this branch
     let prDetail: PRDetail | undefined;
     if (mergedPR) {
       prDetail = {
         number: mergedPR.number,
         title: mergedPR.title,
         author: mergedPR.author,
-        sourceBranch: mergedPR.sourceBranch,
-        targetBranch: mergedPR.targetBranch,
-        status: mergedPR.status,
+        sourceBranch: mergedPR.headBranch || mergedPR.sourceBranch,
+        targetBranch: mergedPR.baseBranch || mergedPR.targetBranch,
+        status: mergedPR.state,
         reviewers: mergedPR.reviewers || [],
         checks: [],
         mergedAt: mergedPR.mergedAt,
         mergedBy: mergedPR.mergedBy,
         comments: 0,
-        url: mergedPR.url,
+        url: mergedPR.htmlUrl,
       };
     }
 
-    // Find target branch ID if this branch was merged via PR
     let mergedTo: string | undefined;
     let mergeType: 'pr' | 'direct' | 'bypass' | undefined;
     
     if (mergedPR) {
-      mergedTo = mergedPR.baseBranch;
+      mergedTo = mergedPR.baseBranch || mergedPR.targetBranch;
       mergeType = 'pr';
     }
-    console.log('Branch:', branchName, 'mergedTo:', mergedTo);
 
     return {
       id: branchName,
@@ -285,9 +283,9 @@ function PRDetailModal({ pr, onClose }: { pr: PRDetail; onClose: () => void }) {
               href={pr.url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="inline-block text-sm text-indigo-600 hover:text-indigo-800"
+              className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
             >
-              View on GitHub →
+              View on GitHub <ExternalLink className="w-3 h-3" />
             </a>
           )}
         </div>
@@ -341,8 +339,8 @@ function CommitDetailModal({ commit, onClose }: { commit: CommitDetail; onClose:
   );
 }
 
-// ============ REPO CARD ============
-function RepoCard({ name, fullName, healthScore, findings, isExpanded = false, isLoading = false, onClick }: any) {
+// ============ REPO CARD (Tree View) ============
+function RepoCard({ name, fullName, healthScore, findings, isExpanded = false, isLoading = false, onClick, onViewClick }: any) {
   const getHealthColor = (score: number | null) => {
     if (score === null) return 'bg-gray-100 text-gray-500';
     if (score >= 80) return 'bg-emerald-100 text-emerald-700';
@@ -382,14 +380,25 @@ function RepoCard({ name, fullName, healthScore, findings, isExpanded = false, i
         <span className={`text-xs font-bold px-2 py-0.5 rounded ${getHealthColor(healthScore)}`}>
           {healthScore !== null ? `${healthScore}%` : 'N/A'}
         </span>
-        {totalFindings > 0 && (
-          <div className="flex gap-1.5 text-[10px] font-medium">
-            {findings.critical > 0 && <span className="text-purple-600">{findings.critical}C</span>}
-            {findings.high > 0 && <span className="text-rose-600">{findings.high}H</span>}
-            {findings.medium > 0 && <span className="text-amber-600">{findings.medium}M</span>}
-            {findings.low > 0 && <span className="text-yellow-600">{findings.low}L</span>}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {totalFindings > 0 && (
+            <div className="flex gap-1.5 text-[10px] font-medium">
+              {findings.critical > 0 && <span className="text-purple-600">{findings.critical}C</span>}
+              {findings.high > 0 && <span className="text-rose-600">{findings.high}H</span>}
+              {findings.medium > 0 && <span className="text-amber-600">{findings.medium}M</span>}
+              {findings.low > 0 && <span className="text-yellow-600">{findings.low}L</span>}
+            </div>
+          )}
+          {isExpanded && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onViewClick?.(); }}
+              className="p-1 hover:bg-indigo-100 rounded text-indigo-600"
+              title="View details"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -613,15 +622,196 @@ function ConnectorLines({ featureBranches, protectedBranches, containerRef, onLi
   );
 }
 
+// ============ LIST VIEW ROW ============
+function RepoListRow({ repo, onRowClick }: { repo: Repo; onRowClick: (id: string) => void }) {
+  const getHealthColor = (score: number | null) => {
+    if (score === null) return 'bg-gray-100 text-gray-500';
+    if (score >= 80) return 'bg-emerald-100 text-emerald-700';
+    if (score >= 50) return 'bg-amber-100 text-amber-700';
+    return 'bg-rose-100 text-rose-700';
+  };
+
+  const totalFindings = repo.findings.critical + repo.findings.high + repo.findings.medium + repo.findings.low;
+
+  return (
+    <tr 
+      className="hover:bg-gray-50 cursor-pointer transition-colors"
+      onClick={() => onRowClick(repo.id)}
+    >
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-indigo-100">
+            <GitBranch className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <div className="font-medium text-gray-900">{repo.name}</div>
+            <div className="text-xs text-gray-500">{repo.fullName}</div>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <span className={`text-xs font-bold px-2.5 py-1 rounded ${getHealthColor(repo.healthScore)}`}>
+          {repo.healthScore !== null ? `${repo.healthScore}%` : 'N/A'}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1 text-sm text-gray-600">
+          <GitMerge className="w-4 h-4" />
+          <span>{repo.branches.length || '-'}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        {totalFindings > 0 ? (
+          <div className="flex gap-2 text-xs font-medium">
+            {repo.findings.critical > 0 && <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">{repo.findings.critical} Critical</span>}
+            {repo.findings.high > 0 && <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">{repo.findings.high} High</span>}
+            {repo.findings.medium > 0 && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{repo.findings.medium} Med</span>}
+            {repo.findings.low > 0 && <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700">{repo.findings.low} Low</span>}
+          </div>
+        ) : (
+          <span className="text-xs text-gray-400">No findings</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1 text-xs text-gray-500">
+          <Calendar className="w-3.5 h-3.5" />
+          <span>{repo.lastScan ? new Date(repo.lastScan).toLocaleDateString() : 'Never'}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <a 
+          href={repo.url || `https://github.com/${repo.fullName}`} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-indigo-600 hover:text-indigo-800"
+          onClick={e => e.stopPropagation()}
+        >
+          <ExternalLink className="w-4 h-4" />
+        </a>
+      </td>
+    </tr>
+  );
+}
+
+// ============ LIST VIEW ============
+function ListView({ repos, onRowClick }: { repos: Repo[]; onRowClick: (id: string) => void }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+      <table className="w-full">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Repository</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Health</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Branches</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Findings</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Scan</th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {repos.map(repo => (
+            <RepoListRow key={repo.id} repo={repo} onRowClick={onRowClick} />
+          ))}
+        </tbody>
+      </table>
+      {repos.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          No repositories found.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ TREE VIEW ============
+function TreeView({ repos, expandedId, onRepoClick, onViewClick, onLineClick, containerRefs }: any) {
+  return (
+    <>
+      {/* Column Headers */}
+      <div className="grid grid-cols-[192px_280px_60px_280px] gap-4 mb-3 pb-2 border-b border-gray-200">
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Repositories</div>
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Feature Branches</div>
+        <div></div>
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Protected Branches</div>
+      </div>
+      
+      {/* Repos */}
+      <div className="space-y-4">
+        {repos.map((repo: Repo) => {
+          const isExpanded = expandedId === repo.id;
+          const featureBranches = repo.branches.filter(b => !b.isProtected && !b.isDefault);
+          const protectedBranches = repo.branches.filter(b => b.isProtected || b.isDefault);
+          
+          return (
+            <div key={repo.id} ref={(el) => { containerRefs.current[repo.id] = el; }} className="relative">
+              <div className="grid grid-cols-[192px_280px_60px_280px] gap-4 items-start">
+                <RepoCard
+                  name={repo.name}
+                  fullName={repo.fullName}
+                  healthScore={repo.healthScore}
+                  findings={repo.findings}
+                  isExpanded={isExpanded}
+                  isLoading={repo.isLoading}
+                  onClick={() => onRepoClick(repo.id)}
+                  onViewClick={() => onViewClick(repo.id)}
+                />
+                
+                {isExpanded ? (
+                  <>
+                    <div className="flex flex-col gap-2 relative z-10">
+                      {repo.isLoading ? (
+                        <div className="flex items-center gap-2 py-2 text-gray-400">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="text-sm">Loading branches...</span>
+                        </div>
+                      ) : featureBranches.length > 0 ? (
+                        featureBranches.map((branch) => (
+                          <BranchCard key={branch.id} {...branch} onBranchClick={() => {}} onScanClick={() => {}} />
+                        ))
+                      ) : (
+                        <div className="text-xs text-gray-400 py-2">No feature branches</div>
+                      )}
+                    </div>
+                    <div></div>
+                    <div className="flex flex-col gap-2 relative z-10">
+                      {!repo.isLoading && protectedBranches.map((branch) => (
+                        <BranchCard key={branch.id} {...branch} onBranchClick={() => {}} onScanClick={() => {}} />
+                      ))}
+                    </div>
+                    {!repo.isLoading && (
+                      <ConnectorLines 
+                        featureBranches={featureBranches}
+                        protectedBranches={protectedBranches}
+                        containerRef={{ current: containerRefs.current[repo.id] }}
+                        onLineClick={onLineClick}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <div className="col-span-3 flex items-center text-gray-400 text-sm py-2">
+                    Click to expand
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 // ============ MAIN PAGE ============
 export default function RepoSecurityView() {
   const { currentProject } = useProject();
+  const router = useRouter();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedPR, setSelectedPR] = useState<PRDetail | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<CommitDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'tree' | 'list'>('tree');
   const containerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => {
@@ -645,6 +835,8 @@ export default function RepoSecurityView() {
         findings: r.findings || { critical: 0, high: 0, medium: 0, low: 0 },
         branches: [],
         isLoading: false,
+        lastScan: r.lastScanAt,
+        url: r.htmlUrl,
       }));
       setRepos(reposWithDefaults);
     } catch (err: any) {
@@ -666,8 +858,7 @@ export default function RepoSecurityView() {
         fetchScans(currentProject.id, repoId),
         fetchFindings(currentProject.id, repoId),
       ]);
-      console.log('PRs received:', pulls);
-
+      
       const transformedBranches = transformBranches(branches, scans, pulls);
       const healthScore = calculateHealthScore(findings);
       
@@ -704,58 +895,88 @@ export default function RepoSecurityView() {
     }
   };
 
+  const handleListRowClick = (repoId: string) => {
+    router.push(`/dashboard/repos/${repoId}`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-gray-800">Repository Security</h1>
-        <button 
-          onClick={loadRepositories}
-          disabled={!currentProject}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Legend */}
-      <div className="mb-6 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 font-medium">Health:</span>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-500"></span><span className="text-gray-600">80+</span></div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500"></span><span className="text-gray-600">50-79</span></div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-rose-500"></span><span className="text-gray-600">&lt;50</span></div>
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex items-center bg-white border border-gray-200 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('tree')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                viewMode === 'tree' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Tree
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                viewMode === 'list' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <List className="w-4 h-4" />
+              List
+            </button>
           </div>
-          <div className="w-px h-4 bg-gray-200" />
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 font-medium">Branch:</span>
-            <div className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /><span className="text-gray-600">Default</span></div>
-            <div className="flex items-center gap-1"><Shield className="w-3.5 h-3.5 text-blue-500" /><span className="text-gray-600">Protected</span></div>
-          </div>
-          <div className="w-px h-4 bg-gray-200" />
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 font-medium">Commit:</span>
-            <div className="flex items-center gap-1"><GitPullRequest className="w-3.5 h-3.5 text-green-600" /><span className="text-gray-600">PR</span></div>
-            <div className="flex items-center gap-1"><Upload className="w-3.5 h-3.5 text-blue-600" /><span className="text-gray-600">Direct</span></div>
-            <div className="flex items-center gap-1"><AlertOctagon className="w-3.5 h-3.5 text-rose-600" /><span className="text-gray-600">Bypass</span></div>
-          </div>
-          <div className="w-px h-4 bg-gray-200" />
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 font-medium">Scan:</span>
-            <div className="flex items-center gap-1"><ScanSearch className="w-3.5 h-3.5 text-indigo-600" /><span className="text-gray-600">Scanned</span></div>
-            <div className="flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-rose-600" /><span className="text-gray-600">Not Scanned</span></div>
-          </div>
-          <div className="w-px h-4 bg-gray-200" />
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 font-medium">Types:</span>
-            <div className="flex items-center gap-1"><FileCode className="w-3.5 h-3.5 text-violet-600" /><span className="text-gray-600">SAST</span></div>
-            <div className="flex items-center gap-1"><Package className="w-3.5 h-3.5 text-orange-600" /><span className="text-gray-600">SCA</span></div>
-            <div className="flex items-center gap-1"><Key className="w-3.5 h-3.5 text-rose-600" /><span className="text-gray-600">Secrets</span></div>
-            <div className="flex items-center gap-1"><Cloud className="w-3.5 h-3.5 text-sky-600" /><span className="text-gray-600">IaC</span></div>
-          </div>
+          
+          <button 
+            onClick={loadRepositories}
+            disabled={!currentProject}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
       </div>
+
+      {/* Legend - only show in tree view */}
+      {viewMode === 'tree' && (
+        <div className="mb-6 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 font-medium">Health:</span>
+              <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-500"></span><span className="text-gray-600">80+</span></div>
+              <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500"></span><span className="text-gray-600">50-79</span></div>
+              <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-rose-500"></span><span className="text-gray-600">&lt;50</span></div>
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 font-medium">Branch:</span>
+              <div className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /><span className="text-gray-600">Default</span></div>
+              <div className="flex items-center gap-1"><Shield className="w-3.5 h-3.5 text-blue-500" /><span className="text-gray-600">Protected</span></div>
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 font-medium">Commit:</span>
+              <div className="flex items-center gap-1"><GitPullRequest className="w-3.5 h-3.5 text-green-600" /><span className="text-gray-600">PR</span></div>
+              <div className="flex items-center gap-1"><Upload className="w-3.5 h-3.5 text-blue-600" /><span className="text-gray-600">Direct</span></div>
+              <div className="flex items-center gap-1"><AlertOctagon className="w-3.5 h-3.5 text-rose-600" /><span className="text-gray-600">Bypass</span></div>
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 font-medium">Scan:</span>
+              <div className="flex items-center gap-1"><ScanSearch className="w-3.5 h-3.5 text-indigo-600" /><span className="text-gray-600">Scanned</span></div>
+              <div className="flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-rose-600" /><span className="text-gray-600">Not Scanned</span></div>
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500 font-medium">Types:</span>
+              <div className="flex items-center gap-1"><FileCode className="w-3.5 h-3.5 text-violet-600" /><span className="text-gray-600">SAST</span></div>
+              <div className="flex items-center gap-1"><Package className="w-3.5 h-3.5 text-orange-600" /><span className="text-gray-600">SCA</span></div>
+              <div className="flex items-center gap-1"><Key className="w-3.5 h-3.5 text-rose-600" /><span className="text-gray-600">Secrets</span></div>
+              <div className="flex items-center gap-1"><Cloud className="w-3.5 h-3.5 text-sky-600" /><span className="text-gray-600">IaC</span></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* No Project Selected */}
       {!currentProject && (
@@ -786,77 +1007,24 @@ export default function RepoSecurityView() {
         </div>
       )}
 
-      {/* Column Headers */}
+      {/* Content */}
       {currentProject && repos.length > 0 && (
-        <div className="grid grid-cols-[192px_280px_60px_280px] gap-4 mb-3 pb-2 border-b border-gray-200">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Repositories</div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Feature Branches</div>
-          <div></div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Protected Branches</div>
-        </div>
+        viewMode === 'tree' ? (
+          <TreeView 
+            repos={repos}
+            expandedId={expandedId}
+            onRepoClick={handleRepoClick}
+            onViewClick={(repoId: string) => router.push(`/dashboard/repos/${repoId}`)}
+            onLineClick={handleLineClick}
+            containerRefs={containerRefs}
+          />
+        ) : (
+          <ListView 
+            repos={repos}
+            onRowClick={handleListRowClick}
+          />
+        )
       )}
-      
-      {/* Repos */}
-      <div className="space-y-4">
-        {repos.map((repo) => {
-          const isExpanded = expandedId === repo.id;
-          const featureBranches = repo.branches.filter(b => !b.isProtected && !b.isDefault);
-          const protectedBranches = repo.branches.filter(b => b.isProtected || b.isDefault);
-          
-          return (
-            <div key={repo.id} ref={(el) => { containerRefs.current[repo.id] = el; }} className="relative">
-              <div className="grid grid-cols-[192px_280px_60px_280px] gap-4 items-start">
-                <RepoCard
-                  name={repo.name}
-                  fullName={repo.fullName}
-                  healthScore={repo.healthScore}
-                  findings={repo.findings}
-                  isExpanded={isExpanded}
-                  isLoading={repo.isLoading}
-                  onClick={() => handleRepoClick(repo.id)}
-                />
-                
-                {isExpanded ? (
-                  <>
-                    <div className="flex flex-col gap-2 relative z-10">
-                      {repo.isLoading ? (
-                        <div className="flex items-center gap-2 py-2 text-gray-400">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span className="text-sm">Loading branches...</span>
-                        </div>
-                      ) : featureBranches.length > 0 ? (
-                        featureBranches.map((branch) => (
-                          <BranchCard key={branch.id} {...branch} onBranchClick={() => {}} onScanClick={() => {}} />
-                        ))
-                      ) : (
-                        <div className="text-xs text-gray-400 py-2">No feature branches</div>
-                      )}
-                    </div>
-                    <div></div>
-                    <div className="flex flex-col gap-2 relative z-10">
-                      {!repo.isLoading && protectedBranches.map((branch) => (
-                        <BranchCard key={branch.id} {...branch} onBranchClick={() => {}} onScanClick={() => {}} />
-                      ))}
-                    </div>
-                    {!repo.isLoading && (
-                      <ConnectorLines 
-                        featureBranches={featureBranches}
-                        protectedBranches={protectedBranches}
-                        containerRef={{ current: containerRefs.current[repo.id] }}
-                        onLineClick={handleLineClick}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <div className="col-span-3 flex items-center text-gray-400 text-sm py-2">
-                    Click to expand
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
 
       {selectedPR && <PRDetailModal pr={selectedPR} onClose={() => setSelectedPR(null)} />}
       {selectedCommit && <CommitDetailModal commit={selectedCommit} onClose={() => setSelectedCommit(null)} />}

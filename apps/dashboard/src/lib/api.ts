@@ -107,6 +107,16 @@ export interface Finding {
   aiExploitability?: string | null;
   aiRemediation?: string | null;
   aiTriagedAt?: string | null;
+  // VulnDB Enrichment fields (populated at scan time)
+  cweData?: { id: string; name: string; description: string; capecIds?: string[] } | null;
+  cveData?: any | null;
+  owaspCategory?: string | null;
+  attackTechniques?: Array<{ id: string; name: string; tacticId: string; tactic?: { id: string; name: string } }> | null;
+  complianceControls?: Array<{ frameworkId: string; controlId: string; controlName: string }> | null;
+  riskScore?: number | null;
+  isKev?: boolean;
+  epssScore?: number | null;
+  enrichedAt?: string | null;
 }
 
 export interface AiTriageResult {
@@ -463,6 +473,21 @@ export const vulndbApi = {
       fetchApi<any>(repositoryId ? `/vulndb/attack/surface/${repositoryId}` : '/vulndb/attack/surface'),
     killchain: () => fetchApi<any>('/vulndb/attack/killchain'),
     groups: () => fetchApi<any[]>('/vulndb/attack/groups/relevant'),
+  },
+
+  // Enrichment - fetches CWE details, ATT&CK techniques, compliance mappings
+  enrich: (params: { cweId?: string; cveId?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params.cweId) searchParams.append('cweId', params.cweId);
+    if (params.cveId) searchParams.append('cveId', params.cveId);
+    return fetchApi<{
+      cve?: any;
+      cwe?: { id: string; name: string; description: string; capecIds?: string[] };
+      owaspCategory?: { id: string; name: string; rank: number };
+      complianceMappings?: Array<{ frameworkId: string; controlId: string; controlName: string }>;
+      attackTechniques?: Array<{ id: string; name: string; tacticId: string; tactic?: { id: string; name: string } }>;
+      riskScore: number;
+    }>(`/vulndb/enrich?${searchParams}`);
   },
 
   // Sync

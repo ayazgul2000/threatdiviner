@@ -22,6 +22,7 @@ import { IScanner, NormalizedFinding, ScanContext } from '../../scanners/interfa
 import { BULL_CONNECTION } from '../custom-bull.module';
 import { AiService, TriageRequest } from '../../ai/ai.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { FindingEnrichmentService } from '../../vulndb/finding-enrichment.service';
 
 type ScanStatus = 'pending' | 'queued' | 'cloning' | 'scanning' | 'analyzing' | 'storing' | 'notifying' | 'completed' | 'failed';
 
@@ -52,6 +53,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly aiService: AiService,
     private readonly notificationsService: NotificationsService,
     private readonly prCommentsService: PRCommentsService,
+    private readonly findingEnrichmentService: FindingEnrichmentService,
     @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
   ) {
     this.aiTriageEnabled = this.configService.get('AI_TRIAGE_ENABLED', 'false') === 'true';
@@ -383,6 +385,14 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
         duration: Math.round(duration / 1000), // Convert to seconds
       },
     });
+
+    // Enrich findings with VulnDB data (CWE, ATT&CK, OWASP, compliance mappings)
+    try {
+      await this.findingEnrichmentService.enrichScanFindings(scanId);
+      this.logger.log(`Enriched findings for scan ${scanId}`);
+    } catch (error) {
+      this.logger.warn(`Failed to enrich findings for scan ${scanId}: ${error}`);
+    }
 
     // Update repository last scan time
     const scan = await this.prisma.scan.findUnique({

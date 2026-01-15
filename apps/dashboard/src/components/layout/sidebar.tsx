@@ -78,7 +78,7 @@ function getMenuConfig(hasProject: boolean, projectName?: string): MenuConfigIte
       label: projectName ? `Project: ${projectName.slice(0, 15)}${projectName.length > 15 ? '...' : ''}` : 'Project',
       icon: FolderGit2,
       items: [
-        { href: '/dashboard/repositories', label: 'Repositories', icon: GitBranch },
+        { href: '/dashboard/repos', label: 'Repositories', icon: GitBranch },
         { href: '/dashboard/scans', label: 'Scans', icon: Search },
         { href: '/dashboard/findings', label: 'Findings', icon: Bug },
         { href: '/dashboard/baselines', label: 'Baselines', icon: FileText },

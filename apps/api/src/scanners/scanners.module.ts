@@ -5,6 +5,7 @@ import { ScmModule } from '../scm/scm.module';
 import { QueueModule } from '../queue/queue.module';
 import { AiModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { VulnDbModule } from '../vulndb/vulndb.module';
 
 // Utils
 import { GitService } from './utils/git.service';
@@ -17,6 +18,10 @@ import { SarifParser } from './parsers/sarif.parser';
 
 // SAST Scanners
 import { SemgrepScanner } from './sast/semgrep/semgrep.scanner';
+import { SemgrepRuleSyncService } from './sast/semgrep/semgrep-rule-sync.service';
+
+// Scheduler
+import { ScannerSchedulerService } from './scanner-scheduler.service';
 import { BanditScanner } from './sast/bandit/bandit.scanner';
 import { GosecScanner } from './sast/gosec/gosec.scanner';
 
@@ -41,7 +46,7 @@ import { DiffFilterService } from './services/diff-filter.service';
 import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule, forwardRef(() => NotificationsModule)],
+  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule, VulnDbModule, forwardRef(() => NotificationsModule)],
   providers: [
     // Utils
     GitService,
@@ -54,6 +59,7 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
 
     // SAST Scanners
     SemgrepScanner,
+    SemgrepRuleSyncService,
     BanditScanner,
     GosecScanner,
 
@@ -77,12 +83,16 @@ import { ScanProcessor, NotifyProcessor } from '../queue/processors';
     // Queue Processors
     ScanProcessor,
     NotifyProcessor,
+
+    // Scheduler
+    ScannerSchedulerService,
   ],
   exports: [
     GitService,
     LocalExecutorService,
     SarifParser,
     SemgrepScanner,
+    SemgrepRuleSyncService,
     BanditScanner,
     GosecScanner,
     TrivyScanner,

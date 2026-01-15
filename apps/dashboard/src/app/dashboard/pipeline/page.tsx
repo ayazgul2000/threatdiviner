@@ -440,7 +440,7 @@ export default function PipelinePage() {
 
                     {/* Configure Gate Button */}
                     <Link
-                      href={selectedRepo ? `/dashboard/repositories/${selectedRepo}/settings` : '#'}
+                      href={selectedRepo ? `/dashboard/repos/${selectedRepo}/settings` : '#'}
                       className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline block"
                     >
                       Configure Gate

@@ -108,7 +108,16 @@
       "Bash(pnpm --dir \"C:/Dev/threatdiviner-v0.2.0/apps/api\" start:dev)",
       "Bash(pnpm --dir \"C:/Dev/threatdiviner-v0.2.0/apps/dashboard\" dev)",
       "Bash(pnpm run start:dev:*)",
-      "Bash(pnpm run dev:*)"
+      "Bash(pnpm run dev:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(PGPASSWORD=threatdiviner_dev psql:*)",
+      "Bash(node:*)",
+      "Bash(npx eslint:*)",
+      "Bash(grep:*)",
+      "Bash(for dir in \"C:/dev/threatdiviner-v0.2.0/apps/api/src/scanners/sast/semgrep/rules/registry/\"*/)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(git reset:*)"
     ]
   }
 }
