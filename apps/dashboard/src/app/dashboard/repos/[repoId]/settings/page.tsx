@@ -90,6 +90,16 @@ export default function RepositorySettingsPage() {
     blockOnSeverity: 'critical' as 'none' | 'critical' | 'high' | 'medium',
   });
 
+  // GitHub Write-back Settings
+  const [writebackSettings, setWritebackSettings] = useState({
+    enabled: true,
+    checkRunEnabled: true,
+    prCommentsEnabled: true,
+    inlineAnnotations: true,
+    sarifUploadEnabled: false,
+    blockPrOnSeverity: 'none' as 'none' | 'critical' | 'high' | 'medium',
+  });
+
   useEffect(() => {
     const fetchRepository = async () => {
       try {
@@ -109,6 +119,16 @@ export default function RepositorySettingsPage() {
           if (repo.scanConfig.schedulePattern) {
             setCustomCron(repo.scanConfig.schedulePattern);
           }
+          // Load write-back settings
+          const config = repo.scanConfig as any;
+          setWritebackSettings({
+            enabled: config.checkRunEnabled ?? true,
+            checkRunEnabled: config.checkRunEnabled ?? true,
+            prCommentsEnabled: config.prCommentsEnabled ?? true,
+            inlineAnnotations: config.inlineAnnotations ?? true,
+            sarifUploadEnabled: config.sarifUploadEnabled ?? false,
+            blockPrOnSeverity: config.blockPrOnSeverity ?? 'none',
+          });
         }
       } catch (err) {
         console.error('Failed to fetch repository:', err);
@@ -173,6 +193,12 @@ export default function RepositorySettingsPage() {
         scanOnSchedule: scheduleEnabled,
         schedulePattern,
         scanners: enabledScanners,
+        // Write-back settings
+        checkRunEnabled: writebackSettings.enabled && writebackSettings.checkRunEnabled,
+        prCommentsEnabled: writebackSettings.enabled && writebackSettings.prCommentsEnabled,
+        inlineAnnotations: writebackSettings.enabled && writebackSettings.inlineAnnotations,
+        sarifUploadEnabled: writebackSettings.enabled && writebackSettings.sarifUploadEnabled,
+        blockPrOnSeverity: writebackSettings.enabled ? writebackSettings.blockPrOnSeverity : 'none',
       });
 
       setSuccess('Settings saved successfully');
@@ -496,6 +522,117 @@ export default function RepositorySettingsPage() {
             When enabled, findings will be automatically analyzed by AI to determine false positive likelihood,
             severity accuracy, and remediation suggestions.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* GitHub Write-back Settings */}
+      <Card variant="bordered">
+        <CardHeader>
+          <CardTitle>GitHub Write-back</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Master toggle */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <label className="flex items-center gap-3">
+                <button
+                  onClick={() => setWritebackSettings({ ...writebackSettings, enabled: !writebackSettings.enabled })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    writebackSettings.enabled ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      writebackSettings.enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">Enable GitHub Write-back</span>
+                  <p className="text-xs text-gray-500">Post scan results back to GitHub (check runs, comments, annotations)</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Sub-options (disabled when master toggle is off) */}
+            <div className={`space-y-3 pl-4 border-l-2 border-gray-200 dark:border-gray-700 ${!writebackSettings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={writebackSettings.checkRunEnabled}
+                  onChange={(e) => setWritebackSettings({ ...writebackSettings, checkRunEnabled: e.target.checked })}
+                  disabled={!writebackSettings.enabled}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Post Check Run</span>
+                  <p className="text-xs text-gray-500">Show pass/fail status on commits</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={writebackSettings.prCommentsEnabled}
+                  onChange={(e) => setWritebackSettings({ ...writebackSettings, prCommentsEnabled: e.target.checked })}
+                  disabled={!writebackSettings.enabled}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Post PR Comments</span>
+                  <p className="text-xs text-gray-500">Post summary comment on open pull requests</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={writebackSettings.inlineAnnotations}
+                  onChange={(e) => setWritebackSettings({ ...writebackSettings, inlineAnnotations: e.target.checked })}
+                  disabled={!writebackSettings.enabled}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Inline Annotations</span>
+                  <p className="text-xs text-gray-500">Show findings on specific code lines in PR diff</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={writebackSettings.sarifUploadEnabled}
+                  onChange={(e) => setWritebackSettings({ ...writebackSettings, sarifUploadEnabled: e.target.checked })}
+                  disabled={!writebackSettings.enabled}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Upload SARIF</span>
+                  <p className="text-xs text-gray-500">Upload results to GitHub Security tab (requires GitHub Advanced Security)</p>
+                </div>
+              </label>
+
+              <div className="pt-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Block PR on Severity
+                </label>
+                <select
+                  value={writebackSettings.blockPrOnSeverity}
+                  onChange={(e) => setWritebackSettings({ ...writebackSettings, blockPrOnSeverity: e.target.value as typeof writebackSettings.blockPrOnSeverity })}
+                  disabled={!writebackSettings.enabled}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="none">None (Do not block)</option>
+                  <option value="critical">Critical only</option>
+                  <option value="high">High and above</option>
+                  <option value="medium">Medium and above</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Set check run to failure if findings of this severity or higher are detected
+                </p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

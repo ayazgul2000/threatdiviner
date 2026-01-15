@@ -599,37 +599,47 @@ export class ScmService {
     const [owner, repoName] = repository.fullName.split('/');
     const commit = await provider.getLatestCommit(token, owner, repoName, targetBranch);
 
-    // Get scan config (use defaults if not configured)
-    const scanConfig = repository.scanConfig || {
-      enableSast: true,
-      enableSca: true,
-      enableSecrets: true,
-      enableIac: true,
-      enableDast: false,
-      enableContainerScan: false,
-      targetUrls: [] as string[],
-      containerImages: [] as string[],
-      skipPaths: ['node_modules', 'vendor', '.git'] as string[],
-      branches: [repository.defaultBranch] as string[],
-    };
+    // Get scan config with defaults
+    const scanConfig = repository.scanConfig || {};
+    const effectiveConfig = this.getEffectiveConfig(scanConfig, targetBranch);
 
     // Build scanners array based on config
     const enabledScanners: string[] = [];
-    if (scanConfig.enableSast) enabledScanners.push('semgrep');
-    if (scanConfig.enableSca) enabledScanners.push('trivy');
-    if (scanConfig.enableSecrets) enabledScanners.push('gitleaks');
-    if (scanConfig.enableIac) enabledScanners.push('checkov');
+    if (effectiveConfig.enableSast) enabledScanners.push('semgrep');
+    if (effectiveConfig.enableSca) enabledScanners.push('trivy');
+    if (effectiveConfig.enableSecrets) enabledScanners.push('gitleaks');
+    if (effectiveConfig.enableIac) enabledScanners.push('checkov');
+
+    // Create check run for write-back if enabled
+    let checkRunId: string | undefined;
+    if (effectiveConfig.checkRunEnabled) {
+      try {
+        checkRunId = await provider.createCheckRun(
+          token,
+          owner,
+          repoName,
+          commit.sha,
+          'ThreatDiviner Security Scan',
+          'queued',
+        );
+        this.logger.log(`Created check run ${checkRunId} for manual scan`);
+      } catch (error) {
+        this.logger.warn(`Failed to create check run for manual scan: ${error}`);
+        // Continue without check run - don't block scan
+      }
+    }
 
     const scan = await this.prisma.scan.create({
       data: {
         tenantId,
         repositoryId,
-        projectId: repository.projectId, // Associate scan with repository's project
+        projectId: repository.projectId,
         commitSha: commit.sha,
         branch: targetBranch,
         triggeredBy: 'manual',
         status: 'queued',
         scanners: enabledScanners,
+        checkRunId,
       },
     });
 
@@ -643,25 +653,76 @@ export class ScmService {
       branch: targetBranch,
       cloneUrl: repository.cloneUrl,
       fullName: repository.fullName,
+      checkRunId,
+      triggeredBy: 'manual',
       config: {
-        enableSast: scanConfig.enableSast,
-        enableSca: scanConfig.enableSca,
-        enableSecrets: scanConfig.enableSecrets,
-        enableIac: scanConfig.enableIac,
-        enableDast: 'enableDast' in scanConfig ? scanConfig.enableDast : false,
-        enableContainerScan: 'enableContainerScan' in scanConfig ? scanConfig.enableContainerScan : false,
-        targetUrls: 'targetUrls' in scanConfig ? (scanConfig.targetUrls as string[]) : [],
-        containerImages: 'containerImages' in scanConfig ? (scanConfig.containerImages as string[]) : [],
-        skipPaths: (scanConfig.skipPaths as string[]) || [],
-        branches: (scanConfig.branches as string[]) || [repository.defaultBranch],
+        enableSast: effectiveConfig.enableSast,
+        enableSca: effectiveConfig.enableSca,
+        enableSecrets: effectiveConfig.enableSecrets,
+        enableIac: effectiveConfig.enableIac,
+        enableDast: effectiveConfig.enableDast,
+        enableContainerScan: effectiveConfig.enableContainerScan,
+        targetUrls: effectiveConfig.targetUrls,
+        containerImages: effectiveConfig.containerImages,
+        skipPaths: effectiveConfig.skipPaths,
+        branches: effectiveConfig.branches,
       },
     };
 
     // Queue scan job
     await this.queueService.enqueueScan(jobData);
-    this.logger.log(`Scan ${scan.id} queued for ${repository.fullName}@${targetBranch}`);
+    this.logger.log(`Scan ${scan.id} queued for ${repository.fullName}@${targetBranch}${checkRunId ? ' with check run' : ''}`);
 
     return scan.id;
+  }
+
+  /**
+   * Get effective config merging repo-level with branch-level overrides
+   */
+  private getEffectiveConfig(scanConfig: any, branch: string): {
+    enableSast: boolean;
+    enableSca: boolean;
+    enableSecrets: boolean;
+    enableIac: boolean;
+    enableDast: boolean;
+    enableContainerScan: boolean;
+    targetUrls: string[];
+    containerImages: string[];
+    skipPaths: string[];
+    branches: string[];
+    checkRunEnabled: boolean;
+    prCommentsEnabled: boolean;
+    inlineAnnotations: boolean;
+    sarifUploadEnabled: boolean;
+    blockPrOnSeverity: string;
+  } {
+    // Base config with defaults
+    const base = {
+      enableSast: scanConfig.enableSast ?? true,
+      enableSca: scanConfig.enableSca ?? true,
+      enableSecrets: scanConfig.enableSecrets ?? true,
+      enableIac: scanConfig.enableIac ?? true,
+      enableDast: scanConfig.enableDast ?? false,
+      enableContainerScan: scanConfig.enableContainerScan ?? false,
+      targetUrls: scanConfig.targetUrls ?? [],
+      containerImages: scanConfig.containerImages ?? [],
+      skipPaths: scanConfig.skipPaths ?? ['node_modules', 'vendor', '.git'],
+      branches: scanConfig.branches ?? ['main', 'master'],
+      checkRunEnabled: scanConfig.checkRunEnabled ?? true,
+      prCommentsEnabled: scanConfig.prCommentsEnabled ?? true,
+      inlineAnnotations: scanConfig.inlineAnnotations ?? true,
+      sarifUploadEnabled: scanConfig.sarifUploadEnabled ?? false,
+      blockPrOnSeverity: scanConfig.blockPrOnSeverity ?? 'none',
+    };
+
+    // Apply branch overrides if present
+    const branchOverrides = scanConfig.branchOverrides as Record<string, any> | null;
+    if (branchOverrides && branchOverrides[branch]) {
+      const override = branchOverrides[branch];
+      return { ...base, ...override };
+    }
+
+    return base;
   }
 
   async getScan(tenantId: string, scanId: string) {

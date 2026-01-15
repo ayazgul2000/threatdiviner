@@ -227,6 +227,13 @@ model ScanConfig {
   prCommentMaxFindings Int        @default(20) @map("pr_comment_max_findings")
   prCommentSeverities  String[]   @default(["critical", "high", "medium"]) @map("pr_comment_severities")
   prDiffOnly           Boolean    @default(true) @map("pr_diff_only")
+  // Write-back features
+  checkRunEnabled      Boolean    @default(true) @map("check_run_enabled")
+  inlineAnnotations    Boolean    @default(true) @map("inline_annotations")
+  sarifUploadEnabled   Boolean    @default(false) @map("sarif_upload_enabled")
+  blockPrOnSeverity    String     @default("none") @map("block_pr_on_severity") // none, critical, high, medium
+  // Branch-level overrides (JSON map of branchName -> partial config)
+  branchOverrides      Json?      @map("branch_overrides")
   createdAt            DateTime   @default(now()) @map("created_at")
   updatedAt            DateTime   @updatedAt @map("updated_at")
   repository           Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
