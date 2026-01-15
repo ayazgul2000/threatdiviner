@@ -245,6 +245,7 @@ model Scan {
   status         String     @default("pending")
   triggeredBy    String     @map("triggered_by")
   triggerEvent   String?    @map("trigger_event")
+  scanners       String[]   @default([]) // Scanners enabled at scan creation
   pullRequestId  String?    @map("pull_request_id")
   pullRequestUrl String?    @map("pull_request_url")
   checkRunId     String?    @map("check_run_id")

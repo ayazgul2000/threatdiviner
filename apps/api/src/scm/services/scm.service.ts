@@ -599,18 +599,6 @@ export class ScmService {
     const [owner, repoName] = repository.fullName.split('/');
     const commit = await provider.getLatestCommit(token, owner, repoName, targetBranch);
 
-    const scan = await this.prisma.scan.create({
-      data: {
-        tenantId,
-        repositoryId,
-        projectId: repository.projectId, // Associate scan with repository's project
-        commitSha: commit.sha,
-        branch: targetBranch,
-        triggeredBy: 'manual',
-        status: 'queued',
-      },
-    });
-
     // Get scan config (use defaults if not configured)
     const scanConfig = repository.scanConfig || {
       enableSast: true,
@@ -624,6 +612,26 @@ export class ScmService {
       skipPaths: ['node_modules', 'vendor', '.git'] as string[],
       branches: [repository.defaultBranch] as string[],
     };
+
+    // Build scanners array based on config
+    const enabledScanners: string[] = [];
+    if (scanConfig.enableSast) enabledScanners.push('semgrep');
+    if (scanConfig.enableSca) enabledScanners.push('trivy');
+    if (scanConfig.enableSecrets) enabledScanners.push('gitleaks');
+    if (scanConfig.enableIac) enabledScanners.push('checkov');
+
+    const scan = await this.prisma.scan.create({
+      data: {
+        tenantId,
+        repositoryId,
+        projectId: repository.projectId, // Associate scan with repository's project
+        commitSha: commit.sha,
+        branch: targetBranch,
+        triggeredBy: 'manual',
+        status: 'queued',
+        scanners: enabledScanners,
+      },
+    });
 
     // Build job data
     const jobData: ScanJobData = {
@@ -732,6 +740,7 @@ export class ScmService {
           select: {
             fullName: true,
             htmlUrl: true,
+            scanConfig: true,
           },
         },
         _count: {
@@ -742,14 +751,20 @@ export class ScmService {
       take: limit,
     });
 
-    // Add findings breakdown by severity for each scan
+    // Add findings breakdown by severity and scanners list for each scan
     const scansWithStats = await Promise.all(
       scans.map(async (scan) => {
-        const severityStats = await this.prisma.finding.groupBy({
-          by: ['severity'],
-          where: { scanId: scan.id },
-          _count: { severity: true },
-        });
+        const [severityStats, scannerStats] = await Promise.all([
+          this.prisma.finding.groupBy({
+            by: ['severity'],
+            where: { scanId: scan.id },
+            _count: { severity: true },
+          }),
+          this.prisma.finding.groupBy({
+            by: ['scanner'],
+            where: { scanId: scan.id },
+          }),
+        ]);
 
         const stats = {
           total: scan._count.findings,
@@ -760,10 +775,26 @@ export class ScmService {
           info: severityStats.find((s) => s.severity === 'info')?._count?.severity || 0,
         };
 
+        // Extract unique scanners that had findings
+        const scannersWithFindings = scannerStats.map((s) => s.scanner).filter(Boolean);
+
+        // Use stored scanners from scan record, fallback to config-based for old scans
+        let enabledScanners = scan.scanners || [];
+        if (enabledScanners.length === 0) {
+          // Fallback for old scans without scanners field
+          const config = scan.repository?.scanConfig;
+          if (config?.enableSast) enabledScanners.push('semgrep');
+          if (config?.enableSca) enabledScanners.push('trivy');
+          if (config?.enableSecrets) enabledScanners.push('gitleaks');
+          if (config?.enableIac) enabledScanners.push('checkov');
+        }
+
         return {
           ...scan,
           findingsCount: stats.total,
           stats,
+          scannersWithFindings,
+          enabledScanners: enabledScanners.length > 0 ? enabledScanners : ['semgrep', 'trivy', 'gitleaks'],
         };
       }),
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { GitBranch, GitMerge, Shield, Star, GitCommit, ArrowLeft, ExternalLink, RefreshCw, Loader2, FileCode, Package, Key, Cloud, Calendar, User, Clock, CheckCircle, XCircle, AlertTriangle, Play, GitPullRequest, Upload, Settings } from 'lucide-react';
 import { useProject } from '@/contexts/project-context';
@@ -56,6 +56,48 @@ function ScansTab({ scans, onScanClick }: { scans: any[]; onScanClick: (id: stri
     return <div className="text-center py-12 text-gray-500">No scans for this branch yet</div>;
   }
 
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return { icon: CheckCircle, label: 'Completed', class: 'bg-emerald-100 text-emerald-700' };
+      case 'running':
+        return { icon: Loader2, label: 'Scanning...', class: 'bg-blue-100 text-blue-700', animate: true };
+      case 'pending':
+      case 'queued':
+        return { icon: Clock, label: 'Queued', class: 'bg-amber-100 text-amber-700' };
+      case 'failed':
+        return { icon: XCircle, label: 'Failed', class: 'bg-rose-100 text-rose-700' };
+      default:
+        return { icon: Clock, label: status, class: 'bg-gray-100 text-gray-700' };
+    }
+  };
+
+  const getScannerIcons = (scan: any) => {
+    const isRunning = scan.status === 'running' || scan.status === 'pending' || scan.status === 'queued';
+    // Use enabledScanners from config, fallback to scanners with findings
+    const enabledScanners = scan.enabledScanners || scan.scanners || [];
+
+    return (
+      <div className="flex items-center gap-1">
+        {enabledScanners.includes('semgrep') && (
+          <FileCode className={`w-4 h-4 text-violet-600 ${isRunning ? 'animate-pulse' : ''}`} title="SAST (Semgrep)" />
+        )}
+        {enabledScanners.includes('trivy') && (
+          <Package className={`w-4 h-4 text-orange-600 ${isRunning ? 'animate-pulse' : ''}`} title="SCA (Trivy)" />
+        )}
+        {enabledScanners.includes('gitleaks') && (
+          <Key className={`w-4 h-4 text-rose-600 ${isRunning ? 'animate-pulse' : ''}`} title="Secrets (Gitleaks)" />
+        )}
+        {enabledScanners.includes('checkov') && (
+          <Cloud className={`w-4 h-4 text-sky-600 ${isRunning ? 'animate-pulse' : ''}`} title="IaC (Checkov)" />
+        )}
+        {enabledScanners.length === 0 && (
+          <span className="text-xs text-gray-400">—</span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -71,52 +113,53 @@ function ScansTab({ scans, onScanClick }: { scans: any[]; onScanClick: (id: stri
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {scans.map((scan) => (
-            <tr key={scan.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => onScanClick(scan.id)}>
-              <td className="px-4 py-3">
-                <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                  scan.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                  scan.status === 'running' ? 'bg-blue-100 text-blue-700' :
-                  scan.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-700'
-                }`}>
-                  {scan.status === 'completed' && <CheckCircle className="w-3 h-3" />}
-                  {scan.status === 'running' && <Loader2 className="w-3 h-3 animate-spin" />}
-                  {scan.status === 'failed' && <XCircle className="w-3 h-3" />}
-                  {scan.status}
-                </span>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-1">
-                  {(scan.sastEnabled || scan.scanners?.includes('semgrep')) && <FileCode className="w-4 h-4 text-violet-600" title="SAST" />}
-                  {(scan.scaEnabled || scan.scanners?.includes('trivy')) && <Package className="w-4 h-4 text-orange-600" title="SCA" />}
-                  {(scan.secretsEnabled || scan.scanners?.includes('gitleaks')) && <Key className="w-4 h-4 text-rose-600" title="Secrets" />}
-                  {(scan.iacEnabled || scan.scanners?.includes('checkov')) && <Cloud className="w-4 h-4 text-sky-600" title="IaC" />}
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                <span className={`text-sm font-medium ${(scan.findingsCount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  {scan.findingsCount || 0}
-                </span>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-1 text-sm text-gray-600">
-                  {scan.triggerEvent === 'pull_request' && <GitPullRequest className="w-4 h-4 text-green-600" />}
-                  {scan.triggerEvent === 'push' && <Upload className="w-4 h-4 text-blue-600" />}
-                  {scan.triggerEvent === 'manual' && <Play className="w-4 h-4 text-gray-600" />}
-                  <span>{scan.triggerEvent || 'manual'}</span>
-                </div>
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
-                {scan.duration ? `${Math.round(scan.duration / 1000)}s` : '-'}
-              </td>
-              <td className="px-4 py-3 text-xs text-gray-500">
-                {scan.createdAt ? new Date(scan.createdAt).toLocaleString() : '-'}
-              </td>
-              <td className="px-4 py-3">
-                <ExternalLink className="w-4 h-4 text-gray-400" />
-              </td>
-            </tr>
-          ))}
+          {scans.map((scan) => {
+            const statusInfo = getStatusDisplay(scan.status);
+            const StatusIcon = statusInfo.icon;
+            return (
+              <tr key={scan.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => onScanClick(scan.id)}>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${statusInfo.class}`}>
+                    <StatusIcon className={`w-3 h-3 ${statusInfo.animate ? 'animate-spin' : ''}`} />
+                    {statusInfo.label}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  {getScannerIcons(scan)}
+                </td>
+                <td className="px-4 py-3">
+                  {scan.status === 'running' || scan.status === 'pending' || scan.status === 'queued' ? (
+                    <span className="text-sm text-gray-400">—</span>
+                  ) : (
+                    <span className={`text-sm font-medium ${(scan.findingsCount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {scan.findingsCount || 0}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1 text-sm text-gray-600">
+                    {scan.triggeredBy === 'pull_request' && <GitPullRequest className="w-4 h-4 text-green-600" />}
+                    {scan.triggeredBy === 'push' && <Upload className="w-4 h-4 text-blue-600" />}
+                    {(scan.triggeredBy === 'manual' || !scan.triggeredBy) && <Play className="w-4 h-4 text-gray-600" />}
+                    <span>{scan.triggeredBy || 'manual'}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {scan.status === 'running' ? (
+                    <span className="text-blue-600">In progress...</span>
+                  ) : scan.duration ? (
+                    `${Math.round(scan.duration)}s`
+                  ) : '-'}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500">
+                  {scan.createdAt ? new Date(scan.createdAt).toLocaleString() : '-'}
+                </td>
+                <td className="px-4 py-3">
+                  <ExternalLink className="w-4 h-4 text-gray-400" />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -173,19 +216,14 @@ export default function BranchDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [triggeringScan, setTriggeringScan] = useState(false);
   const [activeTab, setActiveTab] = useState<'scans' | 'commits'>('scans');
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const isProtected = branchId === 'main' || branchId === 'master' || branchId === 'develop';
   const isDefault = branchId === 'main' || branchId === 'master';
 
-  useEffect(() => {
-    if (repoId && branchId && currentProject?.id) {
-      loadData();
-    }
-  }, [repoId, branchId, currentProject?.id]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async (showLoading = true) => {
     if (!repoId || !branchId || !currentProject?.id) return;
-    setIsLoading(true);
+    if (showLoading) setIsLoading(true);
     try {
       const [repoData, scansData] = await Promise.all([
         fetchRepository(repoId),
@@ -197,9 +235,41 @@ export default function BranchDetailPage() {
     } catch (err) {
       console.error('Failed to load branch data:', err);
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
-  };
+  }, [repoId, branchId, currentProject?.id]);
+
+  // Initial load
+  useEffect(() => {
+    if (repoId && branchId && currentProject?.id) {
+      loadData(true);
+    }
+  }, [repoId, branchId, currentProject?.id, loadData]);
+
+  // Auto-poll when there's a running/pending scan
+  useEffect(() => {
+    const hasRunningScan = scans.some(s => s.status === 'running' || s.status === 'pending' || s.status === 'queued');
+
+    // Clear existing interval
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    // Start polling if there's a running scan
+    if (hasRunningScan) {
+      pollingRef.current = setInterval(() => {
+        loadData(false); // Don't show loading spinner during poll
+      }, 3000);
+    }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [scans, loadData]);
 
   const handleScanClick = (scanId: string) => {
     router.push(`/dashboard/scans/${scanId}`);
@@ -211,8 +281,8 @@ export default function BranchDetailPage() {
     try {
       await scansApi.trigger(repoId, branchId);
       toastCtx.success('Scan Started', `Security scan initiated for ${branchId}`);
-      // Reload data after triggering
-      setTimeout(loadData, 3000);
+      // Immediately reload to pick up the new scan (will trigger polling)
+      await loadData(false);
     } catch (err) {
       console.error('Failed to trigger scan:', err);
       toastCtx.error('Error', 'Failed to trigger scan');
