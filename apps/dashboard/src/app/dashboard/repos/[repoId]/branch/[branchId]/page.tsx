@@ -15,10 +15,10 @@ async function fetchRepository(repositoryId: string): Promise<any> {
 }
 
 async function fetchBranchScans(projectId: string, repositoryId: string, branch: string): Promise<any[]> {
-  const res = await fetch(`${API_URL}/scm/scans?projectId=${projectId}&repositoryId=${repositoryId}&limit=100`, { credentials: 'include' });
+  const encodedBranch = encodeURIComponent(branch);
+  const res = await fetch(`${API_URL}/scm/scans?projectId=${projectId}&repositoryId=${repositoryId}&branch=${encodedBranch}&limit=100`, { credentials: 'include' });
   if (!res.ok) return [];
   const data = await res.json();
-  // Return ALL scans without branch filtering for now
   return data.scans || data || [];
 }
 

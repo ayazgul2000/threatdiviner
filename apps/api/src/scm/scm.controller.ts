@@ -51,13 +51,21 @@ export class ScmController {
     @Query() query: OAuthCallbackDto,
     @Res() res: Response,
   ) {
+    const dashboardUrl = this.configService.get('DASHBOARD_URL') || 'http://localhost:3000';
+
+    // Handle GitHub App installation callback (has installation_id, no state)
+    if (query.installation_id && query.setup_action) {
+      // GitHub App was installed - redirect to success
+      res.redirect(`${dashboardUrl}/dashboard/connections?app_installed=${query.installation_id}`);
+      return;
+    }
+
+    // Handle regular OAuth callback
     try {
-      const result = await this.scmService.handleOAuthCallback(query.code, query.state);
+      const result = await this.scmService.handleOAuthCallback(query.code, query.state!);
       // Redirect to dashboard with success
-      const dashboardUrl = this.configService.get('DASHBOARD_URL') || 'http://localhost:3000';
       res.redirect(`${dashboardUrl}/dashboard/connections?connected=${result.connectionId}`);
     } catch (error) {
-      const dashboardUrl = this.configService.get('DASHBOARD_URL') || 'http://localhost:3000';
       res.redirect(`${dashboardUrl}/dashboard/connections?error=oauth_failed`);
     }
   }
@@ -255,6 +263,7 @@ export class ScmController {
     @CurrentUser() user: { tenantId: string },
     @Query('projectId') projectId: string,
     @Query('repositoryId') repositoryId?: string,
+    @Query('branch') branch?: string,
     @Query('limit') limit?: string,
   ) {
     if (!projectId) {
@@ -265,6 +274,7 @@ export class ScmController {
       repositoryId,
       limit ? parseInt(limit, 10) : undefined,
       projectId,
+      branch,
     );
   }
 

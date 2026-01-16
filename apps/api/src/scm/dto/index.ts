@@ -9,8 +9,18 @@ export class OAuthCallbackDto {
   @IsString()
   code!: string;
 
+  @IsOptional()
   @IsString()
-  state!: string;
+  state?: string;
+
+  // GitHub App installation callback parameters
+  @IsOptional()
+  @IsString()
+  installation_id?: string;
+
+  @IsOptional()
+  @IsString()
+  setup_action?: string;
 }
 
 export class ConnectWithPatDto {
@@ -102,6 +112,27 @@ export class UpdateScanConfigDto {
   @IsArray()
   @IsString({ each: true })
   containerImages?: string[];
+
+  // Write-back settings
+  @IsOptional()
+  @IsBoolean()
+  checkRunEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  prCommentsEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  inlineAnnotations?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  sarifUploadEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  blockPrOnSeverity?: string;
 }
 
 export class TriggerScanDto {

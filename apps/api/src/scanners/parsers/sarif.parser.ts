@@ -135,8 +135,8 @@ export class SarifParser {
       snippet,
     );
 
-    // Extract CWE/CVE/OWASP from rule properties
-    const { cweIds, cveIds, owaspIds } = this.extractSecurityIds(rule);
+    // Extract CWE/CVE/OWASP from rule properties and ruleId
+    const { cweIds, cveIds, owaspIds } = this.extractSecurityIds(rule, result.ruleId);
 
     return {
       scanner: scannerName,
@@ -213,7 +213,7 @@ export class SarifParser {
     }
   }
 
-  private extractSecurityIds(rule?: SarifRule): {
+  private extractSecurityIds(rule?: SarifRule, ruleId?: string): {
     cweIds: string[];
     cveIds: string[];
     owaspIds: string[];
@@ -230,6 +230,14 @@ export class SarifParser {
         cveIds.push(tag);
       } else if (tag.match(/^A\d{2}:\d{4}/)) {
         owaspIds.push(tag);
+      }
+    }
+
+    // For scanners like Trivy, CVE is often in the ruleId directly
+    if (ruleId && cveIds.length === 0) {
+      const cveMatch = ruleId.match(/CVE-\d{4}-\d+/i);
+      if (cveMatch) {
+        cveIds.push(cveMatch[0].toUpperCase());
       }
     }
 

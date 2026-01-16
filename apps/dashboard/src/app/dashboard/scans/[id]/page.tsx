@@ -21,18 +21,12 @@ async function fetchRepository(repositoryId: string): Promise<any> {
 
 async function fetchScanFindings(scanId: string): Promise<any> {
   const res = await fetch(`${API_URL}/scm/findings?scanId=${scanId}&limit=100`, { credentials: 'include' });
-  if (!res.ok) return { findings: [], summary: { critical: 0, high: 0, medium: 0, low: 0 } };
+  if (!res.ok) return { findings: [], total: 0 };
   const data = await res.json();
   const findings = data.findings || data || [];
-  
-  // Calculate summary from findings
-  const summary = { critical: 0, high: 0, medium: 0, low: 0 };
-  findings.forEach((f: any) => {
-    const sev = (f.severity || '').toLowerCase();
-    if (sev in summary) summary[sev as keyof typeof summary]++;
-  });
-  
-  return { findings, summary, scanId };
+  const total = data.total || findings.length;
+
+  return { findings, total, scanId };
 }
 
 function ScannerCard({ name, icon: Icon, color, findings, duration, status }: any) {
@@ -65,36 +59,37 @@ function ScannerCard({ name, icon: Icon, color, findings, duration, status }: an
   );
 }
 
-function FindingsSummary({ findings }: { findings: any }) {
-  const summary = findings.summary || { critical: 0, high: 0, medium: 0, low: 0 };
-  const total = summary.critical + summary.high + summary.medium + summary.low;
+function FindingsSummary({ scan, scanId }: { scan: any; scanId: string }) {
+  // Use API-provided severity stats for accurate counts
+  const stats = scan?.severityStats || { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+  const total = stats.total || (stats.critical + stats.high + stats.medium + stats.low);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="text-sm font-semibold text-gray-900 mb-4">Findings Summary</h3>
-      
+
       <div className="grid grid-cols-4 gap-4 mb-4">
         <div className="text-center p-3 rounded-lg bg-purple-50">
-          <div className="text-2xl font-bold text-purple-700">{summary.critical}</div>
+          <div className="text-2xl font-bold text-purple-700">{stats.critical}</div>
           <div className="text-xs text-purple-600">Critical</div>
         </div>
         <div className="text-center p-3 rounded-lg bg-rose-50">
-          <div className="text-2xl font-bold text-rose-700">{summary.high}</div>
+          <div className="text-2xl font-bold text-rose-700">{stats.high}</div>
           <div className="text-xs text-rose-600">High</div>
         </div>
         <div className="text-center p-3 rounded-lg bg-amber-50">
-          <div className="text-2xl font-bold text-amber-700">{summary.medium}</div>
+          <div className="text-2xl font-bold text-amber-700">{stats.medium}</div>
           <div className="text-xs text-amber-600">Medium</div>
         </div>
         <div className="text-center p-3 rounded-lg bg-yellow-50">
-          <div className="text-2xl font-bold text-yellow-700">{summary.low}</div>
+          <div className="text-2xl font-bold text-yellow-700">{stats.low}</div>
           <div className="text-xs text-yellow-600">Low</div>
         </div>
       </div>
 
       {total > 0 && (
-        <a 
-          href={`/dashboard/findings?scanId=${findings.scanId}`}
+        <a
+          href={`/dashboard/findings?scanId=${scanId}`}
           className="flex items-center justify-center gap-2 w-full py-2 text-sm text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
         >
           View all {total} findings <ExternalLink className="w-4 h-4" />
@@ -118,7 +113,6 @@ export default function ScanDetailPage() {
 
   const [scan, setScan] = useState<any>(null);
   const [repo, setRepo] = useState<any>(null);
-  const [findings, setFindings] = useState<any>({ findings: [], summary: {} });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -130,13 +124,9 @@ export default function ScanDetailPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [scanData, findingsData] = await Promise.all([
-        fetchScan(scanId),
-        fetchScanFindings(scanId),
-      ]);
+      const scanData = await fetchScan(scanId);
       setScan(scanData);
-      setFindings({ ...findingsData, scanId });
-      
+
       // Fetch repo info if we have repositoryId
       if (scanData?.repositoryId) {
         const repoData = await fetchRepository(scanData.repositoryId);
@@ -329,7 +319,7 @@ export default function ScanDetailPage() {
 
         {/* Right Column - Findings */}
         <div>
-          <FindingsSummary findings={findings} />
+          <FindingsSummary scan={scan} scanId={scanId} />
         </div>
       </div>
     </div>

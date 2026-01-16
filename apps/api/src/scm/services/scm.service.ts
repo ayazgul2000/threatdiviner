@@ -485,6 +485,11 @@ export class ScmService {
     schedulePattern: string | null;
     targetUrls: string[];
     containerImages: string[];
+    checkRunEnabled: boolean;
+    prCommentsEnabled: boolean;
+    inlineAnnotations: boolean;
+    sarifUploadEnabled: boolean;
+    blockPrOnSeverity: string;
   }>) {
     this.logger.log(`Updating scan config for repository ${repositoryId}, config: ${JSON.stringify(config)}`);
 
@@ -531,6 +536,13 @@ export class ScmService {
     if (config.skipPaths !== undefined) updateData.skipPaths = config.skipPaths;
     if (config.targetUrls !== undefined) updateData.targetUrls = config.targetUrls;
     if (config.containerImages !== undefined) updateData.containerImages = config.containerImages;
+
+    // Handle write-back settings
+    if (config.checkRunEnabled !== undefined) updateData.checkRunEnabled = config.checkRunEnabled;
+    if (config.prCommentsEnabled !== undefined) updateData.prCommentsEnabled = config.prCommentsEnabled;
+    if (config.inlineAnnotations !== undefined) updateData.inlineAnnotations = config.inlineAnnotations;
+    if (config.sarifUploadEnabled !== undefined) updateData.sarifUploadEnabled = config.sarifUploadEnabled;
+    if (config.blockPrOnSeverity !== undefined) updateData.blockPrOnSeverity = config.blockPrOnSeverity;
 
     // Use upsert to create ScanConfig if it doesn't exist
     this.logger.log(`Upserting scan config with data: ${JSON.stringify(updateData)}`);
@@ -746,12 +758,19 @@ export class ScmService {
       throw new NotFoundException('Scan not found');
     }
 
-    // Count findings by scanner type
-    const scannerCounts = await this.prisma.finding.groupBy({
-      by: ['scanner'],
-      where: { scanId },
-      _count: { id: true },
-    });
+    // Count findings by scanner type and severity in parallel
+    const [scannerCounts, severityCounts] = await Promise.all([
+      this.prisma.finding.groupBy({
+        by: ['scanner'],
+        where: { scanId },
+        _count: { id: true },
+      }),
+      this.prisma.finding.groupBy({
+        by: ['severity'],
+        where: { scanId },
+        _count: { id: true },
+      }),
+    ]);
 
     const findingsCount: Record<string, number> = {
       sast: 0,
@@ -776,6 +795,23 @@ export class ScmService {
       }
     }
 
+    // Build severity stats
+    const severityStats = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+      total: 0,
+    };
+    for (const item of severityCounts) {
+      const sev = item.severity?.toLowerCase() as keyof typeof severityStats;
+      if (sev && sev in severityStats) {
+        severityStats[sev] = item._count.id;
+      }
+      severityStats.total += item._count.id;
+    }
+
     // Flatten scanConfig for easier frontend access
     const scanConfig = scan.repository?.scanConfig;
     return {
@@ -786,15 +822,17 @@ export class ScmService {
       iacEnabled: scanConfig?.enableIac ?? true,
       dastEnabled: scanConfig?.enableDast ?? false,
       findingsCount,
+      severityStats,
     };
   }
 
-  async listScans(tenantId: string, repositoryId?: string, limit = 50, projectId?: string) {
+  async listScans(tenantId: string, repositoryId?: string, limit = 50, projectId?: string, branch?: string) {
     const scans = await this.prisma.scan.findMany({
       where: {
         tenantId,
         ...(repositoryId && { repositoryId }),
         ...(projectId && { projectId }),
+        ...(branch && { branch }),
       },
       include: {
         repository: {

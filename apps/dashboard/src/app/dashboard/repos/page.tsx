@@ -724,7 +724,7 @@ function ListView({ repos, onRowClick }: { repos: Repo[]; onRowClick: (id: strin
 }
 
 // ============ TREE VIEW ============
-function TreeView({ repos, expandedId, onRepoClick, onViewClick, onLineClick, containerRefs }: any) {
+function TreeView({ repos, expandedId, onRepoClick, onViewClick, onLineClick, onBranchClick, containerRefs }: any) {
   return (
     <>
       {/* Column Headers */}
@@ -766,7 +766,7 @@ function TreeView({ repos, expandedId, onRepoClick, onViewClick, onLineClick, co
                         </div>
                       ) : featureBranches.length > 0 ? (
                         featureBranches.map((branch) => (
-                          <BranchCard key={branch.id} {...branch} onBranchClick={() => {}} onScanClick={() => {}} />
+                          <BranchCard key={branch.id} {...branch} onBranchClick={(branchId: string) => onBranchClick(repo.id, branchId)} onScanClick={() => {}} />
                         ))
                       ) : (
                         <div className="text-xs text-gray-400 py-2">No feature branches</div>
@@ -775,7 +775,7 @@ function TreeView({ repos, expandedId, onRepoClick, onViewClick, onLineClick, co
                     <div></div>
                     <div className="flex flex-col gap-2 relative z-10">
                       {!repo.isLoading && protectedBranches.map((branch) => (
-                        <BranchCard key={branch.id} {...branch} onBranchClick={() => {}} onScanClick={() => {}} />
+                        <BranchCard key={branch.id} {...branch} onBranchClick={(branchId: string) => onBranchClick(repo.id, branchId)} onScanClick={() => {}} />
                       ))}
                     </div>
                     {!repo.isLoading && (
@@ -899,6 +899,10 @@ export default function RepoSecurityView() {
     router.push(`/dashboard/repos/${repoId}`);
   };
 
+  const handleBranchClick = (repoId: string, branchId: string) => {
+    router.push(`/dashboard/repos/${repoId}/branch/${encodeURIComponent(branchId)}`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -1010,12 +1014,13 @@ export default function RepoSecurityView() {
       {/* Content */}
       {currentProject && repos.length > 0 && (
         viewMode === 'tree' ? (
-          <TreeView 
+          <TreeView
             repos={repos}
             expandedId={expandedId}
             onRepoClick={handleRepoClick}
             onViewClick={(repoId: string) => router.push(`/dashboard/repos/${repoId}`)}
             onLineClick={handleLineClick}
+            onBranchClick={handleBranchClick}
             containerRefs={containerRefs}
           />
         ) : (

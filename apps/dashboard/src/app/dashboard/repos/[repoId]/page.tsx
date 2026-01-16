@@ -669,79 +669,6 @@ function PRActivityTab({ pulls }: { pulls: any[] }) {
   );
 }
 
-// ============ SETTINGS TAB ============
-function SettingsTab({ repo }: { repo: any }) {
-  const [scanConfig, setScanConfig] = useState({
-    sast: true,
-    sca: true,
-    secrets: true,
-    iac: false,
-  });
-  const [autoScan, setAutoScan] = useState({
-    onPR: true,
-    onPush: true,
-    scheduled: false,
-  });
-
-  return (
-    <div className="space-y-6 p-4">
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Scan Configuration</h3>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={scanConfig.sast} onChange={e => setScanConfig({...scanConfig, sast: e.target.checked})} className="rounded" />
-            <FileCode className="w-4 h-4 text-violet-600" />
-            <span className="text-sm">SAST</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={scanConfig.sca} onChange={e => setScanConfig({...scanConfig, sca: e.target.checked})} className="rounded" />
-            <Package className="w-4 h-4 text-orange-600" />
-            <span className="text-sm">SCA</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={scanConfig.secrets} onChange={e => setScanConfig({...scanConfig, secrets: e.target.checked})} className="rounded" />
-            <Key className="w-4 h-4 text-rose-600" />
-            <span className="text-sm">Secrets</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={scanConfig.iac} onChange={e => setScanConfig({...scanConfig, iac: e.target.checked})} className="rounded" />
-            <Cloud className="w-4 h-4 text-sky-600" />
-            <span className="text-sm">IaC</span>
-          </label>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Auto-scan Triggers</h3>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={autoScan.onPR} onChange={e => setAutoScan({...autoScan, onPR: e.target.checked})} className="rounded" />
-            <GitPullRequest className="w-4 h-4 text-green-600" />
-            <span className="text-sm">On Pull Request</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={autoScan.onPush} onChange={e => setAutoScan({...autoScan, onPush: e.target.checked})} className="rounded" />
-            <Upload className="w-4 h-4 text-blue-600" />
-            <span className="text-sm">On Push to Protected</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={autoScan.scheduled} onChange={e => setAutoScan({...autoScan, scheduled: e.target.checked})} className="rounded" />
-            <Calendar className="w-4 h-4 text-gray-600" />
-            <span className="text-sm">Scheduled (Daily)</span>
-          </label>
-        </div>
-      </div>
-
-      <div className="pt-4 border-t border-gray-200">
-        <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-          <Play className="w-4 h-4" />
-          Run Scan Now
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ============ MAIN PAGE ============
 export default function RepoDetailPage() {
   const { currentProject } = useProject();
@@ -755,7 +682,7 @@ export default function RepoDetailPage() {
   const [pulls, setPulls] = useState<any[]>([]);
   const [findings, setFindings] = useState({ critical: 0, high: 0, medium: 0, low: 0 });
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'branches' | 'scans' | 'prs' | 'settings'>('branches');
+  const [activeTab, setActiveTab] = useState<'branches' | 'scans' | 'prs'>('branches');
   const [selectedBranchForSettings, setSelectedBranchForSettings] = useState<Branch | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -836,7 +763,7 @@ export default function RepoDetailPage() {
               <div className="p-2 rounded-lg bg-indigo-100">
                 <GitBranch className="w-5 h-5 text-indigo-600" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">{repo?.name || 'Repository'}</h1>
+              <h1 className="text-xl font-bold text-gray-900">{repo?.name || repo?.fullName?.split('/').pop() || 'Repository'}</h1>
               <span className={`text-sm font-bold px-2.5 py-1 rounded ${getHealthColor(healthScore)}`}>
                 {healthScore !== null ? `${healthScore}%` : 'N/A'}
               </span>
@@ -924,21 +851,12 @@ export default function RepoDetailPage() {
           >
             PR Activity
           </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'settings' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            Settings
-          </button>
         </div>
         
         <div>
           {activeTab === 'branches' && <BranchesTab branches={branches} onBranchClick={handleBranchClick} onSettingsClick={handleBranchSettingsClick} />}
           {activeTab === 'scans' && <ScanHistoryTab scans={scans} />}
           {activeTab === 'prs' && <PRActivityTab pulls={pulls} />}
-          {activeTab === 'settings' && <SettingsTab repo={repo} />}
         </div>
       </div>
 

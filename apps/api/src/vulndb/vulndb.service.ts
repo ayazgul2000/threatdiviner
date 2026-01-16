@@ -282,22 +282,29 @@ export class VulnDbService {
       result.cve = await this.getCve(finding.cveId);
     }
 
-    if (finding.cweId) {
-      const cwe = await this.getCwe(finding.cweId);
+    // Determine CWE ID - use provided cweId, or extract from CVE if available
+    let effectiveCweId = finding.cweId;
+    if (!effectiveCweId && result.cve && result.cve.cweIds && result.cve.cweIds.length > 0) {
+      // Use the first CWE ID from the CVE record
+      effectiveCweId = result.cve.cweIds[0];
+    }
+
+    if (effectiveCweId) {
+      const cwe = await this.getCwe(effectiveCweId);
       if (cwe) {
         // Add CAPEC IDs from static mapping
-        const capecIds = CWE_CAPEC_MAPPINGS[finding.cweId] || [];
+        const capecIds = CWE_CAPEC_MAPPINGS[effectiveCweId] || [];
         result.cwe = { ...cwe, capecIds };
       }
-      result.owaspCategory = await this.getOwaspCategory(finding.cweId);
-      result.complianceMappings = await this.getControlsByCwe(finding.cweId);
+      result.owaspCategory = await this.getOwaspCategory(effectiveCweId);
+      result.complianceMappings = await this.getControlsByCwe(effectiveCweId);
 
       // Try database lookup first, fallback to static mapping
-      result.attackTechniques = await this.getAttackTechniquesForCwe(finding.cweId);
+      result.attackTechniques = await this.getAttackTechniquesForCwe(effectiveCweId);
 
       // If no techniques from DB, use static mapping
       if (!result.attackTechniques || result.attackTechniques.length === 0) {
-        const attackIds = CWE_ATTACK_MAPPINGS[finding.cweId] || [];
+        const attackIds = CWE_ATTACK_MAPPINGS[effectiveCweId] || [];
         if (attackIds.length > 0) {
           // Fetch technique details from database
           const techniques = await this.prisma.attackTechnique.findMany({

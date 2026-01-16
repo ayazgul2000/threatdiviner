@@ -18,11 +18,143 @@ export class GitHubProvider implements ScmProvider {
   private readonly logger = new Logger(GitHubProvider.name);
   private readonly clientId: string;
   private readonly clientSecret: string;
+  private readonly appId: string;
+  private readonly privateKey: string;
   private readonly apiBaseUrl = 'https://api.github.com';
+
+  // Cache for installation tokens (key: installationId, value: { token, expiresAt })
+  private installationTokenCache = new Map<string, { token: string; expiresAt: Date }>();
 
   constructor(private readonly configService: ConfigService) {
     this.clientId = this.configService.get<string>('GITHUB_CLIENT_ID') || '';
     this.clientSecret = this.configService.get<string>('GITHUB_CLIENT_SECRET') || '';
+    this.appId = this.configService.get<string>('GITHUB_APP_ID') || '';
+    this.privateKey = (this.configService.get<string>('GITHUB_PRIVATE_KEY') || '').replace(/\\n/g, '\n');
+  }
+
+  /**
+   * Check if GitHub App is configured
+   */
+  isAppConfigured(): boolean {
+    return !!(this.appId && this.privateKey);
+  }
+
+  /**
+   * Generate a JWT for GitHub App authentication
+   */
+  private generateAppJwt(): string {
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      iat: now - 60, // Issued 60 seconds ago to account for clock drift
+      exp: now + 600, // Expires in 10 minutes (max allowed)
+      iss: this.appId,
+    };
+
+    // Create JWT header
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+
+    // Sign the JWT
+    const signatureInput = `${encodedHeader}.${encodedPayload}`;
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(signatureInput);
+    const signature = sign.sign(this.privateKey, 'base64url');
+
+    return `${encodedHeader}.${encodedPayload}.${signature}`;
+  }
+
+  /**
+   * Get installation ID for a repository
+   */
+  async getInstallationId(owner: string, repo: string): Promise<string | null> {
+    if (!this.isAppConfigured()) {
+      return null;
+    }
+
+    try {
+      const jwt = this.generateAppJwt();
+      const response = await fetch(`${this.apiBaseUrl}/repos/${owner}/${repo}/installation`, {
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': `Bearer ${jwt}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Failed to get installation for ${owner}/${repo}: ${response.status}`);
+        return null;
+      }
+
+      const data = await response.json();
+      return String(data.id);
+    } catch (error) {
+      this.logger.error(`Error getting installation ID: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get an installation access token for GitHub App operations
+   */
+  async getInstallationToken(installationId: string): Promise<string | null> {
+    if (!this.isAppConfigured()) {
+      this.logger.warn('GitHub App not configured (missing GITHUB_APP_ID or GITHUB_PRIVATE_KEY)');
+      return null;
+    }
+
+    // Check cache first
+    const cached = this.installationTokenCache.get(installationId);
+    if (cached && cached.expiresAt > new Date(Date.now() + 5 * 60 * 1000)) {
+      // Token is valid for at least 5 more minutes
+      return cached.token;
+    }
+
+    try {
+      const jwt = this.generateAppJwt();
+      const response = await fetch(
+        `${this.apiBaseUrl}/app/installations/${installationId}/access_tokens`,
+        {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/vnd.github+json',
+            'Authorization': `Bearer ${jwt}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        this.logger.error(`Failed to get installation token: ${response.status} ${error}`);
+        return null;
+      }
+
+      const data = await response.json();
+      const token = data.token;
+      const expiresAt = new Date(data.expires_at);
+
+      // Cache the token
+      this.installationTokenCache.set(installationId, { token, expiresAt });
+      this.logger.log(`Obtained installation token for installation ${installationId}`);
+
+      return token;
+    } catch (error) {
+      this.logger.error(`Error getting installation token: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get an App token for a specific repository (gets installation ID then token)
+   */
+  async getAppTokenForRepo(owner: string, repo: string): Promise<string | null> {
+    const installationId = await this.getInstallationId(owner, repo);
+    if (!installationId) {
+      return null;
+    }
+    return this.getInstallationToken(installationId);
   }
 
   getOAuthUrl(state: string, redirectUri: string): string {
@@ -201,6 +333,15 @@ export class GitHubProvider implements ScmProvider {
     conclusion?: 'success' | 'failure' | 'neutral' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required',
     output?: { title: string; summary: string; text?: string },
   ): Promise<string> {
+    // Check Runs require GitHub App authentication
+    // Try to get an App token, fall back to provided token (will likely fail for non-App tokens)
+    const appToken = await this.getAppTokenForRepo(owner, repo);
+    const tokenToUse = appToken || accessToken;
+
+    if (!appToken) {
+      this.logger.warn('No GitHub App token available for check run - using OAuth token (may fail)');
+    }
+
     const body: any = {
       name,
       head_sha: sha,
@@ -216,7 +357,7 @@ export class GitHubProvider implements ScmProvider {
       body.output = output;
     }
 
-    const response = await this.apiRequest(accessToken, `/repos/${owner}/${repo}/check-runs`, {
+    const response = await this.apiRequest(tokenToUse, `/repos/${owner}/${repo}/check-runs`, {
       method: 'POST',
       body: JSON.stringify(body),
     });
@@ -233,6 +374,10 @@ export class GitHubProvider implements ScmProvider {
     conclusion?: 'success' | 'failure' | 'neutral' | 'cancelled' | 'skipped' | 'timed_out' | 'action_required',
     output?: { title: string; summary: string; text?: string },
   ): Promise<void> {
+    // Check Runs require GitHub App authentication
+    const appToken = await this.getAppTokenForRepo(owner, repo);
+    const tokenToUse = appToken || accessToken;
+
     const body: any = { status };
 
     if (status === 'completed' && conclusion) {
@@ -244,7 +389,7 @@ export class GitHubProvider implements ScmProvider {
       body.output = output;
     }
 
-    await this.apiRequest(accessToken, `/repos/${owner}/${repo}/check-runs/${checkRunId}`, {
+    await this.apiRequest(tokenToUse, `/repos/${owner}/${repo}/check-runs/${checkRunId}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
@@ -275,6 +420,10 @@ export class GitHubProvider implements ScmProvider {
       }>;
     },
   ): Promise<void> {
+    // Check Runs require GitHub App authentication
+    const appToken = await this.getAppTokenForRepo(owner, repo);
+    const tokenToUse = appToken || accessToken;
+
     const body: any = { status };
 
     if (status === 'completed' && conclusion) {
@@ -286,7 +435,7 @@ export class GitHubProvider implements ScmProvider {
       body.output = output;
     }
 
-    await this.apiRequest(accessToken, `/repos/${owner}/${repo}/check-runs/${checkRunId}`, {
+    await this.apiRequest(tokenToUse, `/repos/${owner}/${repo}/check-runs/${checkRunId}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
