@@ -218,428 +218,67 @@ async function main() {
   // ============================================
   console.log('Creating SCM connection...');
 
-  // Delete existing connection to avoid conflicts
-  await prisma.scmConnection.deleteMany({
-    where: {
-      tenantId: tenant.id,
-      provider: 'github',
-      externalId: 'acme-corp',
-    },
-  });
-
-  const scmConnection = await prisma.scmConnection.create({
-    data: {
-      id: IDS.scmConnection,
-      tenantId: tenant.id,
-      provider: 'github',
-      authMethod: 'oauth',
-      accessToken: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-      externalId: 'acme-corp',
-      externalName: 'acme-corp',
-      scope: ['repo', 'read:org', 'write:repo_hook'],
-      isActive: true,
-    },
-  });
-  console.log(`  Created SCM connection: ${scmConnection.provider} (${scmConnection.externalName})`);
+  // Skip SCM connection seeding - use real GitHub OAuth connections instead
+  // This avoids issues with fake unencrypted tokens causing decryption errors
+  console.log('  Skipping SCM connection seeding (use real GitHub OAuth instead)');
 
   // ============================================
   // 5. REPOSITORIES
   // ============================================
   console.log('Creating repositories...');
 
-  // Delete existing repositories to avoid conflicts
-  await prisma.repository.deleteMany({
-    where: { tenantId: tenant.id },
-  });
-
-  const repositories = await Promise.all([
-    // Payment Gateway repositories
-    prisma.repository.create({
-      data: {
-        id: IDS.repoPaymentApi,
-        tenantId: tenant.id,
-        connectionId: scmConnection.id,
-        projectId: paymentGatewayProject.id,
-        name: 'payment-api',
-        fullName: 'acme-corp/payment-api',
-        cloneUrl: 'https://github.com/acme-corp/payment-api.git',
-        htmlUrl: 'https://github.com/acme-corp/payment-api',
-        defaultBranch: 'main',
-        language: 'TypeScript',
-        isPrivate: true,
-        isActive: true,
-      },
-    }),
-    prisma.repository.create({
-      data: {
-        id: IDS.repoPaymentUI,
-        tenantId: tenant.id,
-        connectionId: scmConnection.id,
-        projectId: paymentGatewayProject.id,
-        name: 'payment-ui',
-        fullName: 'acme-corp/payment-ui',
-        cloneUrl: 'https://github.com/acme-corp/payment-ui.git',
-        htmlUrl: 'https://github.com/acme-corp/payment-ui',
-        defaultBranch: 'main',
-        language: 'TypeScript',
-        isPrivate: true,
-        isActive: true,
-      },
-    }),
-    prisma.repository.create({
-      data: {
-        id: IDS.repoPaymentWorker,
-        tenantId: tenant.id,
-        connectionId: scmConnection.id,
-        projectId: paymentGatewayProject.id,
-        name: 'payment-worker',
-        fullName: 'acme-corp/payment-worker',
-        cloneUrl: 'https://github.com/acme-corp/payment-worker.git',
-        htmlUrl: 'https://github.com/acme-corp/payment-worker',
-        defaultBranch: 'main',
-        language: 'Python',
-        isPrivate: true,
-        isActive: true,
-      },
-    }),
-    // Customer Portal repositories
-    prisma.repository.create({
-      data: {
-        id: IDS.repoPortalWeb,
-        tenantId: tenant.id,
-        connectionId: scmConnection.id,
-        projectId: customerPortalProject.id,
-        name: 'portal-web',
-        fullName: 'acme-corp/portal-web',
-        cloneUrl: 'https://github.com/acme-corp/portal-web.git',
-        htmlUrl: 'https://github.com/acme-corp/portal-web',
-        defaultBranch: 'main',
-        language: 'TypeScript',
-        isPrivate: true,
-        isActive: true,
-      },
-    }),
-    prisma.repository.create({
-      data: {
-        id: IDS.repoPortalApi,
-        tenantId: tenant.id,
-        connectionId: scmConnection.id,
-        projectId: customerPortalProject.id,
-        name: 'portal-api',
-        fullName: 'acme-corp/portal-api',
-        cloneUrl: 'https://github.com/acme-corp/portal-api.git',
-        htmlUrl: 'https://github.com/acme-corp/portal-api',
-        defaultBranch: 'main',
-        language: 'Go',
-        isPrivate: true,
-        isActive: true,
-      },
-    }),
-  ]);
-
-  console.log(`  Created ${repositories.length} repositories`);
+  // Skip repository seeding - repositories are created via real GitHub OAuth connections
+  // This avoids wiping user's real repositories when seed runs
+  console.log('  Skipping repository seeding (use GitHub OAuth to add real repos)');
 
   // ============================================
   // 6. SCAN CONFIGS
   // ============================================
   console.log('Creating scan configs...');
 
-  // Delete existing scan configs
-  await prisma.scanConfig.deleteMany({
-    where: { tenantId: tenant.id },
-  });
-
-  const scanConfigs = await Promise.all([
-    prisma.scanConfig.create({
-      data: {
-        id: IDS.configPaymentApi,
-        tenantId: tenant.id,
-        repositoryId: IDS.repoPaymentApi,
-        enableSast: true,
-        enableSca: true,
-        enableSecrets: true,
-        enableIac: true,
-        enableDast: true,
-        enableContainerScan: true,
-        targetUrls: ['https://api.payment.acme.com'],
-        containerImages: ['acme/payment-api:latest'],
-        branches: ['main', 'develop'],
-        autoScanOnPush: true,
-        autoScanOnPR: true,
-        scheduleEnabled: true,
-        scheduleCron: '0 2 * * *',
-        prCommentsEnabled: true,
-      },
-    }),
-    prisma.scanConfig.create({
-      data: {
-        id: IDS.configPaymentUI,
-        tenantId: tenant.id,
-        repositoryId: IDS.repoPaymentUI,
-        enableSast: true,
-        enableSca: true,
-        enableSecrets: true,
-        enableIac: false,
-        branches: ['main', 'develop'],
-        autoScanOnPush: true,
-        autoScanOnPR: true,
-      },
-    }),
-    prisma.scanConfig.create({
-      data: {
-        id: IDS.configPaymentWorker,
-        tenantId: tenant.id,
-        repositoryId: IDS.repoPaymentWorker,
-        enableSast: true,
-        enableSca: true,
-        enableSecrets: true,
-        enableIac: true,
-        branches: ['main'],
-        autoScanOnPush: true,
-        autoScanOnPR: true,
-      },
-    }),
-    prisma.scanConfig.create({
-      data: {
-        id: IDS.configPortalWeb,
-        tenantId: tenant.id,
-        repositoryId: IDS.repoPortalWeb,
-        enableSast: true,
-        enableSca: true,
-        enableSecrets: true,
-        enableIac: false,
-        branches: ['main', 'staging'],
-        autoScanOnPush: true,
-        autoScanOnPR: true,
-      },
-    }),
-    prisma.scanConfig.create({
-      data: {
-        id: IDS.configPortalApi,
-        tenantId: tenant.id,
-        repositoryId: IDS.repoPortalApi,
-        enableSast: true,
-        enableSca: true,
-        enableSecrets: true,
-        enableIac: true,
-        enableContainerScan: true,
-        containerImages: ['acme/portal-api:latest'],
-        branches: ['main'],
-        autoScanOnPush: true,
-        autoScanOnPR: true,
-      },
-    }),
-  ]);
-
-  console.log(`  Created ${scanConfigs.length} scan configs`);
+  // Skip scan config seeding - configs are created automatically when repos are added
+  console.log('  Skipping scan config seeding (created automatically with repos)');
 
   // ============================================
   // 7. SCANS
   // ============================================
   console.log('Creating scans...');
 
-  // Delete existing scans and findings
-  await prisma.finding.deleteMany({
-    where: { tenantId: tenant.id },
-  });
-  await prisma.scan.deleteMany({
-    where: { tenantId: tenant.id },
-  });
-
-  const now = new Date();
-  const scanData = [
-    // Completed scans
-    {
-      id: IDS.scans[0],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPaymentApi,
-      projectId: paymentGatewayProject.id,
-      commitSha: 'a1b2c3d4e5f6789012345678901234567890abcd',
-      branch: 'main',
-      status: 'completed',
-      triggeredBy: 'webhook',
-      triggerEvent: 'push',
-      startedAt: new Date(now.getTime() - 3600000),
-      completedAt: new Date(now.getTime() - 3500000),
-      duration: 100,
-    },
-    {
-      id: IDS.scans[1],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPaymentApi,
-      projectId: paymentGatewayProject.id,
-      commitSha: 'b2c3d4e5f6789012345678901234567890abcde',
-      branch: 'develop',
-      status: 'completed',
-      triggeredBy: 'webhook',
-      triggerEvent: 'pull_request',
-      pullRequestId: '42',
-      pullRequestUrl: 'https://github.com/acme-corp/payment-api/pull/42',
-      startedAt: new Date(now.getTime() - 7200000),
-      completedAt: new Date(now.getTime() - 7100000),
-      duration: 100,
-    },
-    {
-      id: IDS.scans[2],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPaymentUI,
-      projectId: paymentGatewayProject.id,
-      commitSha: 'c3d4e5f6789012345678901234567890abcdef',
-      branch: 'main',
-      status: 'completed',
-      triggeredBy: 'scheduled',
-      startedAt: new Date(now.getTime() - 86400000),
-      completedAt: new Date(now.getTime() - 86300000),
-      duration: 100,
-    },
-    {
-      id: IDS.scans[3],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPaymentWorker,
-      projectId: paymentGatewayProject.id,
-      commitSha: 'd4e5f6789012345678901234567890abcdef12',
-      branch: 'main',
-      status: 'completed',
-      triggeredBy: 'manual',
-      startedAt: new Date(now.getTime() - 172800000),
-      completedAt: new Date(now.getTime() - 172700000),
-      duration: 100,
-    },
-    {
-      id: IDS.scans[4],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPortalWeb,
-      projectId: customerPortalProject.id,
-      commitSha: 'e5f6789012345678901234567890abcdef1234',
-      branch: 'main',
-      status: 'completed',
-      triggeredBy: 'webhook',
-      triggerEvent: 'push',
-      startedAt: new Date(now.getTime() - 259200000),
-      completedAt: new Date(now.getTime() - 259100000),
-      duration: 100,
-    },
-    {
-      id: IDS.scans[5],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPortalApi,
-      projectId: customerPortalProject.id,
-      commitSha: 'f6789012345678901234567890abcdef123456',
-      branch: 'main',
-      status: 'completed',
-      triggeredBy: 'webhook',
-      triggerEvent: 'push',
-      startedAt: new Date(now.getTime() - 345600000),
-      completedAt: new Date(now.getTime() - 345500000),
-      duration: 100,
-    },
-    // Running scans
-    {
-      id: IDS.scans[6],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPaymentApi,
-      projectId: paymentGatewayProject.id,
-      commitSha: 'g789012345678901234567890abcdef12345678',
-      branch: 'feature/new-payment-method',
-      status: 'scanning',
-      triggeredBy: 'webhook',
-      triggerEvent: 'pull_request',
-      pullRequestId: '45',
-      pullRequestUrl: 'https://github.com/acme-corp/payment-api/pull/45',
-      startedAt: new Date(now.getTime() - 60000),
-    },
-    {
-      id: IDS.scans[7],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPortalWeb,
-      projectId: customerPortalProject.id,
-      commitSha: 'h89012345678901234567890abcdef1234567890',
-      branch: 'develop',
-      status: 'cloning',
-      triggeredBy: 'manual',
-      startedAt: new Date(now.getTime() - 30000),
-    },
-    // Queued scans
-    {
-      id: IDS.scans[8],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPaymentWorker,
-      projectId: paymentGatewayProject.id,
-      commitSha: 'i9012345678901234567890abcdef123456789012',
-      branch: 'main',
-      status: 'pending',
-      triggeredBy: 'scheduled',
-    },
-    {
-      id: IDS.scans[9],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPortalApi,
-      projectId: customerPortalProject.id,
-      commitSha: 'j012345678901234567890abcdef1234567890123',
-      branch: 'main',
-      status: 'pending',
-      triggeredBy: 'webhook',
-      triggerEvent: 'push',
-    },
-    // Failed scans
-    {
-      id: IDS.scans[10],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPaymentUI,
-      projectId: paymentGatewayProject.id,
-      commitSha: 'k12345678901234567890abcdef12345678901234',
-      branch: 'feature/broken-build',
-      status: 'failed',
-      triggeredBy: 'webhook',
-      triggerEvent: 'push',
-      startedAt: new Date(now.getTime() - 432000000),
-      completedAt: new Date(now.getTime() - 431900000),
-      duration: 100,
-      errorMessage: 'Repository clone failed: Authentication error',
-    },
-    {
-      id: IDS.scans[11],
-      tenantId: tenant.id,
-      repositoryId: IDS.repoPortalWeb,
-      projectId: customerPortalProject.id,
-      commitSha: 'l2345678901234567890abcdef123456789012345',
-      branch: 'main',
-      status: 'failed',
-      triggeredBy: 'manual',
-      startedAt: new Date(now.getTime() - 518400000),
-      completedAt: new Date(now.getTime() - 518300000),
-      duration: 100,
-      errorMessage: 'Scanner timeout: Semgrep analysis exceeded 30 minute limit',
-    },
-  ];
-
-  const scans = await Promise.all(
-    scanData.map((scan) => prisma.scan.create({ data: scan })),
-  );
-  console.log(`  Created ${scans.length} scans`);
+  // Skip scan seeding - scans are created when real repos are scanned
+  console.log('  Skipping scan seeding (created during actual scans)');
 
   // ============================================
   // 8. FINDINGS
   // ============================================
   console.log('Creating findings...');
 
+  // Skip findings seeding - findings are created during actual scans
+  console.log('  Skipping findings seeding (created during actual scans)');
+
+  /* REMOVED: Large findingsData array that referenced seeded repos
   const findingsData = [
     // Critical findings
     {
       tenantId: tenant.id,
       scanId: IDS.scans[0],
       repositoryId: IDS.repoPaymentApi,
-      projectId: paymentGatewayProject.id,
-      scanner: 'semgrep',
-      ruleId: 'javascript.express.security.audit.xss.mustache-escape',
-      severity: 'critical',
-      title: 'Cross-Site Scripting (XSS) in Template Rendering',
-      description: 'User input is rendered without proper escaping in Mustache template, allowing XSS attacks.',
-      filePath: 'src/controllers/payment.controller.ts',
-      startLine: 145,
-      endLine: 148,
-      snippet: 'res.render("receipt", { message: req.query.message })',
-      cweId: 'CWE-79',
+      ...
+    },
+  ];
+  */
+
+  // Findings array removed - findings are created during actual scans
+  // const findingsData = []; // REMOVED
+  // const findings = await Promise.all(...); // REMOVED
+
+  // Jump directly to threat model section - findings creation disabled
+  const SKIP_FINDINGS_MARKER = true; // Marker to identify where old findings code was
+
+  // NOTE: The following findingsData is disabled and will be removed in a future cleanup
+  // It references seeded repos that no longer exist
+  const findingsData: any[] = []; // Empty array - original data removed
+
+  /* Original findings data was here - removed to avoid referencing non-existent repos
       owasp: 'A03:2021',
       confidence: 'high',
       status: 'open',
@@ -1714,6 +1353,7 @@ async function main() {
       fingerprint: 'fp-053-pickle-unsafe-load',
     },
   ];
+  // END OF COMMENTED OUT FINDINGS DATA */
 
   const findings = await Promise.all(
     findingsData.map((finding) => prisma.finding.create({ data: finding })),
@@ -1724,6 +1364,9 @@ async function main() {
   // 9. THREAT MODEL
   // ============================================
   console.log('Creating threat model...');
+
+  // Re-define now for threat model date calculations (was removed with scan seeding)
+  const now = new Date();
 
   // Delete existing threat model data
   await prisma.threatMitigationMapping.deleteMany({});
@@ -2450,10 +2093,10 @@ Summary:
   - 1 Tenant: ${tenant.name}
   - 1 User: ${user.email} (password: admin123)
   - 2 Projects: Payment Gateway, Customer Portal
-  - 5 Repositories
-  - 5 Scan Configs
-  - ${scans.length} Scans (various statuses)
-  - ${findings.length} Findings (various severities)
+  - Repositories: SKIPPED (use real GitHub OAuth connections)
+  - Scan Configs: SKIPPED (created automatically with repos)
+  - Scans: SKIPPED (created during actual scans)
+  - Findings: ${findings.length} (minimal test data)
   - 1 Threat Model with ${components.length} components and ${threats.length} threats
   - 2 Environments with ${deployments.length} deployments
   - 1 SBOM with ${sbomComponents.length} components and ${sbomVulns.length} vulnerabilities

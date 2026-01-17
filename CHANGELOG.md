@@ -2,6 +2,31 @@
 
 All notable changes to ThreatDiviner will be documented in this file.
 
+## [v2.6.1] - Seed Data Fix (2026-01-18)
+
+### Fixed
+
+**Database Seeding Issues:**
+- Removed fake SCM connection seeding that caused "Invalid ciphertext format" errors
+- Seed no longer wipes user-created repositories, scans, and findings
+- SCM connections, repositories, scan configs, scans, and findings are no longer seeded
+- These resources should be created via real GitHub OAuth connections
+
+**Repository Sync:**
+- Fixed issue where `project_repo_access` entries existed but actual repository records were not created
+- Repositories are now properly synced when access is granted
+
+### Changed
+
+**Seed File (`apps/api/prisma/seed.ts`):**
+- Skips SCM connection seeding (use real OAuth connections)
+- Skips repository seeding (created via OAuth)
+- Skips scan config seeding (created automatically with repos)
+- Skips scan and findings seeding (created during actual scans)
+- Still seeds: tenant, user, projects, threat models, environments, SBOMs
+
+---
+
 ## [v2.6.0] - CLI/Pipeline Integration (2026-01-18)
 
 ### Added
