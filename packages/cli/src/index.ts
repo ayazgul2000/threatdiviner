@@ -6,6 +6,7 @@ import { scanCommand } from './commands/scan';
 import { configCommand } from './commands/config';
 import { uploadCommand } from './commands/upload';
 import { baselineCommand } from './commands/baseline';
+import { remoteScanCommand } from './commands/remote-scan';
 
 const program = new Command();
 
@@ -38,6 +39,7 @@ program
 
 // Register commands
 program.addCommand(scanCommand);
+program.addCommand(remoteScanCommand);
 program.addCommand(configCommand);
 program.addCommand(uploadCommand);
 program.addCommand(baselineCommand);

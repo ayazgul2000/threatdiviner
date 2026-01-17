@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScmService } from '../scm/services/scm.service';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ProjectsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private scmService: ScmService,
+  ) {}
 
   async findAll(tenantId: string) {
     const projects = await this.prisma.project.findMany({
@@ -275,6 +281,7 @@ export class ProjectsService {
 
   /**
    * Grant a project access to specific repositories from a connection
+   * Also creates the actual repository records for scanning
    */
   async grantRepoAccess(
     tenantId: string,
@@ -292,21 +299,33 @@ export class ProjectsService {
       throw new NotFoundException('Project does not have access to this connection. Grant connection access first.');
     }
 
-    // Create repo access entries
+    // Create repo access entries and repository records
     const created = await Promise.all(
       repos.map(async (repo) => {
         const existing = await this.prisma.projectRepoAccess.findFirst({
           where: { projectAccessId: access.id, externalRepoId: repo.externalRepoId },
         });
-        if (existing) return existing;
 
-        return this.prisma.projectRepoAccess.create({
+        // Create repo access entry if not exists
+        const repoAccess = existing || await this.prisma.projectRepoAccess.create({
           data: {
             projectAccessId: access.id,
             externalRepoId: repo.externalRepoId,
             fullName: repo.fullName,
           },
         });
+
+        // Also create the actual repository record for scanning
+        try {
+          await this.scmService.addRepository(tenantId, connectionId, repo.fullName, projectId);
+          this.logger.log(`Created repository record for ${repo.fullName}`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Failed to create repository record for ${repo.fullName}: ${message}`);
+          // Continue - repo access is still granted even if repository creation fails
+        }
+
+        return repoAccess;
       }),
     );
 

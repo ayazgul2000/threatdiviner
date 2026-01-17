@@ -66,7 +66,7 @@ function saveConfig(config: CliConfig): void {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
 
-async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
+async function apiRequest(endpoint: string, options: { method?: string; body?: string } = {}): Promise<any> {
   const config = loadConfig();
 
   if (!config.token) {
@@ -78,11 +78,11 @@ async function apiRequest(endpoint: string, options: RequestInit = {}): Promise<
   const url = `${config.apiUrl}${endpoint}`;
 
   const response = await fetch(url, {
-    ...options,
+    method: options.method || 'GET',
+    body: options.body,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.token}`,
-      ...options.headers,
     },
   });
 

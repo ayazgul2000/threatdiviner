@@ -1011,4 +1011,50 @@ export class ScmService {
   getDecryptedToken(connection: { accessToken: string }): string {
     return this.cryptoService.decrypt(connection.accessToken);
   }
+
+  // ========== CLI/Pipeline Integration Methods ==========
+
+  /**
+   * Get latest commit for a branch (for CLI/pipeline use)
+   */
+  async getLatestCommit(
+    tenantId: string,
+    connectionId: string,
+    owner: string,
+    repo: string,
+    branch: string,
+  ): Promise<{ sha: string; message?: string; author?: string }> {
+    const connection = await this.getConnection(tenantId, connectionId);
+    const provider = this.getProvider(connection.provider);
+    const token = this.cryptoService.decrypt(connection.accessToken);
+
+    const commit = await provider.getLatestCommit(token, owner, repo, branch);
+    return {
+      sha: commit.sha,
+      message: commit.message,
+      author: commit.author?.name,
+    };
+  }
+
+  /**
+   * Create a check run (for CLI/pipeline use)
+   */
+  async createCheckRun(
+    token: string,
+    providerName: string,
+    owner: string,
+    repo: string,
+    sha: string,
+    name: string,
+    status: 'queued' | 'in_progress' | 'completed',
+  ): Promise<string> {
+    const provider = this.getProvider(providerName);
+
+    // Only GitHub supports check runs directly
+    if (providerName !== 'github' || !('createCheckRun' in provider)) {
+      throw new BadRequestException(`Check runs not supported for provider ${providerName}`);
+    }
+
+    return (provider as GitHubProvider).createCheckRun(token, owner, repo, sha, name, status);
+  }
 }

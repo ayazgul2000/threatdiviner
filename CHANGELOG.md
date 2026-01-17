@@ -2,6 +2,82 @@
 
 All notable changes to ThreatDiviner will be documented in this file.
 
+## [v2.6.0] - CLI/Pipeline Integration (2026-01-18)
+
+### Added
+
+#### CLI/Pipeline Remote Scan Feature
+Complete CI/CD pipeline integration allowing pipelines to trigger scans on the ThreatDiviner server.
+
+**API Endpoints:**
+- `POST /cli/trigger-scan` - Trigger a remote scan from CLI/pipeline
+- `GET /cli/capabilities?repository=` - Get available write-back capabilities for a repository
+- `GET /cli/default-settings?repository=` - Get effective settings that would apply for CLI scans
+
+**CLI Command (`tdiv remote-scan`):**
+```bash
+tdiv remote-scan [options]
+  -r, --repository <name>   Repository name (owner/repo)
+  -b, --branch <name>       Branch name
+  -c, --commit <sha>        Commit SHA
+  --pr <number>             Pull request number
+  --scanners <list>         Comma-separated scanners (semgrep,trivy,gitleaks,checkov)
+  --write-back <options>    Write-back options (pr_comments,pr_summary,check_status,annotations,sarif_upload)
+  --fail-on <severity>      Pipeline gate severity (none,critical,high,medium,low)
+  --fail-count <number>     Pipeline gate count threshold
+  --no-wait                 Don't wait for scan completion
+  --timeout <seconds>       Scan timeout (default: 600)
+  --api-url <url>           ThreatDiviner API URL
+  --api-key <key>           API key
+  -q, --quiet               Quiet mode
+  --json                    JSON output
+```
+
+**Dashboard UI (Repository Settings):**
+- New "CLI/Pipeline Integration" settings card
+- Master toggle: "Apply these settings for CLI/Pipeline scans"
+- Write-back options configuration (PR comments, summary, check status, annotations, SARIF upload)
+- Comment severity filtering and max comments settings
+- Pipeline gate settings (fail on severity, fail on count)
+- Info box showing minimal defaults when toggle is off
+
+**Settings Priority:**
+1. CLI command flags (highest priority)
+2. Repository settings (if "Apply for CLI" is enabled)
+3. Minimal defaults: Semgrep, Trivy, Gitleaks + PR summary + fail on critical
+
+**Write-back Capabilities (per SCM provider):**
+- GitHub: PR comments, PR summary, check status, annotations, SARIF upload
+- GitLab: PR comments, PR summary, check status
+- Bitbucket: PR comments, PR summary
+- Azure DevOps: PR comments, PR summary, check status
+
+### Changed
+
+**Database Schema:**
+- `ScanConfig` model: Added CLI/Pipeline settings fields
+  - `applySettingsForCLI` - Enable repo settings for CLI scans
+  - `cliWriteBackPRComments`, `cliWriteBackPRSummary`, `cliWriteBackCheckStatus`, `cliWriteBackAnnotations`, `cliWriteBackSarif` - Write-back toggles
+  - `cliCommentSeverities`, `cliMaxComments` - Comment configuration
+  - `cliFailOnSeverity`, `cliFailOnCount` - Pipeline gate settings
+
+- `Scan` model: Added CLI metadata fields
+  - `cliTriggered` - Flag indicating CLI-triggered scan
+  - `cliWriteBackConfig` - Write-back options enabled for this scan
+  - `cliFailOnSeverity`, `cliFailOnCount` - Pipeline gate settings used
+
+**Files Modified:**
+- `apps/api/prisma/schema.prisma` - Schema updates
+- `apps/api/src/cli/cli.module.ts` - Added ScmModule, QueueModule imports
+- `apps/api/src/cli/cli.service.ts` - Added `triggerRemoteScan`, `getCapabilities`, `getDefaultSettings`
+- `apps/api/src/cli/cli.controller.ts` - Added trigger-scan, capabilities, default-settings endpoints
+- `apps/api/src/scm/services/scm.service.ts` - Added `getLatestCommit`, `createCheckRun` methods
+- `apps/dashboard/src/app/dashboard/repos/[repoId]/settings/page.tsx` - Added CLI settings UI
+- `packages/cli/src/commands/remote-scan.ts` - New CLI command
+- `packages/cli/src/index.ts` - Registered remote-scan command
+
+---
+
 ## [Unreleased] - BATCH 21: Fix Broken Features from BATCH-20 (2026-01-02)
 
 ### Fixed

@@ -100,6 +100,20 @@ export default function RepositorySettingsPage() {
     blockPrOnSeverity: 'none' as 'none' | 'critical' | 'high' | 'medium',
   });
 
+  // CLI/Pipeline Settings
+  const [cliSettings, setCliSettings] = useState({
+    applySettingsForCLI: false,
+    writeBackPRComments: true,
+    writeBackPRSummary: true,
+    writeBackCheckStatus: true,
+    writeBackAnnotations: false,
+    writeBackSarif: false,
+    commentSeverities: ['critical', 'high'] as string[],
+    maxComments: 20,
+    failOnSeverity: 'critical' as 'none' | 'critical' | 'high' | 'medium' | 'low',
+    failOnCount: 0,
+  });
+
   useEffect(() => {
     const fetchRepository = async () => {
       try {
@@ -128,6 +142,19 @@ export default function RepositorySettingsPage() {
             inlineAnnotations: config.inlineAnnotations ?? true,
             sarifUploadEnabled: config.sarifUploadEnabled ?? false,
             blockPrOnSeverity: config.blockPrOnSeverity ?? 'none',
+          });
+          // Load CLI settings
+          setCliSettings({
+            applySettingsForCLI: config.applySettingsForCLI ?? false,
+            writeBackPRComments: config.cliWriteBackPRComments ?? true,
+            writeBackPRSummary: config.cliWriteBackPRSummary ?? true,
+            writeBackCheckStatus: config.cliWriteBackCheckStatus ?? true,
+            writeBackAnnotations: config.cliWriteBackAnnotations ?? false,
+            writeBackSarif: config.cliWriteBackSarif ?? false,
+            commentSeverities: config.cliCommentSeverities ?? ['critical', 'high'],
+            maxComments: config.cliMaxComments ?? 20,
+            failOnSeverity: config.cliFailOnSeverity ?? 'critical',
+            failOnCount: config.cliFailOnCount ?? 0,
           });
         }
       } catch (err) {
@@ -199,6 +226,17 @@ export default function RepositorySettingsPage() {
         inlineAnnotations: writebackSettings.enabled && writebackSettings.inlineAnnotations,
         sarifUploadEnabled: writebackSettings.enabled && writebackSettings.sarifUploadEnabled,
         blockPrOnSeverity: writebackSettings.enabled ? writebackSettings.blockPrOnSeverity : 'none',
+        // CLI/Pipeline settings
+        applySettingsForCLI: cliSettings.applySettingsForCLI,
+        cliWriteBackPRComments: cliSettings.writeBackPRComments,
+        cliWriteBackPRSummary: cliSettings.writeBackPRSummary,
+        cliWriteBackCheckStatus: cliSettings.writeBackCheckStatus,
+        cliWriteBackAnnotations: cliSettings.writeBackAnnotations,
+        cliWriteBackSarif: cliSettings.writeBackSarif,
+        cliCommentSeverities: cliSettings.commentSeverities,
+        cliMaxComments: cliSettings.maxComments,
+        cliFailOnSeverity: cliSettings.failOnSeverity,
+        cliFailOnCount: cliSettings.failOnCount,
       });
 
       setSuccess('Settings saved successfully');
@@ -632,6 +670,190 @@ export default function RepositorySettingsPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* CLI/Pipeline Settings */}
+      <Card variant="bordered">
+        <CardHeader>
+          <CardTitle>CLI/Pipeline Integration</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Master toggle */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <label className="flex items-center gap-3">
+                <button
+                  onClick={() => setCliSettings({ ...cliSettings, applySettingsForCLI: !cliSettings.applySettingsForCLI })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    cliSettings.applySettingsForCLI ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      cliSettings.applySettingsForCLI ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">Apply these settings for CLI/Pipeline scans</span>
+                  <p className="text-xs text-gray-500">When enabled, scans triggered via CLI will use these settings. Otherwise, minimal defaults apply.</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Default settings info (when toggle is off) */}
+            {!cliSettings.applySettingsForCLI && (
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-700 dark:text-blue-300 font-medium mb-2">Minimal Defaults (currently active for CLI scans)</p>
+                <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                  <li>• <strong>Scanners:</strong> Semgrep, Trivy, Gitleaks</li>
+                  <li>• <strong>Write-back:</strong> PR Summary, Check Status</li>
+                  <li>• <strong>Pipeline Gate:</strong> Fail on Critical severity</li>
+                </ul>
+                <p className="text-xs text-blue-500 mt-2">
+                  CLI flags can always override these settings when triggering scans.
+                </p>
+              </div>
+            )}
+
+            {/* CLI Settings (enabled when master toggle is on) */}
+            {cliSettings.applySettingsForCLI && (
+              <div className="space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                {/* Write-back options */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Write-back Options</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={cliSettings.writeBackPRComments}
+                        onChange={(e) => setCliSettings({ ...cliSettings, writeBackPRComments: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Inline PR comments</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={cliSettings.writeBackPRSummary}
+                        onChange={(e) => setCliSettings({ ...cliSettings, writeBackPRSummary: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">PR summary comment</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={cliSettings.writeBackCheckStatus}
+                        onChange={(e) => setCliSettings({ ...cliSettings, writeBackCheckStatus: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Check run status</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={cliSettings.writeBackAnnotations}
+                        onChange={(e) => setCliSettings({ ...cliSettings, writeBackAnnotations: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Code annotations</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={cliSettings.writeBackSarif}
+                        onChange={(e) => setCliSettings({ ...cliSettings, writeBackSarif: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Upload SARIF to Security tab</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Comment settings */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Comment on Severities
+                    </label>
+                    <div className="space-y-1">
+                      {['critical', 'high', 'medium', 'low'].map((sev) => (
+                        <label key={sev} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={cliSettings.commentSeverities.includes(sev)}
+                            onChange={(e) => {
+                              const newSeverities = e.target.checked
+                                ? [...cliSettings.commentSeverities, sev]
+                                : cliSettings.commentSeverities.filter(s => s !== sev);
+                              setCliSettings({ ...cliSettings, commentSeverities: newSeverities });
+                            }}
+                            className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-xs text-gray-600 dark:text-gray-400 capitalize">{sev}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Max Comments
+                    </label>
+                    <input
+                      type="number"
+                      value={cliSettings.maxComments}
+                      onChange={(e) => setCliSettings({ ...cliSettings, maxComments: parseInt(e.target.value) || 20 })}
+                      min={1}
+                      max={100}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Pipeline gate settings */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Pipeline Gate</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Fail on Severity
+                      </label>
+                      <select
+                        value={cliSettings.failOnSeverity}
+                        onChange={(e) => setCliSettings({ ...cliSettings, failOnSeverity: e.target.value as typeof cliSettings.failOnSeverity })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                      >
+                        <option value="none">None (never fail)</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Fail on Count
+                      </label>
+                      <input
+                        type="number"
+                        value={cliSettings.failOnCount}
+                        onChange={(e) => setCliSettings({ ...cliSettings, failOnCount: parseInt(e.target.value) || 0 })}
+                        min={0}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">0 = disabled (severity-based only)</p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  Note: CLI command flags can override these settings when triggering scans.
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

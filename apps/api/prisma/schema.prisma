@@ -232,6 +232,25 @@ model ScanConfig {
   inlineAnnotations    Boolean    @default(true) @map("inline_annotations")
   sarifUploadEnabled   Boolean    @default(false) @map("sarif_upload_enabled")
   blockPrOnSeverity    String     @default("none") @map("block_pr_on_severity") // none, critical, high, medium
+
+  // CLI/Pipeline Integration Settings
+  // When true, these repo settings apply to CLI/pipeline-triggered scans
+  // Priority: CLI flags > repo settings (if enabled) > minimal defaults
+  applySettingsForCLI      Boolean    @default(false) @map("apply_settings_for_cli")
+
+  // CLI Write-back options (what to send back to the pipeline/SCM)
+  cliWriteBackPRComments   Boolean    @default(true) @map("cli_write_back_pr_comments")
+  cliWriteBackPRSummary    Boolean    @default(true) @map("cli_write_back_pr_summary")
+  cliWriteBackCheckStatus  Boolean    @default(true) @map("cli_write_back_check_status")
+  cliWriteBackAnnotations  Boolean    @default(false) @map("cli_write_back_annotations")
+  cliWriteBackSarif        Boolean    @default(false) @map("cli_write_back_sarif")
+  cliCommentSeverities     String[]   @default(["critical", "high"]) @map("cli_comment_severities")
+  cliMaxComments           Int        @default(20) @map("cli_max_comments")
+
+  // CLI Pipeline gate settings
+  cliFailOnSeverity        String     @default("critical") @map("cli_fail_on_severity") // none, critical, high, medium, low
+  cliFailOnCount           Int        @default(0) @map("cli_fail_on_count") // 0 = disabled
+
   // Branch-level overrides (JSON map of branchName -> partial config)
   branchOverrides      Json?      @map("branch_overrides")
   createdAt            DateTime   @default(now()) @map("created_at")
@@ -264,6 +283,13 @@ model Scan {
   errorMessage   String?    @map("error_message")
   createdAt      DateTime   @default(now()) @map("created_at")
   projectId      String?    @map("project_id")
+
+  // CLI/Pipeline trigger metadata
+  cliTriggered         Boolean   @default(false) @map("cli_triggered")
+  cliWriteBackConfig   String[]  @default([]) @map("cli_write_back_config") // Write-back options enabled for this scan
+  cliFailOnSeverity    String?   @map("cli_fail_on_severity") // Pipeline gate: fail on this severity
+  cliFailOnCount       Int?      @map("cli_fail_on_count") // Pipeline gate: fail if count exceeds
+
   findings       Finding[]
   project        Project?   @relation(fields: [projectId], references: [id])
   repository     Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
@@ -273,6 +299,7 @@ model Scan {
   @@index([repositoryId])
   @@index([projectId])
   @@index([status])
+  @@index([cliTriggered])
   @@map("scans")
 }
 

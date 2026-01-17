@@ -70,7 +70,7 @@ export const uploadCommand = new Command('upload')
         throw new Error(`Upload failed: ${error}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as { scanId: string; findingsCount: number; dashboardUrl?: string };
 
       if (spinner) {
         spinner.succeed('Results uploaded successfully');
