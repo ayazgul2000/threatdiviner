@@ -144,6 +144,8 @@ export class PRCommentsService {
 
   /**
    * Update check run with annotations for all findings
+   * For PR scans: includes annotations (they link correctly) - batched in chunks of 50
+   * For non-PR scans: skip annotations (they don't link correctly), use enhanced summary with direct links
    */
   async updateCheckRunWithAnnotations(
     scanId: string,
@@ -173,17 +175,10 @@ export class PRCommentsService {
 
     const accessToken = this.cryptoService.decrypt(connection.accessToken);
     const [owner, repo] = scan.repository.fullName.split('/');
+    const isPRScan = !!scan.pullRequestId;
 
-    // Build annotations (max 50 per API call)
-    const annotations = scan.findings.slice(0, 50).map(f => ({
-      path: f.filePath,
-      start_line: f.startLine || 1,
-      end_line: f.endLine || f.startLine || 1,
-      annotation_level: this.mapSeverityToAnnotationLevel(f.severity),
-      title: f.ruleId,
-      message: f.title || f.description || 'Security finding',
-      raw_details: f.snippet || undefined,
-    }));
+    // Sort findings by severity (critical > high > medium > low > info)
+    const sortedFindings = this.sortFindingsBySeverity(scan.findings);
 
     // Determine conclusion based on findings
     const hasCritical = scan.findings.some(f => f.severity === 'critical');
@@ -193,25 +188,95 @@ export class PRCommentsService {
     else if (hasHigh) conclusion = 'failure';
     else if (scan.findings.length > 0) conclusion = 'neutral';
 
-    const summary = this.buildCheckRunSummary(scan.findings);
+    // Build summary - for non-PR scans, include direct links to files
+    const summary = isPRScan
+      ? this.buildCheckRunSummary(scan.findings)
+      : this.buildCheckRunSummaryWithLinks(sortedFindings, owner, repo, scan.commitSha);
 
     try {
-      await this.githubProvider.updateCheckRunWithAnnotations(
-        accessToken,
-        owner,
-        repo,
-        checkRunId,
-        'completed',
-        conclusion,
-        {
-          title: 'ThreatDiviner Security Scan',
-          summary,
-          annotations,
-        },
-      );
+      if (isPRScan && sortedFindings.length > 0) {
+        // Build all annotations, prioritized by severity
+        const allAnnotations = sortedFindings.map(f => ({
+          path: f.filePath,
+          start_line: f.startLine || 1,
+          end_line: f.endLine || f.startLine || 1,
+          annotation_level: this.mapSeverityToAnnotationLevel(f.severity),
+          title: f.ruleId,
+          message: f.title || f.description || 'Security finding',
+          raw_details: f.snippet || undefined,
+        }));
+
+        // GitHub API limits to 50 annotations per request, batch them
+        const BATCH_SIZE = 50;
+        const batches: typeof allAnnotations[] = [];
+        for (let i = 0; i < allAnnotations.length; i += BATCH_SIZE) {
+          batches.push(allAnnotations.slice(i, i + BATCH_SIZE));
+        }
+
+        this.logger.log(`Posting ${allAnnotations.length} annotations in ${batches.length} batch(es)`);
+
+        // Post each batch - first batch includes summary, subsequent are append-only
+        for (let i = 0; i < batches.length; i++) {
+          const isLastBatch = i === batches.length - 1;
+          const batch = batches[i];
+
+          await this.githubProvider.updateCheckRunWithAnnotations(
+            accessToken,
+            owner,
+            repo,
+            checkRunId,
+            isLastBatch ? 'completed' : 'in_progress',
+            isLastBatch ? conclusion : undefined,
+            {
+              title: 'ThreatDiviner Security Scan',
+              summary, // GitHub overwrites summary each update, but it's required
+              annotations: batch,
+            },
+          );
+
+          // Small delay between batches to avoid rate limiting
+          if (!isLastBatch) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      } else {
+        // Non-PR scan or no findings - single update with summary only
+        await this.githubProvider.updateCheckRunWithAnnotations(
+          accessToken,
+          owner,
+          repo,
+          checkRunId,
+          'completed',
+          conclusion,
+          {
+            title: 'ThreatDiviner Security Scan',
+            summary,
+            annotations: undefined,
+          },
+        );
+      }
     } catch (error) {
       this.logger.error(`Failed to update check run with annotations: ${error}`);
     }
+  }
+
+  /**
+   * Sort findings by severity priority: critical > high > medium > low > info
+   */
+  private sortFindingsBySeverity(findings: Finding[]): Finding[] {
+    const severityOrder: Record<string, number> = {
+      critical: 0,
+      high: 1,
+      medium: 2,
+      low: 3,
+      info: 4,
+    };
+
+    return [...findings].sort((a, b) => {
+      const orderA = severityOrder[a.severity.toLowerCase()] ?? 5;
+      const orderB = severityOrder[b.severity.toLowerCase()] ?? 5;
+      return orderA - orderB;
+    });
   }
 
   private formatFindingComment(finding: Finding): string {
@@ -288,6 +353,70 @@ export class PRCommentsService {
     };
 
     return `Found ${findings.length} security issues:\n- Critical: ${counts.critical}\n- High: ${counts.high}\n- Medium: ${counts.medium}\n- Low: ${counts.low}`;
+  }
+
+  /**
+   * Build check run summary with direct file links (for non-PR scans)
+   * Since annotations don't link correctly for non-PR scans, we include direct links in the summary
+   */
+  private buildCheckRunSummaryWithLinks(
+    sortedFindings: Finding[],
+    owner: string,
+    repo: string,
+    commitSha: string,
+  ): string {
+    if (sortedFindings.length === 0) {
+      return '✅ No security issues found!';
+    }
+
+    const counts = {
+      critical: sortedFindings.filter(f => f.severity === 'critical').length,
+      high: sortedFindings.filter(f => f.severity === 'high').length,
+      medium: sortedFindings.filter(f => f.severity === 'medium').length,
+      low: sortedFindings.filter(f => f.severity === 'low').length,
+    };
+
+    const severityEmoji: Record<string, string> = {
+      critical: '🔴',
+      high: '🟠',
+      medium: '🟡',
+      low: '🔵',
+      info: '⚪',
+    };
+
+    const lines = [
+      `Found **${sortedFindings.length}** security issues:`,
+      '',
+      '| Severity | Count |',
+      '|----------|-------|',
+      `| 🔴 Critical | ${counts.critical} |`,
+      `| 🟠 High | ${counts.high} |`,
+      `| 🟡 Medium | ${counts.medium} |`,
+      `| 🔵 Low | ${counts.low} |`,
+      '',
+      '---',
+      '',
+      '### Top Findings (by severity)',
+      '',
+    ];
+
+    // Show top 50 findings with direct links, prioritized by severity
+    const topFindings = sortedFindings.slice(0, 50);
+    for (const finding of topFindings) {
+      const emoji = severityEmoji[finding.severity.toLowerCase()] || '⚪';
+      const line = finding.startLine || 1;
+      const fileUrl = `https://github.com/${owner}/${repo}/blob/${commitSha}/${finding.filePath}#L${line}`;
+      lines.push(
+        `- ${emoji} **${finding.severity.toUpperCase()}** - [${finding.filePath}:${line}](${fileUrl})`,
+        `  - \`${finding.ruleId}\`: ${finding.title || 'Security finding'}`,
+      );
+    }
+
+    if (sortedFindings.length > 50) {
+      lines.push('', `*... and ${sortedFindings.length - 50} more findings*`);
+    }
+
+    return lines.join('\n');
   }
 
   private mapSeverityToAnnotationLevel(

@@ -4,6 +4,7 @@ import { Job, Worker } from 'bullmq';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from '../../scm/services/crypto.service';
 import { PRCommentsService } from '../../scm/services/pr-comments.service';
+import { SarifUploadService } from '../../scm/services/sarif-upload.service';
 import { GitHubProvider } from '../../scm/providers';
 import { GitService, LanguageStats } from '../../scanners/utils';
 import { SemgrepScanner } from '../../scanners/sast/semgrep';
@@ -54,6 +55,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly notificationsService: NotificationsService,
     private readonly prCommentsService: PRCommentsService,
     private readonly findingEnrichmentService: FindingEnrichmentService,
+    private readonly sarifUploadService: SarifUploadService,
     @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
   ) {
     this.aiTriageEnabled = this.configService.get('AI_TRIAGE_ENABLED', 'false') === 'true';
@@ -166,8 +168,9 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       let dedupedFindings = this.findingProcessor.deduplicateFindings(allFindings);
       await job.updateProgress(75);
 
-      // 4b. Apply diff filter for PR scans (diff-only mode)
-      if (job.data.pullRequestId && job.data.config.prDiffOnly) {
+      // 4b. Apply diff filter (diff-only mode)
+      // Works for both PR scans and branch scans
+      if (job.data.config.prDiffOnly) {
         dedupedFindings = await this.applyDiffFilter(job.data, dedupedFindings);
       }
       await job.updateProgress(80);
@@ -199,8 +202,16 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
 
       // 7b. Post PR inline comments (if PR scan)
       if (job.data.pullRequestId) {
-        await this.postPRComments(scanId, job.data.checkRunId);
+        await this.postPRComments(scanId);
       }
+
+      // 7c. Update check run with annotations (for all scans with checkRunId)
+      if (job.data.checkRunId) {
+        await this.updateCheckRunAnnotations(scanId, job.data.checkRunId);
+      }
+
+      // 7d. Upload SARIF to GitHub Security tab (if enabled in write-back config)
+      await this.uploadSarifIfEnabled(scanId);
 
       // 8. Complete
       await this.completeScan(scanId, storedCount, Date.now() - startTime);
@@ -607,33 +618,84 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async postPRComments(scanId: string, checkRunId?: string): Promise<void> {
+  private async postPRComments(scanId: string): Promise<void> {
     try {
       // Post inline comments on PR
       const { posted, skipped } = await this.prCommentsService.postPRComments(scanId);
       this.logger.log(`Posted ${posted} PR comments (${skipped} skipped due to limit)`);
-
-      // Update check run with annotations
-      if (checkRunId) {
-        await this.prCommentsService.updateCheckRunWithAnnotations(scanId, checkRunId);
-      }
     } catch (error) {
       // Log but don't fail the scan if PR comments fail
       this.logger.error(`PR comments failed: ${error}`);
     }
   }
 
+  private async updateCheckRunAnnotations(scanId: string, checkRunId: string): Promise<void> {
+    try {
+      await this.prCommentsService.updateCheckRunWithAnnotations(scanId, checkRunId);
+      this.logger.log(`Updated check run ${checkRunId} with annotations`);
+    } catch (error) {
+      // Log but don't fail the scan if annotations fail
+      this.logger.error(`Check run annotations failed: ${error}`);
+    }
+  }
+
+  /**
+   * Upload SARIF to GitHub Security tab if enabled in scan's write-back config
+   */
+  private async uploadSarifIfEnabled(scanId: string): Promise<void> {
+    try {
+      // Check if SARIF upload is enabled for this scan
+      const scan = await this.prisma.scan.findUnique({
+        where: { id: scanId },
+        select: { cliWriteBackConfig: true, repositoryId: true },
+      });
+
+      if (!scan) return;
+
+      // Check CLI write-back config first
+      const cliEnabled = scan.cliWriteBackConfig?.includes('sarif_upload');
+
+      // If not CLI-triggered, check repository scan config
+      let repoEnabled = false;
+      if (!cliEnabled) {
+        const scanConfig = await this.prisma.scanConfig.findUnique({
+          where: { repositoryId: scan.repositoryId },
+          select: { sarifUploadEnabled: true },
+        });
+        repoEnabled = scanConfig?.sarifUploadEnabled ?? false;
+      }
+
+      if (!cliEnabled && !repoEnabled) {
+        this.logger.debug(`SARIF upload not enabled for scan ${scanId}`);
+        return;
+      }
+
+      // Generate SARIF and upload
+      this.logger.log(`Uploading SARIF to GitHub Security tab for scan ${scanId}`);
+      const sarifContent = await this.sarifUploadService.generateSarifFromScan(scanId);
+      const result = await this.sarifUploadService.uploadSarif(scanId, sarifContent);
+
+      if (result.success) {
+        this.logger.log(`SARIF uploaded successfully: ${result.url}`);
+      } else {
+        this.logger.warn(`SARIF upload failed: ${result.error}`);
+      }
+    } catch (error) {
+      // Log but don't fail the scan if SARIF upload fails
+      this.logger.error(`SARIF upload failed: ${error}`);
+    }
+  }
+
   /**
    * Apply diff filter to only include findings in changed lines
+   * Supports both PR scans (diff against base) and branch scans (diff against default branch)
    */
   private async applyDiffFilter(
     data: ScanJobData,
     findings: NormalizedFinding[],
   ): Promise<NormalizedFinding[]> {
     try {
-      this.logger.log(`Applying diff filter for PR #${data.pullRequestId}`);
-
-      // Get the PR diff from GitHub
+      // Get SCM connection
       const connection = await this.prisma.scmConnection.findUnique({
         where: { id: data.connectionId },
       });
@@ -646,13 +708,41 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       const accessToken = this.cryptoService.decrypt(connection.accessToken);
       const [owner, repo] = data.fullName.split('/');
 
-      // Get PR diff
-      const diffText = await this.githubProvider.getPullRequestDiff(
-        accessToken,
-        owner,
-        repo,
-        data.pullRequestId!,
-      );
+      let diffText: string;
+
+      if (data.pullRequestId) {
+        // PR scan: Get PR diff
+        this.logger.log(`Applying diff filter for PR #${data.pullRequestId}`);
+        diffText = await this.githubProvider.getPullRequestDiff(
+          accessToken,
+          owner,
+          repo,
+          data.pullRequestId,
+        );
+      } else {
+        // Branch scan: Get diff against default branch
+        const repository = await this.prisma.repository.findUnique({
+          where: { id: data.repositoryId },
+          select: { defaultBranch: true },
+        });
+
+        const defaultBranch = repository?.defaultBranch || 'main';
+
+        // Skip if scanning the default branch itself
+        if (data.branch === defaultBranch) {
+          this.logger.log(`Scanning default branch ${defaultBranch}, diff filter not applicable`);
+          return findings;
+        }
+
+        this.logger.log(`Applying diff filter: ${defaultBranch}...${data.branch}`);
+        diffText = await this.githubProvider.getBranchDiff(
+          accessToken,
+          owner,
+          repo,
+          defaultBranch,
+          data.branch,
+        );
+      }
 
       if (!diffText) {
         this.logger.warn('No diff found, skipping filter');
@@ -663,11 +753,13 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       const diffData = this.diffFilterService.parseDiff(diffText);
 
       // Cache the diff for later use (e.g., for PR comments)
-      await this.diffFilterService.cacheDiff(
-        data.scanId,
-        data.pullRequestId!,
-        diffData,
-      );
+      if (data.pullRequestId) {
+        await this.diffFilterService.cacheDiff(
+          data.scanId,
+          data.pullRequestId,
+          diffData,
+        );
+      }
 
       // Filter findings
       const filtered = this.diffFilterService.filterFindingsByDiff(findings, diffData);

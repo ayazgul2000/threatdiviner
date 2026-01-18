@@ -305,7 +305,7 @@ export const findingsApi = {
       });
     }
     const query = params.toString() ? `?${params.toString()}` : '';
-    return fetchApi<{ findings: Finding[]; total: number }>(`/scm/findings${query}`);
+    return fetchApi<{ findings: Finding[]; total: number; counts: { critical: number; high: number; medium: number; low: number; info: number } }>(`/scm/findings${query}`);
   },
 
   get: (id: string) =>

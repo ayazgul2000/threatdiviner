@@ -43,7 +43,7 @@ export class AuthController {
     this.accessCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' as const : 'lax' as const,
       maxAge: accessMaxAge,
       path: '/',
     };
@@ -51,7 +51,7 @@ export class AuthController {
     this.refreshCookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' as const : 'lax' as const,
       maxAge: refreshMaxAge,
       path: '/auth/refresh',
     };
@@ -120,14 +120,14 @@ export class AuthController {
     res.clearCookie(this.accessCookieName, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' as const : 'lax' as const,
       path: '/',
     });
 
     res.clearCookie(this.refreshCookieName, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' as const : 'lax' as const,
       path: '/auth/refresh',
     });
 

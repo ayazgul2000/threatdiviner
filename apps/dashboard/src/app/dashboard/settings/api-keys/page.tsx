@@ -79,7 +79,10 @@ export default function ApiKeysPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name: newKeyName.trim() }),
+        body: JSON.stringify({
+          name: newKeyName.trim(),
+          scopes: ['scans:read', 'scans:trigger', 'findings:read', 'findings:update', 'repositories:read', 'baselines:read', 'baselines:manage'],
+        }),
       });
 
       if (!response.ok) {

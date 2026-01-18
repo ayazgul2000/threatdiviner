@@ -912,7 +912,15 @@ export class ScmService {
       where.scan = { repositoryId };
     }
 
-    const [findings, total] = await Promise.all([
+    // Base where clause without severity/status filters for total counts
+    const baseWhere: any = { tenantId };
+    if (scanId) baseWhere.scanId = scanId;
+    if (projectId) baseWhere.projectId = projectId;
+    if (repositoryId) {
+      baseWhere.scan = { repositoryId };
+    }
+
+    const [findings, total, severityCounts] = await Promise.all([
       this.prisma.finding.findMany({
         where,
         include: {
@@ -931,12 +939,33 @@ export class ScmService {
         skip: offset,
       }),
       this.prisma.finding.count({ where }),
+      // Get counts by severity for open findings (ignoring current severity/status filters)
+      this.prisma.finding.groupBy({
+        by: ['severity'],
+        where: { ...baseWhere, status: 'open' },
+        _count: { severity: true },
+      }),
     ]);
 
     // Transform findings to match frontend expected format
     const transformedFindings = findings.map((f) => this.transformFinding(f));
 
-    return { findings: transformedFindings, total };
+    // Transform severity counts into an object
+    const counts = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+    };
+    for (const item of severityCounts) {
+      const sev = item.severity.toLowerCase() as keyof typeof counts;
+      if (sev in counts) {
+        counts[sev] = item._count.severity;
+      }
+    }
+
+    return { findings: transformedFindings, total, counts };
   }
 
   async getFinding(tenantId: string, findingId: string) {

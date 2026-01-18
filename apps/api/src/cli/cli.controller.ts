@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body, Query, UseGuards, Logger } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../libs/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../libs/auth/decorators/current-user.decorator';
+import { CliAuthGuard } from './cli-auth.guard';
 import {
   CliService,
   UploadResult,
@@ -27,6 +27,7 @@ interface TriggerScanDto {
   writeBack?: WriteBackCapability[];
   failOnSeverity?: string;
   failOnCount?: number;
+  diffOnly?: boolean; // Only report findings in changed files (compared to default branch)
 }
 
 interface AuthenticatedUser {
@@ -36,7 +37,7 @@ interface AuthenticatedUser {
 
 @ApiTags('cli')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(CliAuthGuard)
 @Controller('cli')
 export class CliController {
   private readonly logger = new Logger(CliController.name);
@@ -112,6 +113,7 @@ export class CliController {
       writeBack: dto.writeBack,
       failOnSeverity: dto.failOnSeverity,
       failOnCount: dto.failOnCount,
+      diffOnly: dto.diffOnly,
     });
   }
 

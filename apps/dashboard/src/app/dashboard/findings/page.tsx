@@ -38,6 +38,7 @@ export default function FindingsPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [scanInfo, setScanInfo] = useState<{ repoName: string; branch: string; repoId: string; openCount: number; closedCount: number } | null>(null);
   const [total, setTotal] = useState(0);
+  const [severityCounts, setSeverityCounts] = useState({ critical: 0, high: 0, medium: 0, low: 0, info: 0 });
   const [loading, setLoading] = useState(true);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -53,6 +54,8 @@ export default function FindingsPage() {
     status: '',
     scanner: '',
   });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const toastCtx = useToast();
 
@@ -83,14 +86,17 @@ export default function FindingsPage() {
     }
     setLoading(true);
     try {
-      const filterParams: Record<string, string> = {};
+      const filterParams: Record<string, string | number> = {};
       if (filters.severity) filterParams.severity = filters.severity;
       if (filters.status) filterParams.status = filters.status;
       if (scanIdParam) filterParams.scanId = scanIdParam;
+      filterParams.limit = pageSize;
+      filterParams.offset = (page - 1) * pageSize;
 
       const data = await findingsApi.list({ ...filterParams, projectId: currentProject.id });
       setFindings(data.findings || []);
       setTotal(data.total || 0);
+      setSeverityCounts(data.counts || { critical: 0, high: 0, medium: 0, low: 0, info: 0 });
       setSelectedIds(new Set());
 
       // Fetch scan info if filtering by scanId (only on first load, not on filter changes)
@@ -130,9 +136,14 @@ export default function FindingsPage() {
     }
   };
 
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filters.severity, filters.status, scanIdParam]);
+
   useEffect(() => {
     fetchFindings();
-  }, [filters.severity, filters.status, currentProject, scanIdParam]);
+  }, [filters.severity, filters.status, currentProject, scanIdParam, page, pageSize]);
 
   // Filter by scanner client-side (API doesn't support it)
   const filteredFindings = useMemo(() => {
@@ -276,16 +287,7 @@ export default function FindingsPage() {
     setSelectedIds(newSelected);
   };
 
-  const getSeverityCounts = () => {
-    return {
-      critical: findings.filter(f => f.severity === 'critical' && f.status === 'open').length,
-      high: findings.filter(f => f.severity === 'high' && f.status === 'open').length,
-      medium: findings.filter(f => f.severity === 'medium' && f.status === 'open').length,
-      low: findings.filter(f => f.severity === 'low' && f.status === 'open').length,
-    };
-  };
-
-  const severityCounts = getSeverityCounts();
+  // severityCounts comes from API response (all open findings, not just current page)
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600 dark:text-green-400';
@@ -486,101 +488,163 @@ export default function FindingsPage() {
       {findings.length === 0 ? (
         <NoFindingsEmpty />
       ) : (
-        <Card variant="bordered">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow hoverable={false}>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={selectedIds.size === filteredFindings.length && filteredFindings.length > 0}
-                      onChange={toggleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>File</TableHead>
-                  <TableHead>Scanner</TableHead>
-                  <TableHead>AI</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFindings.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      No findings match your filters
-                    </TableCell>
+        <>
+          <Card variant="bordered">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow hoverable={false}>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={selectedIds.size === filteredFindings.length && filteredFindings.length > 0}
+                        onChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>File</TableHead>
+                    <TableHead>Scanner</TableHead>
+                    <TableHead>AI</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredFindings.map((finding) => (
-                    <TableRow key={finding.id}>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(finding.id)}
-                          onChange={() => toggleSelectFinding(finding.id)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <SeverityBadge severity={finding.severity} />
-                      </TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/dashboard/findings/${finding.id}`}
-                          className="font-medium text-gray-900 dark:text-white hover:text-blue-600 truncate max-w-md block"
-                        >
-                          {finding.title}
-                        </Link>
-                        <p className="text-xs text-gray-500 truncate max-w-md" title={finding.ruleId}>
-                          {getShortRuleId(finding.ruleId)}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-sm bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded truncate max-w-xs block" title={finding.filePath}>
-                          {getRelativePath(finding.filePath)}:{finding.startLine}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="default">{finding.scanner}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {finding.aiTriagedAt ? (
-                          <div className="flex items-center gap-1">
-                            {finding.aiFalsePositive ? (
-                              <Badge variant="warning" size="sm">FP</Badge>
-                            ) : (
-                              <Badge variant="success" size="sm">OK</Badge>
-                            )}
-                            <span className={`text-xs ${getConfidenceColor(finding.aiConfidence || 0)}`}>
-                              {Math.round((finding.aiConfidence || 0) * 100)}%
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusColor(finding.status)}>
-                          {finding.status.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setSelectedFinding(finding)}
-                        >
-                          Details
-                        </Button>
+                </TableHeader>
+                <TableBody>
+                  {filteredFindings.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                        No findings match your filters
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  ) : (
+                    filteredFindings.map((finding) => (
+                      <TableRow key={finding.id}>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(finding.id)}
+                            onChange={() => toggleSelectFinding(finding.id)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <SeverityBadge severity={finding.severity} />
+                        </TableCell>
+                        <TableCell>
+                          <Link
+                            href={`/dashboard/findings/${finding.id}`}
+                            className="font-medium text-gray-900 dark:text-white hover:text-blue-600 truncate max-w-md block"
+                          >
+                            {finding.title}
+                          </Link>
+                          <p className="text-xs text-gray-500 truncate max-w-md" title={finding.ruleId}>
+                            {getShortRuleId(finding.ruleId)}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-sm bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded truncate max-w-xs block" title={finding.filePath}>
+                            {getRelativePath(finding.filePath)}:{finding.startLine}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="default">{finding.scanner}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {finding.aiTriagedAt ? (
+                            <div className="flex items-center gap-1">
+                              {finding.aiFalsePositive ? (
+                                <Badge variant="warning" size="sm">FP</Badge>
+                              ) : (
+                                <Badge variant="success" size="sm">OK</Badge>
+                              )}
+                              <span className={`text-xs ${getConfidenceColor(finding.aiConfidence || 0)}`}>
+                                {Math.round((finding.aiConfidence || 0) * 100)}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusColor(finding.status)}>
+                            {finding.status.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setSelectedFinding(finding)}
+                          >
+                            Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Pagination Controls */}
+          {total > pageSize && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">
+                  Showing {Math.min((page - 1) * pageSize + 1, total)} - {Math.min(page * pageSize, total)} of {total}
+                </span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 dark:bg-gray-800"
+                >
+                  <option value={25}>25 per page</option>
+                  <option value={50}>50 per page</option>
+                  <option value={100}>100 per page</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1}
+                >
+                  First
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300">
+                  Page {page} of {Math.ceil(total / pageSize)}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(Math.ceil(total / pageSize), p + 1))}
+                  disabled={page >= Math.ceil(total / pageSize)}
+                >
+                  Next
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPage(Math.ceil(total / pageSize))}
+                  disabled={page >= Math.ceil(total / pageSize)}
+                >
+                  Last
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Finding Detail Modal */}

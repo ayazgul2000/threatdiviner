@@ -20,8 +20,6 @@ export class FindingProcessorService {
       return 0;
     }
 
-    this.logger.log(`Storing ${findings.length} findings for scan ${scanId}`);
-
     // Get the scan to retrieve projectId
     const scan = await this.prisma.scan.findUnique({
       where: { id: scanId },
@@ -29,8 +27,30 @@ export class FindingProcessorService {
     });
     const projectId = scan?.projectId || null;
 
+    // Filter out findings in scanner output files (these are artifacts, not real vulnerabilities)
+    const filteredFindings = findings.filter((f) => {
+      const path = f.filePath.toLowerCase();
+      if (
+        path.endsWith('-results.json') ||
+        path.endsWith('-results.sarif') ||
+        path.endsWith('.gitleaksignore')
+      ) {
+        this.logger.debug(`Excluding scanner artifact: ${f.filePath}`);
+        return false;
+      }
+      return true;
+    });
+
+    if (filteredFindings.length < findings.length) {
+      this.logger.log(
+        `Filtered ${findings.length - filteredFindings.length} scanner artifacts, storing ${filteredFindings.length} findings for scan ${scanId}`,
+      );
+    } else {
+      this.logger.log(`Storing ${filteredFindings.length} findings for scan ${scanId}`);
+    }
+
     // Transform to Prisma format
-    const findingsData = findings.map((f) => ({
+    const findingsData = filteredFindings.map((f) => ({
       tenantId,
       scanId,
       repositoryId,
@@ -150,22 +170,25 @@ export class FindingProcessorService {
       return filePath;
     }
 
-    // Normalize both paths (forward slashes, no trailing slash)
-    const normalizedWorkDir = workDir.replace(/\\/g, '/').replace(/\/$/, '');
+    // Normalize both paths to lowercase forward slashes for comparison
+    const normalizedWorkDir = workDir.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase();
     const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedPathLower = normalizedPath.toLowerCase();
 
-    // If path starts with workDir, strip it
-    if (normalizedPath.startsWith(normalizedWorkDir + '/')) {
+    // If path starts with workDir, strip it (case-insensitive for Windows)
+    if (normalizedPathLower.startsWith(normalizedWorkDir + '/')) {
       return normalizedPath.slice(normalizedWorkDir.length + 1);
     }
 
-    // Also try with backslashes for Windows paths
-    const backslashWorkDir = workDir.replace(/\//g, '\\').replace(/\\$/, '');
-    const backslashPath = filePath.replace(/\//g, '\\');
-    if (backslashPath.startsWith(backslashWorkDir + '\\')) {
-      return backslashPath.slice(backslashWorkDir.length + 1).replace(/\\/g, '/');
+    // Try stripping just the scan directory name pattern for paths that may have different casing
+    // Pattern: /tmp/threatdiviner-scans/{scanId}/
+    const scanDirPattern = /^.*?threatdiviner-scans[\/\\][^\/\\]+[\/\\]/i;
+    const match = normalizedPath.match(scanDirPattern);
+    if (match) {
+      return normalizedPath.slice(match[0].length);
     }
 
+    // Path is already relative or doesn't match patterns - return as-is
     return filePath;
   }
 }

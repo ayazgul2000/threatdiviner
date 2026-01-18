@@ -546,6 +546,36 @@ export class GitHubProvider implements ScmProvider {
   }
 
   /**
+   * Get the raw diff between two branches/refs
+   * Returns unified diff format
+   */
+  async getBranchDiff(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    baseBranch: string,
+    headBranch: string,
+  ): Promise<string> {
+    // GitHub compare API: GET /repos/{owner}/{repo}/compare/{base}...{head}
+    const url = `${this.apiBaseUrl}/repos/${owner}/${repo}/compare/${baseBranch}...${headBranch}`;
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/vnd.github.v3.diff',
+        'Authorization': `Bearer ${accessToken}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      this.logger.error(`GitHub API error getting branch diff: ${response.status} ${error}`);
+      throw new Error(`Failed to get branch diff: ${response.status}`);
+    }
+
+    return response.text();
+  }
+
+  /**
    * Create a PR review with multiple comments
    */
   async createPRReview(

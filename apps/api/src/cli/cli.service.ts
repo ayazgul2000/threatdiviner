@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { ScmService, CryptoService } from '../scm/services';
 import { QueueService } from '../queue/services/queue.service';
+import { GitHubProvider } from '../scm/providers';
 import { ScanJobData } from '../queue/jobs';
 
 interface SarifResult {
@@ -68,6 +69,7 @@ export interface TriggerScanResult {
     writeBack: WriteBackCapability[];
     failOnSeverity: string;
     failOnCount: number;
+    diffOnly: boolean;
   };
 }
 
@@ -81,6 +83,7 @@ export interface TriggerScanOptions {
   writeBack?: WriteBackCapability[];
   failOnSeverity?: string;
   failOnCount?: number;
+  diffOnly?: boolean; // Only report findings in changed files (compared to default branch)
 }
 
 @Injectable()
@@ -94,6 +97,7 @@ export class CliService {
     private readonly scmService: ScmService,
     private readonly cryptoService: CryptoService,
     private readonly queueService: QueueService,
+    private readonly githubProvider: GitHubProvider,
   ) {
     this.dashboardUrl = this.configService.get('DASHBOARD_URL') || 'http://localhost:3000';
   }
@@ -293,8 +297,8 @@ export class CliService {
       );
     }
 
-    // Determine write-back capabilities based on SCM connection
-    const capabilities = this.determineCapabilities(repository.connection);
+    // Determine write-back capabilities based on SCM connection and GitHub App
+    const capabilities = await this.determineCapabilities(repository.connection, repository.fullName);
 
     // Resolve effective settings
     const effectiveSettings = this.resolveEffectiveSettings(
@@ -389,7 +393,7 @@ export class CliService {
       pullRequestId: options.pullRequestId,
       checkRunId,
       triggeredBy: 'cli',
-      config: this.buildScanConfig(effectiveSettings.scanners, repository.scanConfig),
+      config: this.buildScanConfig(effectiveSettings.scanners, repository.scanConfig, effectiveSettings.diffOnly),
     };
 
     // Queue scan job
@@ -425,7 +429,7 @@ export class CliService {
       throw new NotFoundException(`Repository ${repositoryName} not found`);
     }
 
-    return this.determineCapabilities(repository.connection);
+    return this.determineCapabilities(repository.connection, repository.fullName);
   }
 
   /**
@@ -440,6 +444,7 @@ export class CliService {
     writeBack: WriteBackCapability[];
     failOnSeverity: string;
     failOnCount: number;
+    diffOnly: boolean;
   }> {
     const repository = await this.prisma.repository.findFirst({
       where: {
@@ -457,7 +462,7 @@ export class CliService {
       throw new NotFoundException(`Repository ${repositoryName} not found`);
     }
 
-    const capabilities = this.determineCapabilities(repository.connection);
+    const capabilities = await this.determineCapabilities(repository.connection, repository.fullName);
     const settings = this.resolveEffectiveSettings(
       repository.scanConfig,
       {}, // No CLI overrides
@@ -470,16 +475,20 @@ export class CliService {
       writeBack: settings.writeBack,
       failOnSeverity: settings.failOnSeverity,
       failOnCount: settings.failOnCount,
+      diffOnly: settings.diffOnly,
     };
   }
 
   /**
-   * Determine write-back capabilities based on SCM connection type
+   * Determine write-back capabilities based on SCM connection type and GitHub App availability
    */
-  private determineCapabilities(connection: {
-    provider: string;
-    authType?: string | null;
-  }): WriteBackCapabilities {
+  private async determineCapabilities(
+    connection: {
+      provider: string;
+      authType?: string | null;
+    },
+    repositoryFullName?: string,
+  ): Promise<WriteBackCapabilities> {
     const available: WriteBackCapability[] = [];
 
     // GitHub has the most write-back capabilities
@@ -487,8 +496,19 @@ export class CliService {
       // GitHub OAuth or App can do PR comments
       available.push('pr_comments', 'pr_summary');
 
-      // GitHub App or token with checks:write can create check runs
-      if (connection.authType === 'app' || connection.authType === 'oauth') {
+      // Check if GitHub App is configured and has access to the repo
+      let hasGitHubApp = false;
+      if (repositoryFullName && this.githubProvider.isAppConfigured()) {
+        const [owner, repo] = repositoryFullName.split('/');
+        const appToken = await this.githubProvider.getAppTokenForRepo(owner, repo);
+        hasGitHubApp = !!appToken;
+        if (hasGitHubApp) {
+          this.logger.log(`GitHub App available for ${repositoryFullName}`);
+        }
+      }
+
+      // GitHub App, OAuth, or token with checks:write can create check runs
+      if (hasGitHubApp || connection.authType === 'app' || connection.authType === 'oauth') {
         available.push('check_status', 'annotations');
       }
 
@@ -496,10 +516,11 @@ export class CliService {
       // We'll add it as potentially available
       available.push('sarif_upload');
 
-      return {
-        available,
-        reason: 'GitHub connection supports full write-back capabilities',
-      };
+      const reason = hasGitHubApp
+        ? 'GitHub App configured - full write-back capabilities available'
+        : 'GitHub connection supports write-back capabilities';
+
+      return { available, reason };
     }
 
     // GitLab supports PR comments and some status reporting
@@ -553,13 +574,15 @@ export class CliService {
     writeBack: WriteBackCapability[];
     failOnSeverity: string;
     failOnCount: number;
+    diffOnly: boolean;
   } {
     // Check if CLI provided explicit settings
     const hasCLIOverrides = !!(
       options.scanners?.length ||
       options.writeBack?.length ||
       options.failOnSeverity !== undefined ||
-      options.failOnCount !== undefined
+      options.failOnCount !== undefined ||
+      options.diffOnly !== undefined
     );
 
     // Check if repo settings should apply for CLI
@@ -571,6 +594,7 @@ export class CliService {
       writeBack: ['pr_summary', 'check_status'] as WriteBackCapability[],
       failOnSeverity: 'critical',
       failOnCount: 0, // 0 = disabled
+      diffOnly: false, // Full scan by default
     };
 
     // Build effective settings
@@ -579,6 +603,7 @@ export class CliService {
     let writeBack = defaults.writeBack;
     let failOnSeverity = defaults.failOnSeverity;
     let failOnCount = defaults.failOnCount;
+    let diffOnly = defaults.diffOnly;
 
     // Apply repo settings if enabled
     if (useRepoSettings && scanConfig) {
@@ -604,6 +629,9 @@ export class CliService {
       // Pipeline gate settings
       if (scanConfig.cliFailOnSeverity) failOnSeverity = scanConfig.cliFailOnSeverity;
       if (scanConfig.cliFailOnCount !== undefined) failOnCount = scanConfig.cliFailOnCount;
+
+      // Diff-only setting (from prDiffOnly in repo config)
+      if (scanConfig.prDiffOnly !== undefined) diffOnly = scanConfig.prDiffOnly;
     }
 
     // Apply CLI overrides (highest priority)
@@ -613,6 +641,7 @@ export class CliService {
       if (options.writeBack?.length) writeBack = options.writeBack;
       if (options.failOnSeverity !== undefined) failOnSeverity = options.failOnSeverity;
       if (options.failOnCount !== undefined) failOnCount = options.failOnCount;
+      if (options.diffOnly !== undefined) diffOnly = options.diffOnly;
     }
 
     // Filter write-back to only include available capabilities
@@ -624,6 +653,7 @@ export class CliService {
       writeBack: effectiveWriteBack,
       failOnSeverity,
       failOnCount,
+      diffOnly,
     };
   }
 
@@ -633,6 +663,7 @@ export class CliService {
   private buildScanConfig(
     scanners: string[],
     repoConfig: any | null,
+    diffOnly: boolean,
   ): ScanJobData['config'] {
     return {
       enableSast: scanners.includes('semgrep'),
@@ -645,6 +676,7 @@ export class CliService {
       containerImages: repoConfig?.containerImages || [],
       skipPaths: repoConfig?.skipPaths || ['node_modules', 'vendor', '.git'],
       branches: repoConfig?.branches || ['main', 'master'],
+      prDiffOnly: diffOnly,
     };
   }
 }
