@@ -141,6 +141,8 @@ export class TruffleHogScanner implements IScanner {
       cweIds: ['CWE-798'], // Hard-coded credentials
       cveIds: [],
       owaspIds: ['A07:2021'], // Security Misconfiguration
+      capecIds: ['CAPEC-191'], // Read Sensitive Strings Within an Executable
+      attackIds: ['T1552'], // Unsecured Credentials
       references: [
         'https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/',
         'https://cwe.mitre.org/data/definitions/798.html',

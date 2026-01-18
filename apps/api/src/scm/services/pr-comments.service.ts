@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from './crypto.service';
 import { GitHubProvider } from '../providers';
+import { AiService, AutoFixResultWithSource } from '../../ai/ai.service';
 
 interface Finding {
   id: string;
@@ -15,6 +16,16 @@ interface Finding {
   snippet: string | null;
   scanner: string;
   aiRemediation: string | null;
+  autoFix?: string | null;
+  fixConfidence?: number | null;
+  fixSource?: string | null;
+}
+
+export interface SuggestionResult {
+  findingId: string;
+  success: boolean;
+  commentId?: string;
+  error?: string;
 }
 
 @Injectable()
@@ -25,6 +36,7 @@ export class PRCommentsService {
     private readonly prisma: PrismaService,
     private readonly cryptoService: CryptoService,
     private readonly githubProvider: GitHubProvider,
+    private readonly aiService: AiService,
   ) {}
 
   /**
@@ -261,9 +273,245 @@ export class PRCommentsService {
   }
 
   /**
+   * Post AI-generated fix suggestions to PR
+   * Returns results for each finding attempted
+   */
+  async postAISuggestions(
+    scanId: string,
+    findingIds?: string[],
+  ): Promise<{ posted: number; skipped: number; results: SuggestionResult[] }> {
+    const scan = await this.prisma.scan.findUnique({
+      where: { id: scanId },
+      include: {
+        repository: {
+          include: {
+            connection: true,
+            scanConfig: true,
+          },
+        },
+        findings: true,
+      },
+    });
+
+    if (!scan || !scan.pullRequestId) {
+      this.logger.debug(`Scan ${scanId} is not a PR scan, skipping suggestions`);
+      return { posted: 0, skipped: 0, results: [] };
+    }
+
+    const connection = scan.repository.connection;
+    if (connection.provider !== 'github') {
+      this.logger.debug(`Suggestions only supported for GitHub`);
+      return { posted: 0, skipped: 0, results: [] };
+    }
+
+    const accessToken = this.cryptoService.decrypt(connection.accessToken);
+    const [owner, repo] = scan.repository.fullName.split('/');
+    const prNumber = parseInt(scan.pullRequestId, 10);
+
+    // Get PR files to ensure we only post suggestions for changed files
+    let prFiles: string[];
+    try {
+      const files = await this.githubProvider.getPRFiles(accessToken, owner, repo, prNumber);
+      prFiles = files.map(f => f.filename);
+    } catch (error) {
+      this.logger.error(`Failed to get PR files: ${error}`);
+      return { posted: 0, skipped: scan.findings.length, results: [] };
+    }
+
+    // Filter findings
+    let eligibleFindings = scan.findings.filter(f => {
+      // Must be in a file that was changed in the PR
+      const isInDiff = prFiles.some(file => f.filePath.endsWith(file) || file.endsWith(f.filePath));
+      // Must have line information
+      const hasLineInfo = f.startLine !== null;
+      // If specific IDs provided, filter to those
+      const matchesIds = !findingIds || findingIds.includes(f.id);
+      return isInDiff && hasLineInfo && matchesIds;
+    });
+
+    // Sort by severity (critical/high first)
+    eligibleFindings = this.sortFindingsBySeverity(eligibleFindings);
+
+    const results: SuggestionResult[] = [];
+    let posted = 0;
+    let skipped = 0;
+
+    // Process each finding
+    for (const finding of eligibleFindings) {
+      const prFilePath = prFiles.find(f => finding.filePath.endsWith(f) || f.endsWith(finding.filePath));
+      if (!prFilePath) {
+        results.push({ findingId: finding.id, success: false, error: 'File not in PR diff' });
+        skipped++;
+        continue;
+      }
+
+      try {
+        // Generate fix if not already cached
+        let fixResult: AutoFixResultWithSource | null = null;
+
+        if (finding.autoFix && finding.aiConfidence) {
+          // Use cached fix
+          fixResult = {
+            fixedCode: finding.autoFix,
+            explanation: finding.aiRemediation || 'AI-generated fix',
+            confidence: finding.aiConfidence,
+            source: 'cached', // Previously generated
+          };
+        } else {
+          // Generate new fix
+          const fileContent = await this.githubProvider.getFileContent(
+            accessToken,
+            owner,
+            repo,
+            prFilePath,
+            scan.commitSha,
+          );
+
+          fixResult = await this.aiService.generateAutoFixWithSource({
+            finding: {
+              ruleId: finding.ruleId,
+              title: finding.title,
+              description: finding.description || '',
+              severity: finding.severity,
+              filePath: finding.filePath,
+              startLine: finding.startLine || 1,
+              endLine: finding.endLine || undefined,
+              snippet: finding.snippet || undefined,
+              cweId: finding.cweId || undefined,
+            },
+            fileContent: fileContent.content,
+          });
+
+          // Cache the fix in the database
+          if (fixResult) {
+            await this.prisma.finding.update({
+              where: { id: finding.id },
+              data: {
+                autoFix: fixResult.fixedCode,
+                aiRemediation: fixResult.explanation,
+                aiConfidence: fixResult.confidence,
+              },
+            });
+          }
+        }
+
+        if (!fixResult || !fixResult.fixedCode) {
+          results.push({ findingId: finding.id, success: false, error: 'AI could not generate fix' });
+          skipped++;
+          continue;
+        }
+
+        // Check confidence threshold (0.8 = 80%)
+        if (!this.aiService.meetsSuggestionThreshold(fixResult)) {
+          results.push({
+            findingId: finding.id,
+            success: false,
+            error: `Confidence too low: ${Math.round(fixResult.confidence * 100)}%`
+          });
+          skipped++;
+          continue;
+        }
+
+        // Post suggestion to PR
+        const commentId = await this.githubProvider.createPRSuggestionComment(
+          accessToken,
+          owner,
+          repo,
+          prNumber,
+          scan.commitSha,
+          prFilePath,
+          finding.startLine || 1,
+          finding.endLine || finding.startLine || 1,
+          fixResult.fixedCode,
+          finding.title,
+          finding.severity,
+          fixResult.explanation,
+          fixResult.confidence,
+          fixResult.source,
+        );
+
+        results.push({ findingId: finding.id, success: true, commentId });
+        posted++;
+
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to post suggestion for finding ${finding.id}: ${errorMsg}`);
+        results.push({ findingId: finding.id, success: false, error: errorMsg });
+        skipped++;
+      }
+    }
+
+    // Post summary comment if suggestions were posted
+    if (posted > 0) {
+      try {
+        const summaryBody = this.formatSuggestionSummary(posted, skipped);
+        await this.githubProvider.createPRComment(accessToken, owner, repo, prNumber, summaryBody);
+      } catch (error) {
+        this.logger.warn(`Failed to post suggestion summary: ${error}`);
+      }
+    }
+
+    this.logger.log(`Posted ${posted} AI suggestions for scan ${scanId} (${skipped} skipped)`);
+    return { posted, skipped, results };
+  }
+
+  /**
+   * Generate and post suggestion for a single finding
+   */
+  async postSuggestionForFinding(findingId: string): Promise<SuggestionResult> {
+    const finding = await this.prisma.finding.findUnique({
+      where: { id: findingId },
+      include: {
+        scan: {
+          include: {
+            repository: {
+              include: {
+                connection: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!finding) {
+      return { findingId, success: false, error: 'Finding not found' };
+    }
+
+    const { scan } = finding;
+    if (!scan.pullRequestId) {
+      return { findingId, success: false, error: 'Not a PR scan' };
+    }
+
+    const results = await this.postAISuggestions(scan.id, [findingId]);
+    return results.results[0] || { findingId, success: false, error: 'No result' };
+  }
+
+  private formatSuggestionSummary(posted: number, skipped: number): string {
+    const lines = [
+      '## 🤖 ThreatDiviner AI Fix Suggestions',
+      '',
+      `**${posted}** fix suggestions have been posted as inline comments.`,
+      '',
+      'Look for 💡 suggestion comments above - click **"Apply suggestion"** to commit the fix directly.',
+      '',
+    ];
+
+    if (skipped > 0) {
+      lines.push(`*${skipped} findings could not be auto-fixed (low confidence or not in changed files)*`);
+    }
+
+    lines.push('', '---', '*Generated by ThreatDiviner AI (Claude/Gemini)*');
+
+    return lines.join('\n');
+  }
+
+  /**
    * Sort findings by severity priority: critical > high > medium > low > info
    */
-  private sortFindingsBySeverity(findings: Finding[]): Finding[] {
+  private sortFindingsBySeverity<T extends { severity: string }>(findings: T[]): T[] {
     const severityOrder: Record<string, number> = {
       critical: 0,
       high: 1,

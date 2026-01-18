@@ -288,6 +288,7 @@ export class ScmController {
       user.tenantId,
       dto.repositoryId,
       dto.branch,
+      dto.pullRequestId,
     );
     return { scanId };
   }

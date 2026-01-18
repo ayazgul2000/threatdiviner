@@ -133,6 +133,8 @@ export class BanditScanner implements IScanner {
       cweIds: result.issue_cwe ? [`CWE-${result.issue_cwe.id}`] : [],
       cveIds: [],
       owaspIds: [],
+      capecIds: [],
+      attackIds: [],
       references: result.more_info ? [result.more_info] : [],
       fingerprint,
       metadata: {

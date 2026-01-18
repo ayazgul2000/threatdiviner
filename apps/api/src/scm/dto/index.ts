@@ -142,4 +142,8 @@ export class TriggerScanDto {
   @IsOptional()
   @IsString()
   branch?: string;
+
+  @IsOptional()
+  @IsString()
+  pullRequestId?: string;
 }

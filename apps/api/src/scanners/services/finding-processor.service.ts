@@ -67,6 +67,8 @@ export class FindingProcessorService {
       cweId: f.cweIds[0] || null,
       cveId: f.cveIds[0] || null,
       owasp: f.owaspIds[0] || null,
+      capecPatterns: f.capecIds?.length ? f.capecIds : undefined,
+      attackTechniques: f.attackIds?.length ? f.attackIds : undefined,
       confidence: f.confidence,
       status: 'open',
       updatedAt: new Date(),

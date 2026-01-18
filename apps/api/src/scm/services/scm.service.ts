@@ -594,7 +594,7 @@ export class ScmService {
   }
 
   // Scan operations
-  async triggerScan(tenantId: string, repositoryId: string, branch?: string): Promise<string> {
+  async triggerScan(tenantId: string, repositoryId: string, branch?: string, pullRequestId?: string): Promise<string> {
     const repository = await this.prisma.repository.findFirst({
       where: { id: repositoryId, tenantId },
       include: { connection: true, scanConfig: true },
@@ -607,6 +607,7 @@ export class ScmService {
     const provider = this.getProvider(repository.connection.provider);
     const token = this.cryptoService.decrypt(repository.connection.accessToken);
     const targetBranch = branch || repository.defaultBranch;
+    const triggerEvent = pullRequestId ? 'pull_request' : 'manual';
 
     const [owner, repoName] = repository.fullName.split('/');
     const commit = await provider.getLatestCommit(token, owner, repoName, targetBranch);
@@ -648,7 +649,8 @@ export class ScmService {
         projectId: repository.projectId,
         commitSha: commit.sha,
         branch: targetBranch,
-        triggeredBy: 'manual',
+        triggeredBy: triggerEvent,
+        pullRequestId,
         status: 'queued',
         scanners: enabledScanners,
         checkRunId,
@@ -666,7 +668,8 @@ export class ScmService {
       cloneUrl: repository.cloneUrl,
       fullName: repository.fullName,
       checkRunId,
-      triggeredBy: 'manual',
+      pullRequestId,
+      triggeredBy: triggerEvent,
       config: {
         enableSast: effectiveConfig.enableSast,
         enableSca: effectiveConfig.enableSca,

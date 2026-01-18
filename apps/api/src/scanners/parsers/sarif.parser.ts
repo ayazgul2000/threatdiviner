@@ -135,15 +135,15 @@ export class SarifParser {
       snippet,
     );
 
-    // Extract CWE/CVE/OWASP from rule properties and ruleId
-    const { cweIds, cveIds, owaspIds } = this.extractSecurityIds(rule, result.ruleId);
+    // Extract CWE/CVE/OWASP/CAPEC/ATT&CK from rule properties and ruleId
+    const { cweIds, cveIds, owaspIds, capecIds, attackIds } = this.extractSecurityIds(rule, result.ruleId);
 
     return {
       scanner: scannerName,
       ruleId: result.ruleId,
       severity: this.mapSeverity(result.level, rule),
       confidence: this.mapConfidence(rule),
-      title: rule?.shortDescription?.text || result.ruleId,
+      title: this.getCleanTitle(rule, result.ruleId),
       description: result.message.text,
       filePath,
       startLine,
@@ -154,6 +154,8 @@ export class SarifParser {
       cweIds,
       cveIds,
       owaspIds,
+      capecIds,
+      attackIds,
       references: rule?.helpUri ? [rule.helpUri] : [],
       fix: this.extractFix(result),
       fingerprint,
@@ -213,14 +215,48 @@ export class SarifParser {
     }
   }
 
+  /**
+   * Get a clean title from rule metadata or ruleId
+   * Handles cases where shortDescription/name contains full paths
+   */
+  private getCleanTitle(rule: SarifRule | undefined, ruleId: string): string {
+    const rawTitle = rule?.shortDescription?.text || rule?.name || ruleId;
+
+    // If the title looks like a path (contains multiple dots or slashes), extract clean name
+    if (rawTitle.split(/[./]/).length > 3) {
+      return this.extractCleanRuleName(rawTitle);
+    }
+
+    return rawTitle;
+  }
+
+  /**
+   * Extract a clean, readable rule name from a full rule ID path
+   */
+  private extractCleanRuleName(ruleId: string): string {
+    // Handle paths like "C.Dev.threatdiviner-v0.2.0.apps.api.src.scanners.sast.semgrep.rules.custom.sql-injection"
+    // or "javascript.lang.security.detect-child-process"
+    const parts = ruleId.split(/[./]/);
+    const ruleName = parts[parts.length - 1] || ruleId;
+    // Convert kebab-case to Title Case
+    return ruleName
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
   private extractSecurityIds(rule?: SarifRule, ruleId?: string): {
     cweIds: string[];
     cveIds: string[];
     owaspIds: string[];
+    capecIds: string[];
+    attackIds: string[];
   } {
     const cweIds: string[] = [];
     const cveIds: string[] = [];
     const owaspIds: string[] = [];
+    const capecIds: string[] = [];
+    const attackIds: string[] = [];
 
     const tags = rule?.properties?.tags || [];
     for (const tag of tags) {
@@ -230,6 +266,11 @@ export class SarifParser {
         cveIds.push(tag);
       } else if (tag.match(/^A\d{2}:\d{4}/)) {
         owaspIds.push(tag);
+      } else if (tag.startsWith('CAPEC-')) {
+        capecIds.push(tag);
+      } else if (tag.match(/^T\d{4}/)) {
+        // MITRE ATT&CK technique IDs like T1059
+        attackIds.push(tag);
       }
     }
 
@@ -241,7 +282,54 @@ export class SarifParser {
       }
     }
 
-    return { cweIds, cveIds, owaspIds };
+    // Map CWE to CAPEC and ATT&CK if not already present
+    if (cweIds.length > 0 && (capecIds.length === 0 || attackIds.length === 0)) {
+      const mappings = this.getCweSecurityMappings(cweIds[0]);
+      if (capecIds.length === 0 && mappings.capec) {
+        capecIds.push(...mappings.capec);
+      }
+      if (attackIds.length === 0 && mappings.attack) {
+        attackIds.push(...mappings.attack);
+      }
+      if (owaspIds.length === 0 && mappings.owasp) {
+        owaspIds.push(...mappings.owasp);
+      }
+    }
+
+    return { cweIds, cveIds, owaspIds, capecIds, attackIds };
+  }
+
+  /**
+   * Map CWE to CAPEC, ATT&CK, and OWASP
+   */
+  private getCweSecurityMappings(cweId: string): { capec: string[]; attack: string[]; owasp: string[] } {
+    const cweNumber = cweId.replace('CWE-', '');
+    const mappings: Record<string, { capec: string[]; attack: string[]; owasp: string[] }> = {
+      // Injection flaws
+      '89': { capec: ['CAPEC-66'], attack: ['T1190'], owasp: ['A03:2021'] },   // SQL Injection
+      '78': { capec: ['CAPEC-88'], attack: ['T1059'], owasp: ['A03:2021'] },   // OS Command Injection
+      '79': { capec: ['CAPEC-86'], attack: ['T1059.007'], owasp: ['A03:2021'] }, // XSS
+      '94': { capec: ['CAPEC-242'], attack: ['T1059'], owasp: ['A03:2021'] },  // Code Injection
+      '917': { capec: ['CAPEC-242'], attack: ['T1059'], owasp: ['A03:2021'] }, // Expression Language Injection
+      // Path Traversal
+      '22': { capec: ['CAPEC-126'], attack: ['T1083'], owasp: ['A01:2021'] },  // Path Traversal
+      '23': { capec: ['CAPEC-126'], attack: ['T1083'], owasp: ['A01:2021'] },  // Relative Path Traversal
+      // Authentication/Crypto
+      '287': { capec: ['CAPEC-114'], attack: ['T1078'], owasp: ['A07:2021'] }, // Improper Auth
+      '327': { capec: ['CAPEC-97'], attack: ['T1573'], owasp: ['A02:2021'] },  // Broken Crypto
+      '330': { capec: ['CAPEC-112'], attack: ['T1110'], owasp: ['A02:2021'] }, // Weak Random
+      '798': { capec: ['CAPEC-191'], attack: ['T1552'], owasp: ['A07:2021'] }, // Hardcoded Credentials
+      // SSRF
+      '918': { capec: ['CAPEC-664'], attack: ['T1090'], owasp: ['A10:2021'] }, // SSRF
+      // XXE
+      '611': { capec: ['CAPEC-201'], attack: ['T1059'], owasp: ['A05:2021'] }, // XXE
+      // Deserialization
+      '502': { capec: ['CAPEC-586'], attack: ['T1059'], owasp: ['A08:2021'] }, // Deserialization
+      // Security Misconfiguration
+      '200': { capec: ['CAPEC-118'], attack: ['T1082'], owasp: ['A05:2021'] }, // Information Exposure
+      '532': { capec: ['CAPEC-215'], attack: ['T1005'], owasp: ['A09:2021'] }, // Log Injection
+    };
+    return mappings[cweNumber] || { capec: [], attack: [], owasp: [] };
   }
 
   private extractFix(result: SarifResult): NormalizedFinding['fix'] | undefined {

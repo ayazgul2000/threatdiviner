@@ -732,46 +732,58 @@ export default function FindingsPage() {
                     <>
                       <div className="grid grid-cols-3 gap-3">
                         {/* CAPEC - Attack Pattern */}
-                        {selectedFinding.cweData?.capecIds?.[0] ? (
-                          <a
-                            href={`https://capec.mitre.org/data/definitions/${selectedFinding.cweData.capecIds[0].replace('CAPEC-', '')}.html`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">{selectedFinding.cweData.capecIds[0]}</span>
-                              <svg className="w-3 h-3 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
+                        {(() => {
+                          const capecId = selectedFinding.capecPatterns?.[0] || selectedFinding.cweData?.capecIds?.[0];
+                          if (capecId) {
+                            const capecIdStr = typeof capecId === 'string' ? capecId : capecId.id || String(capecId);
+                            return (
+                              <a
+                                href={`https://capec.mitre.org/data/definitions/${capecIdStr.replace('CAPEC-', '')}.html`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-semibold text-rose-600 dark:text-rose-400">{capecIdStr}</span>
+                                  <svg className="w-3 h-3 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </div>
+                                <p className="text-xs text-rose-700 dark:text-rose-300 font-medium">Attack Pattern</p>
+                                <p className="text-xs text-rose-500 dark:text-rose-400 mt-1">CAPEC</p>
+                              </a>
+                            );
+                          }
+                          return (
+                            <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                              <p className="text-xs text-gray-500">No CAPEC mapping</p>
                             </div>
-                            <p className="text-xs text-rose-700 dark:text-rose-300 font-medium">Attack Pattern</p>
-                            <p className="text-xs text-rose-500 dark:text-rose-400 mt-1">CAPEC</p>
-                          </a>
-                        ) : (
-                          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
-                            <p className="text-xs text-gray-500">No CAPEC mapping</p>
-                          </div>
-                        )}
+                          );
+                        })()}
 
                         {/* ATT&CK - Technique */}
-                        {selectedFinding.attackTechniques?.[0] ? (
-                          <a
-                            href={`https://attack.mitre.org/techniques/${selectedFinding.attackTechniques[0].id.replace('.', '/')}/`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{selectedFinding.attackTechniques[0].id}</span>
-                              <svg className="w-3 h-3 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                            </div>
-                            <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">{selectedFinding.attackTechniques[0].name}</p>
-                            <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">ATT&CK Technique</p>
-                          </a>
-                        ) : (
+                        {selectedFinding.attackTechniques?.[0] ? (() => {
+                          const technique = selectedFinding.attackTechniques[0];
+                          const techniqueId = typeof technique === 'string' ? technique : technique.id;
+                          const techniqueName = typeof technique === 'string' ? technique : technique.name;
+                          return (
+                            <a
+                              href={`https://attack.mitre.org/techniques/${techniqueId.replace('.', '/')}/`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{techniqueId}</span>
+                                <svg className="w-3 h-3 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </div>
+                              <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">{techniqueName}</p>
+                              <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">ATT&CK Technique</p>
+                            </a>
+                          );
+                        })() : (
                           <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
                             <p className="text-xs text-gray-500">No ATT&CK mapping</p>
                           </div>

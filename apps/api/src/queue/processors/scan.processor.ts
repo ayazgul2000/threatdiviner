@@ -34,6 +34,8 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
 
   private readonly aiTriageEnabled: boolean;
   private readonly aiTriageBatchSize: number;
+  private readonly aiSuggestionsEnabled: boolean;
+  private readonly aiSuggestionsMinConfidence: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -59,7 +61,10 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
   ) {
     this.aiTriageEnabled = this.configService.get('AI_TRIAGE_ENABLED', 'false') === 'true';
-    this.aiTriageBatchSize = parseInt(this.configService.get('AI_TRIAGE_BATCH_SIZE', '10'), 10);
+    this.aiTriageBatchSize = parseInt(this.configService.get('AI_TRIAGE_BATCH_SIZE', '50'), 10);
+    // AI suggestions enabled by default for PR scans
+    this.aiSuggestionsEnabled = this.configService.get('AI_SUGGESTIONS_ENABLED', 'true') === 'true';
+    this.aiSuggestionsMinConfidence = parseFloat(this.configService.get('AI_SUGGESTIONS_MIN_CONFIDENCE', '0.8'));
   }
 
   async onModuleInit() {
@@ -203,6 +208,11 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       // 7b. Post PR inline comments (if PR scan)
       if (job.data.pullRequestId) {
         await this.postPRComments(scanId);
+
+        // 7b.2. Post AI-generated fix suggestions (if enabled)
+        if (this.aiSuggestionsEnabled) {
+          await this.postAISuggestionsForPR(scanId);
+        }
       }
 
       // 7c. Update check run with annotations (for all scans with checkRunId)
@@ -559,11 +569,14 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       // Run batch triage
       const results = await this.aiService.batchTriageFindings(requests);
 
-      // Update findings with AI triage results
+      // Update findings with AI triage results and generate code fixes
       let triaged = 0;
+      let fixesGenerated = 0;
+
       for (const finding of findings) {
         const result = results.get(finding.id);
         if (result) {
+          // Update triage data first
           await this.prisma.finding.update({
             where: { id: finding.id },
             data: {
@@ -577,10 +590,44 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
             },
           });
           triaged++;
+
+          // Generate actual code fix if NOT a false positive and has snippet
+          if (!result.isLikelyFalsePositive && finding.snippet) {
+            try {
+              const fixResult = await this.aiService.generateAutoFix({
+                finding: {
+                  ruleId: finding.ruleId,
+                  title: finding.title,
+                  description: finding.description || '',
+                  severity: finding.severity,
+                  filePath: finding.filePath,
+                  startLine: finding.startLine || 1,
+                  endLine: finding.endLine || undefined,
+                  snippet: finding.snippet,
+                  cweId: finding.cweId || undefined,
+                },
+                fileContent: finding.snippet, // Use snippet as context if full file not available
+              });
+
+              if (fixResult && fixResult.fixedCode) {
+                await this.prisma.finding.update({
+                  where: { id: finding.id },
+                  data: {
+                    autoFix: fixResult.fixedCode,
+                    aiRemediation: fixResult.explanation, // Update with fix explanation
+                    aiConfidence: fixResult.confidence,
+                  },
+                });
+                fixesGenerated++;
+              }
+            } catch (fixError) {
+              this.logger.warn(`Failed to generate fix for finding ${finding.id}: ${fixError}`);
+            }
+          }
         }
       }
 
-      this.logger.log(`Auto-triaged ${triaged} findings`);
+      this.logger.log(`Auto-triaged ${triaged} findings, generated ${fixesGenerated} code fixes`);
     } catch (error) {
       // Log but don't fail the scan if AI triage fails
       this.logger.error(`Auto-triage failed: ${error}`);
@@ -626,6 +673,59 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       // Log but don't fail the scan if PR comments fail
       this.logger.error(`PR comments failed: ${error}`);
+    }
+  }
+
+  /**
+   * Post AI-generated fix suggestions to the PR
+   * Only posts for findings that meet the confidence threshold
+   */
+  private async postAISuggestionsForPR(scanId: string): Promise<void> {
+    try {
+      // Check if AI is available first
+      const isAvailable = await this.aiService.isAvailable();
+      if (!isAvailable) {
+        this.logger.warn('AI service not available - skipping AI suggestions');
+        return;
+      }
+
+      // Check if repo has AI suggestions disabled
+      const scan = await this.prisma.scan.findUnique({
+        where: { id: scanId },
+        include: {
+          repository: {
+            include: {
+              scanConfig: true,
+            },
+          },
+        },
+      });
+
+      if (!scan) {
+        this.logger.warn(`Scan ${scanId} not found for AI suggestions`);
+        return;
+      }
+
+      // Check if AI suggestions are disabled for this repo
+      if (scan.repository.scanConfig?.aiSuggestionsEnabled === false) {
+        this.logger.log(`AI suggestions disabled for repository ${scan.repository.name}`);
+        return;
+      }
+
+      // Post AI suggestions
+      const { posted, skipped, results } = await this.prCommentsService.postAISuggestions(scanId);
+
+      const errors = results.filter(r => !r.success);
+      if (errors.length > 0) {
+        this.logger.warn(`AI suggestion errors: ${errors.map(e => e.error).join(', ')}`);
+      }
+
+      this.logger.log(
+        `Posted ${posted} AI suggestions to PR (${skipped} skipped, min confidence: ${this.aiSuggestionsMinConfidence})`,
+      );
+    } catch (error) {
+      // Log but don't fail the scan if AI suggestions fail
+      this.logger.error(`AI suggestions failed: ${error}`);
     }
   }
 

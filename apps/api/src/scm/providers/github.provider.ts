@@ -700,6 +700,110 @@ export class GitHubProvider implements ScmProvider {
     return response;
   }
 
+  /**
+   * Create a PR review comment with a suggestion block
+   * This allows users to apply the fix with one click in GitHub UI
+   *
+   * For multi-line suggestions:
+   * - Use start_line and line to specify the range
+   * - The suggestion block replaces all lines from start_line to line
+   */
+  async createPRSuggestionComment(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    prNumber: number,
+    commitSha: string,
+    path: string,
+    startLine: number,
+    endLine: number,
+    suggestedCode: string,
+    title: string,
+    severity: string,
+    explanation: string,
+    confidence: number,
+    source: string,
+  ): Promise<string> {
+    // Format the comment with GitHub suggestion block
+    const severityEmoji: Record<string, string> = {
+      critical: '🔴',
+      high: '🟠',
+      medium: '🟡',
+      low: '🔵',
+      info: '⚪',
+    };
+    const emoji = severityEmoji[severity.toLowerCase()] || '⚪';
+    const confidencePercent = Math.round(confidence * 100);
+
+    const body = `### ${emoji} ThreatDiviner Security Fix
+
+**${severity.toUpperCase()}**: ${title}
+**Confidence**: ${confidencePercent}% | **Source**: ${source}
+
+\`\`\`suggestion
+${suggestedCode}
+\`\`\`
+
+<details>
+<summary>Why this fix?</summary>
+
+${explanation}
+
+</details>
+
+${confidence < 0.8 ? '⚠️ *AI-generated fix – please review carefully.*' : ''}`;
+
+    // For multi-line suggestions, we need to use start_line and line
+    const requestBody: Record<string, unknown> = {
+      body,
+      commit_id: commitSha,
+      path,
+      side: 'RIGHT',
+    };
+
+    if (startLine !== endLine) {
+      // Multi-line comment
+      requestBody.start_line = startLine;
+      requestBody.line = endLine;
+    } else {
+      // Single-line comment
+      requestBody.line = startLine;
+    }
+
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/pulls/${prNumber}/comments`,
+      {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      },
+    );
+
+    return String(response.id);
+  }
+
+  /**
+   * Get file content from repository
+   */
+  async getFileContent(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    path: string,
+    ref: string,
+  ): Promise<{ content: string; sha: string }> {
+    const response = await this.apiRequest(
+      accessToken,
+      `/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`,
+    );
+
+    const content = Buffer.from(response.content, 'base64').toString('utf-8');
+    return {
+      content,
+      sha: response.sha,
+    };
+  }
+
   async getPullRequests(
     accessToken: string,
     owner: string,
