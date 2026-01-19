@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { GitBranch, GitMerge, Shield, Star, GitPullRequest, Upload, AlertOctagon, ScanSearch, FileCode, Package, Key, Cloud, CheckCircle2, AlertTriangle, ArrowLeft, ExternalLink, Settings, Clock, User, CheckCircle, XCircle, Play, MoreVertical, Loader2, RefreshCw, Calendar, X } from 'lucide-react';
+import { GitBranch, GitMerge, Shield, Star, GitPullRequest, Upload, AlertOctagon, ScanSearch, FileCode, Package, Key, Cloud, CheckCircle2, AlertTriangle, ArrowLeft, ExternalLink, Settings, Clock, User, CheckCircle, XCircle, Play, MoreVertical, Loader2, RefreshCw, Calendar, X, Microscope, Network, Zap, TestTube, Building2, Link2 } from 'lucide-react';
 import { useProject } from '@/contexts/project-context';
 import { useRouter, useParams } from 'next/navigation';
 
@@ -461,6 +461,237 @@ function BranchSettingsModal({
   );
 }
 
+// ============ DEEP ANALYSIS MODAL ============
+interface DeepAnalysisOptions {
+  similarVulns: boolean;
+  callChain: boolean;
+  fixPropagation: boolean;
+  secureAlternatives: boolean;
+  securityTests: boolean;
+  architecture: boolean;
+  attackChain: boolean;
+}
+
+function DeepAnalysisModal({
+  repoName,
+  branches,
+  onClose,
+  onStart,
+}: {
+  repoName: string;
+  branches: Branch[];
+  onClose: () => void;
+  onStart: (branch: string, options: DeepAnalysisOptions) => void;
+}) {
+  const [selectedBranch, setSelectedBranch] = useState(branches.find(b => b.isDefault)?.name || branches[0]?.name || 'main');
+  const [options, setOptions] = useState<DeepAnalysisOptions>({
+    similarVulns: true,
+    callChain: true,
+    fixPropagation: true,
+    secureAlternatives: false,
+    securityTests: false,
+    architecture: false,
+    attackChain: false,
+  });
+  const [isStarting, setIsStarting] = useState(false);
+
+  const handleStart = async () => {
+    setIsStarting(true);
+    await onStart(selectedBranch, options);
+    setIsStarting(false);
+  };
+
+  const selectedCount = Object.values(options).filter(Boolean).length;
+
+  const ANALYSIS_OPTIONS = [
+    {
+      key: 'similarVulns' as keyof DeepAnalysisOptions,
+      icon: Microscope,
+      title: 'Similar Vulnerability Detection',
+      description: 'Find similar vulnerable patterns across the entire codebase',
+      recommended: true,
+    },
+    {
+      key: 'callChain' as keyof DeepAnalysisOptions,
+      icon: Network,
+      title: 'Call Chain Analysis',
+      description: 'Trace data flow to determine public vs internal exposure',
+      recommended: true,
+    },
+    {
+      key: 'fixPropagation' as keyof DeepAnalysisOptions,
+      icon: Zap,
+      title: 'Fix Propagation',
+      description: 'Apply fixes to all similar vulnerable usages found',
+      recommended: true,
+    },
+    {
+      key: 'secureAlternatives' as keyof DeepAnalysisOptions,
+      icon: Package,
+      title: 'Secure Alternatives',
+      description: 'Suggest import/dependency-aware secure replacements',
+      recommended: false,
+    },
+    {
+      key: 'securityTests' as keyof DeepAnalysisOptions,
+      icon: TestTube,
+      title: 'Security Test Generation',
+      description: 'Generate test cases for discovered vulnerabilities',
+      recommended: false,
+    },
+    {
+      key: 'architecture' as keyof DeepAnalysisOptions,
+      icon: Building2,
+      title: 'Architecture Recommendations',
+      description: 'Suggest architectural improvements for better security',
+      recommended: false,
+    },
+    {
+      key: 'attackChain' as keyof DeepAnalysisOptions,
+      icon: Link2,
+      title: 'Attack Chain Mapping',
+      description: 'Correlate findings into potential attack chains',
+      recommended: false,
+    },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-[600px] max-h-[85vh] overflow-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-100">
+              <Microscope className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <span className="font-semibold text-gray-900">Deep Security Analysis</span>
+              <p className="text-xs text-gray-500">{repoName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Branch Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Branch to Analyze
+            </label>
+            <select
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.name}>
+                  {branch.name} {branch.isDefault ? '(default)' : ''} {branch.isProtected ? '(protected)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Analysis Options */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-medium text-gray-700">
+                Analysis Features
+              </label>
+              <span className="text-xs text-gray-500">{selectedCount} selected</span>
+            </div>
+            <div className="space-y-2">
+              {ANALYSIS_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                return (
+                  <label
+                    key={opt.key}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      options[opt.key]
+                        ? 'border-purple-300 bg-purple-50'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={options[opt.key]}
+                      onChange={(e) => setOptions({ ...options, [opt.key]: e.target.checked })}
+                      className="mt-1 w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                    />
+                    <Icon className={`w-5 h-5 mt-0.5 ${options[opt.key] ? 'text-purple-600' : 'text-gray-400'}`} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium ${options[opt.key] ? 'text-purple-900' : 'text-gray-900'}`}>
+                          {opt.title}
+                        </span>
+                        {opt.recommended && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-green-100 text-green-700 rounded">
+                            Recommended
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Info Box */}
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-700">
+              <strong>Note:</strong> Deep analysis is AI-intensive and may take several minutes depending on repository size and selected options. This runs a comprehensive security review beyond standard scanning.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={() => setOptions({
+              similarVulns: true,
+              callChain: true,
+              fixPropagation: true,
+              secureAlternatives: false,
+              securityTests: false,
+              architecture: false,
+              attackChain: false,
+            })}
+            className="text-sm text-gray-600 hover:text-gray-800"
+          >
+            Reset to Recommended
+          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleStart}
+              disabled={isStarting || selectedCount === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isStarting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <Microscope className="w-4 h-4" />
+                  Start Deep Analysis
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============ BRANCHES TAB ============
 function BranchesTab({ branches, onBranchClick, onSettingsClick }: { branches: Branch[]; onBranchClick: (id: string) => void; onSettingsClick: (branch: Branch) => void }) {
   const getHealthColor = (score: number | null) => {
@@ -684,6 +915,7 @@ export default function RepoDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'branches' | 'scans' | 'prs'>('branches');
   const [selectedBranchForSettings, setSelectedBranchForSettings] = useState<Branch | null>(null);
+  const [showDeepAnalysisModal, setShowDeepAnalysisModal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -741,6 +973,40 @@ export default function RepoDetailPage() {
     setSelectedBranchForSettings(null);
   };
 
+  const handleStartDeepAnalysis = async (branch: string, options: DeepAnalysisOptions) => {
+    try {
+      // Call API to start deep analysis scan
+      const response = await fetch(`${API_BASE}/scm/scans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          repositoryId: repoId,
+          branch,
+          scanType: 'deep-analysis',
+          deepAnalysisOptions: options,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start deep analysis');
+      }
+
+      const data = await response.json();
+      console.log('Deep analysis started:', data);
+      setShowDeepAnalysisModal(false);
+      // Refresh scan list
+      loadRepoData();
+      // Navigate to the scan details
+      if (data.scanId || data.id) {
+        router.push(`/dashboard/scans/${data.scanId || data.id}`);
+      }
+    } catch (error) {
+      console.error('Failed to start deep analysis:', error);
+      alert('Failed to start deep analysis. Please try again.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
@@ -782,11 +1048,11 @@ export default function RepoDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <a href={repo?.htmlUrl || `https://github.com/${repo?.fullName}`} target="_blank" rel="noopener noreferrer" 
+          <a href={repo?.htmlUrl || `https://github.com/${repo?.fullName}`} target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
             <ExternalLink className="w-4 h-4" /> View on GitHub
           </a>
-          <button 
+          <button
             onClick={() => router.push(`/dashboard/repos/${repoId}/settings`)}
             className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
           >
@@ -794,6 +1060,12 @@ export default function RepoDetailPage() {
           </button>
           <button onClick={loadRepoData} className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
             <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+          <button
+            onClick={() => setShowDeepAnalysisModal(true)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            <Microscope className="w-4 h-4" /> Deep Analysis
           </button>
         </div>
       </div>
@@ -867,6 +1139,16 @@ export default function RepoDetailPage() {
           repoSettings={repo}
           onClose={() => setSelectedBranchForSettings(null)}
           onSave={handleSaveBranchSettings}
+        />
+      )}
+
+      {/* Deep Analysis Modal */}
+      {showDeepAnalysisModal && (
+        <DeepAnalysisModal
+          repoName={repo?.fullName || repo?.name || 'Repository'}
+          branches={branches}
+          onClose={() => setShowDeepAnalysisModal(false)}
+          onStart={handleStartDeepAnalysis}
         />
       )}
     </div>
