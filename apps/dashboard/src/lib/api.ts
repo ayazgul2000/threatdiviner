@@ -107,11 +107,13 @@ export interface Finding {
   aiExploitability?: string | null;
   aiRemediation?: string | null;
   aiTriagedAt?: string | null;
+  autoFix?: string | null;
   // VulnDB Enrichment fields (populated at scan time)
   cweData?: { id: string; name: string; description: string; capecIds?: string[] } | null;
   cveData?: any | null;
   owaspCategory?: string | null;
-  attackTechniques?: Array<{ id: string; name: string; tacticId: string; tactic?: { id: string; name: string } }> | null;
+  capecPatterns?: string[] | null;
+  attackTechniques?: Array<{ id: string; name: string; tacticId: string; tactic?: { id: string; name: string } }> | string[] | null;
   complianceControls?: Array<{ frameworkId: string; controlId: string; controlName: string }> | null;
   riskScore?: number | null;
   isKev?: boolean;
