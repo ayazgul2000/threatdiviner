@@ -18,7 +18,7 @@ import { FindingProcessorService } from '../../scanners/services/finding-process
 import { DiffFilterService } from '../../scanners/services/diff-filter.service';
 import { QueueService } from '../services/queue.service';
 import { QUEUE_NAMES } from '../queue.constants';
-import { ScanJobData, NotifyJobData, FindingsCount, DeepAnalysisOptions } from '../jobs';
+import { ScanJobData, NotifyJobData, FindingsCount } from '../jobs';
 import { IScanner, NormalizedFinding, ScanContext } from '../../scanners/interfaces';
 import { BULL_CONNECTION } from '../custom-bull.module';
 import { AiService, TriageRequest } from '../../ai/ai.service';
@@ -1124,7 +1124,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
    * Runs advanced AI analysis on existing findings without re-scanning
    */
   private async processDeepAnalysis(job: Job<ScanJobData>): Promise<void> {
-    const { scanId, tenantId, repositoryId, fullName, deepAnalysisOptions } = job.data;
+    const { scanId, repositoryId, fullName, deepAnalysisOptions } = job.data;
     const startTime = Date.now();
 
     this.logger.log(`Processing deep analysis scan ${scanId} for ${fullName}`);
@@ -1261,7 +1261,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
    */
   private async runSimilarVulnDetection(
     findings: any[],
-    workDir: string,
+    _workDir: string,
     results: DeepAnalysisResult[],
   ): Promise<void> {
     this.logger.log('Running similar vulnerability detection...');
@@ -1375,7 +1375,7 @@ Respond in JSON format:
    */
   private async runFixPropagation(
     findings: any[],
-    workDir: string,
+    _workDir: string,
     results: DeepAnalysisResult[],
   ): Promise<void> {
     this.logger.log('Running fix propagation analysis...');
@@ -1512,7 +1512,7 @@ Respond in JSON format:
    */
   private async runSecurityTestGeneration(
     findings: any[],
-    workDir: string,
+    _workDir: string,
     results: DeepAnalysisResult[],
   ): Promise<void> {
     this.logger.log('Running security test generation...');
@@ -1578,7 +1578,7 @@ Respond in JSON format:
    */
   private async runArchitectureRecommendations(
     findings: any[],
-    workDir: string,
+    _workDir: string,
     results: DeepAnalysisResult[],
   ): Promise<void> {
     this.logger.log('Running architecture recommendations...');
@@ -1655,7 +1655,7 @@ Respond in JSON format:
    */
   private async runAttackChainMapping(
     findings: any[],
-    workDir: string,
+    _workDir: string,
     results: DeepAnalysisResult[],
   ): Promise<void> {
     this.logger.log('Running attack chain mapping...');
@@ -1741,11 +1741,11 @@ Respond in JSON format:
     await this.prisma.scan.update({
       where: { id: scanId },
       data: {
-        deepAnalysisOptions: {
+        deepAnalysisOptions: JSON.parse(JSON.stringify({
           results,
           completedAt: new Date().toISOString(),
           resultCount: results.length,
-        },
+        })),
       },
     });
 
