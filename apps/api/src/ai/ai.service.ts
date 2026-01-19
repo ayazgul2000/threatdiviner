@@ -248,4 +248,28 @@ export class AiService {
   getConfig(): AiServiceConfig {
     return { ...this.config };
   }
+
+  /**
+   * Run a generic prompt for deep analysis
+   * Uses the first available provider
+   */
+  async analyzeWithPrompt(prompt: string): Promise<string | null> {
+    for (const provider of this.providers) {
+      if (!(await provider.isAvailable())) {
+        continue;
+      }
+
+      try {
+        const result = await provider.analyzeWithPrompt(prompt);
+        if (result) {
+          return result;
+        }
+      } catch (error) {
+        this.logger.error(`${provider.name} analyze failed: ${error}`);
+      }
+    }
+
+    this.logger.warn('All AI providers failed for analysis');
+    return null;
+  }
 }

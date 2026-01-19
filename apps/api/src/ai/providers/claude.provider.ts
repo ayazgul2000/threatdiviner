@@ -95,4 +95,33 @@ export class ClaudeProvider implements AiProviderInterface {
       return null;
     }
   }
+
+  async analyzeWithPrompt(prompt: string): Promise<string | null> {
+    if (!this.client) {
+      return null;
+    }
+
+    try {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 4096,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      });
+
+      const content = response.content[0];
+      if (content.type !== 'text') {
+        throw new Error('Unexpected response type');
+      }
+
+      return content.text;
+    } catch (error) {
+      this.logger.error(`Claude analysis failed: ${error}`);
+      return null;
+    }
+  }
 }

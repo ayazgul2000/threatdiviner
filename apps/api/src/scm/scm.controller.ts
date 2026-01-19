@@ -289,6 +289,8 @@ export class ScmController {
       dto.repositoryId,
       dto.branch,
       dto.pullRequestId,
+      dto.scanType,
+      dto.deepAnalysisOptions,
     );
     return { scanId };
   }

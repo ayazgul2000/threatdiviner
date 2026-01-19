@@ -146,4 +146,21 @@ export class TriggerScanDto {
   @IsOptional()
   @IsString()
   pullRequestId?: string;
+
+  @IsOptional()
+  @IsString()
+  scanType?: 'standard' | 'deep-analysis';
+
+  @IsOptional()
+  deepAnalysisOptions?: DeepAnalysisOptions;
+}
+
+export interface DeepAnalysisOptions {
+  similarVulns?: boolean;
+  callChain?: boolean;
+  fixPropagation?: boolean;
+  secureAlternatives?: boolean;
+  securityTests?: boolean;
+  architecture?: boolean;
+  attackChain?: boolean;
 }

@@ -18,7 +18,7 @@ import { FindingProcessorService } from '../../scanners/services/finding-process
 import { DiffFilterService } from '../../scanners/services/diff-filter.service';
 import { QueueService } from '../services/queue.service';
 import { QUEUE_NAMES } from '../queue.constants';
-import { ScanJobData, NotifyJobData, FindingsCount } from '../jobs';
+import { ScanJobData, NotifyJobData, FindingsCount, DeepAnalysisOptions } from '../jobs';
 import { IScanner, NormalizedFinding, ScanContext } from '../../scanners/interfaces';
 import { BULL_CONNECTION } from '../custom-bull.module';
 import { AiService, TriageRequest } from '../../ai/ai.service';
@@ -128,11 +128,17 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
   }
 
   async process(job: Job<ScanJobData>): Promise<void> {
-    const { scanId, tenantId, repositoryId, fullName } = job.data;
+    const { scanId, tenantId, repositoryId, fullName, scanType } = job.data;
     let workDir: string | undefined;
     const startTime = Date.now();
 
-    this.logger.log(`Processing scan ${scanId} for ${fullName}`);
+    this.logger.log(`Processing scan ${scanId} for ${fullName} (type: ${scanType || 'standard'})`);
+
+    // Handle deep analysis scan type differently
+    if (scanType === 'deep-analysis') {
+      await this.processDeepAnalysis(job);
+      return;
+    }
 
     try {
       // 1. Clone repository
@@ -1112,4 +1118,664 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Full-file triage failed: ${error}`);
     }
   }
+
+  /**
+   * Process a deep analysis scan
+   * Runs advanced AI analysis on existing findings without re-scanning
+   */
+  private async processDeepAnalysis(job: Job<ScanJobData>): Promise<void> {
+    const { scanId, tenantId, repositoryId, fullName, deepAnalysisOptions } = job.data;
+    const startTime = Date.now();
+
+    this.logger.log(`Processing deep analysis scan ${scanId} for ${fullName}`);
+    this.logger.log(`Deep analysis options: ${JSON.stringify(deepAnalysisOptions)}`);
+
+    let workDir: string | undefined;
+
+    try {
+      await this.updateScanStatus(scanId, 'analyzing');
+      await job.updateProgress(10);
+
+      // Check if AI is available
+      const isAvailable = await this.aiService.isAvailable();
+      if (!isAvailable) {
+        throw new Error('AI service not available for deep analysis');
+      }
+
+      // Get repository info
+      const repository = await this.prisma.repository.findUnique({
+        where: { id: repositoryId },
+        include: { connection: true },
+      });
+
+      if (!repository) {
+        throw new Error('Repository not found');
+      }
+
+      // Clone repository for full file access
+      await this.updateScanStatus(scanId, 'cloning');
+      await job.updateProgress(20);
+
+      workDir = await this.cloneRepository(job.data);
+      await job.updateProgress(40);
+
+      // Get existing findings to analyze (from most recent standard scan)
+      const latestStandardScan = await this.prisma.scan.findFirst({
+        where: {
+          repositoryId,
+          scanType: 'standard',
+          status: 'completed',
+          branch: job.data.branch,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+
+      if (!latestStandardScan) {
+        throw new Error('No completed standard scan found for this branch. Run a standard scan first.');
+      }
+
+      // Get all findings from the latest scan
+      const findings = await this.prisma.finding.findMany({
+        where: {
+          scanId: latestStandardScan.id,
+          severity: { in: ['critical', 'high', 'medium'] },
+        },
+        orderBy: [
+          { severity: 'asc' },
+          { createdAt: 'asc' },
+        ],
+      });
+
+      if (findings.length === 0) {
+        this.logger.log('No findings to analyze');
+        await this.completeScan(scanId, 0, Date.now() - startTime);
+        return;
+      }
+
+      this.logger.log(`Deep analyzing ${findings.length} findings with options: ${JSON.stringify(deepAnalysisOptions)}`);
+      await this.updateScanStatus(scanId, 'triaging');
+      await job.updateProgress(50);
+
+      const options = deepAnalysisOptions || {};
+      const analysisResults: DeepAnalysisResult[] = [];
+
+      // Run selected deep analysis features
+      if (options.similarVulns) {
+        await this.runSimilarVulnDetection(findings, workDir, analysisResults);
+      }
+      await job.updateProgress(60);
+
+      if (options.callChain) {
+        await this.runCallChainAnalysis(findings, workDir, analysisResults);
+      }
+      await job.updateProgress(70);
+
+      if (options.fixPropagation) {
+        await this.runFixPropagation(findings, workDir, analysisResults);
+      }
+      await job.updateProgress(75);
+
+      if (options.secureAlternatives) {
+        await this.runSecureAlternatives(findings, workDir, analysisResults);
+      }
+      await job.updateProgress(80);
+
+      if (options.securityTests) {
+        await this.runSecurityTestGeneration(findings, workDir, analysisResults);
+      }
+      await job.updateProgress(85);
+
+      if (options.architecture) {
+        await this.runArchitectureRecommendations(findings, workDir, analysisResults);
+      }
+      await job.updateProgress(90);
+
+      if (options.attackChain) {
+        await this.runAttackChainMapping(findings, workDir, analysisResults);
+      }
+      await job.updateProgress(95);
+
+      // Store deep analysis results
+      await this.storeDeepAnalysisResults(scanId, analysisResults);
+
+      // Complete scan
+      await this.completeScan(scanId, analysisResults.length, Date.now() - startTime);
+      await job.updateProgress(100);
+
+      this.logger.log(`Deep analysis scan ${scanId} completed: ${analysisResults.length} analysis results`);
+
+    } catch (error) {
+      this.logger.error(`Deep analysis scan ${scanId} failed: ${error}`);
+      await this.failScan(scanId, error instanceof Error ? error.message : 'Unknown error');
+      throw error;
+    } finally {
+      if (workDir) {
+        await this.gitService.cleanup(workDir);
+      }
+    }
+  }
+
+  /**
+   * Similar vulnerability detection - finds similar patterns across codebase
+   */
+  private async runSimilarVulnDetection(
+    findings: any[],
+    workDir: string,
+    results: DeepAnalysisResult[],
+  ): Promise<void> {
+    this.logger.log('Running similar vulnerability detection...');
+
+    for (const finding of findings.slice(0, 10)) { // Limit to top 10 for performance
+      try {
+        const prompt = `Analyze this security vulnerability and identify similar patterns in the codebase that might have the same issue:
+
+Vulnerability: ${finding.title}
+Rule: ${finding.ruleId}
+File: ${finding.filePath}
+Code snippet:
+\`\`\`
+${finding.snippet || 'N/A'}
+\`\`\`
+CWE: ${finding.cweId || 'N/A'}
+
+Look for:
+1. Same function/method being used unsafely elsewhere
+2. Similar coding patterns that could have the same vulnerability
+3. Copy-pasted code that shares the vulnerability
+
+Respond in JSON format:
+{
+  "similarPatterns": [
+    {
+      "pattern": "description of the pattern",
+      "searchQuery": "regex or grep query to find similar code",
+      "risk": "why this pattern is risky"
+    }
+  ],
+  "recommendedSearch": "command to search for similar issues"
+}`;
+
+        const response = await this.aiService.analyzeWithPrompt(prompt);
+
+        results.push({
+          findingId: finding.id,
+          analysisType: 'similar_vulns',
+          result: response,
+        });
+      } catch (error) {
+        this.logger.warn(`Similar vuln detection failed for ${finding.id}: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Call chain analysis - determines if vulnerability is publicly accessible
+   */
+  private async runCallChainAnalysis(
+    findings: any[],
+    workDir: string,
+    results: DeepAnalysisResult[],
+  ): Promise<void> {
+    this.logger.log('Running call chain analysis...');
+
+    for (const finding of findings.slice(0, 10)) {
+      try {
+        // Read the file containing the vulnerability
+        const fs = await import('fs/promises');
+        let fileContent = '';
+        try {
+          fileContent = await fs.readFile(`${workDir}/${finding.filePath}`, 'utf-8');
+        } catch {
+          continue;
+        }
+
+        const prompt = `Analyze the call chain for this security vulnerability to determine its exposure:
+
+Vulnerability: ${finding.title}
+Rule: ${finding.ruleId}
+File: ${finding.filePath}:${finding.startLine}
+
+File content:
+\`\`\`
+${fileContent.substring(0, 8000)}
+\`\`\`
+
+Analyze:
+1. Is this function/method called from public endpoints (API routes, controllers)?
+2. What is the call chain from entry points to this vulnerability?
+3. Can an unauthenticated user trigger this vulnerability?
+4. What data flows into the vulnerable code?
+
+Respond in JSON format:
+{
+  "exposure": "public|authenticated|internal|unknown",
+  "callChain": ["entry point", "...", "vulnerable function"],
+  "entryPoints": ["list of public entry points that reach this code"],
+  "dataFlow": "description of how user data reaches the vulnerability",
+  "exploitability": "high|medium|low",
+  "justification": "explanation of the exposure assessment"
+}`;
+
+        const response = await this.aiService.analyzeWithPrompt(prompt);
+
+        results.push({
+          findingId: finding.id,
+          analysisType: 'call_chain',
+          result: response,
+        });
+      } catch (error) {
+        this.logger.warn(`Call chain analysis failed for ${finding.id}: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Fix propagation - applies fix to all similar occurrences
+   */
+  private async runFixPropagation(
+    findings: any[],
+    workDir: string,
+    results: DeepAnalysisResult[],
+  ): Promise<void> {
+    this.logger.log('Running fix propagation analysis...');
+
+    // Group findings by rule to find patterns
+    const byRule = new Map<string, any[]>();
+    for (const finding of findings) {
+      const rule = finding.ruleId;
+      if (!byRule.has(rule)) {
+        byRule.set(rule, []);
+      }
+      byRule.get(rule)!.push(finding);
+    }
+
+    for (const [ruleId, ruleFindings] of byRule) {
+      if (ruleFindings.length < 2) continue;
+
+      try {
+        const snippets = ruleFindings.slice(0, 5).map(f => ({
+          file: f.filePath,
+          line: f.startLine,
+          code: f.snippet || 'N/A',
+        }));
+
+        const prompt = `These findings share the same vulnerability rule. Analyze them to create a unified fix strategy:
+
+Rule: ${ruleId}
+Vulnerability: ${ruleFindings[0].title}
+
+Occurrences:
+${snippets.map((s, i) => `${i + 1}. ${s.file}:${s.line}\n\`\`\`\n${s.code}\n\`\`\``).join('\n\n')}
+
+Provide:
+1. A generalized fix pattern that works for all occurrences
+2. Any helper functions or utilities that could centralize the fix
+3. Step-by-step instructions to apply the fix everywhere
+
+Respond in JSON format:
+{
+  "commonPattern": "what these all have in common",
+  "generalizedFix": "code template for fixing all instances",
+  "helperFunction": "optional helper code to create",
+  "instructions": ["step 1", "step 2", ...],
+  "estimatedChanges": number
+}`;
+
+        const response = await this.aiService.analyzeWithPrompt(prompt);
+
+        results.push({
+          findingId: ruleFindings[0].id,
+          analysisType: 'fix_propagation',
+          result: response,
+          metadata: { affectedFindings: ruleFindings.map(f => f.id) },
+        });
+      } catch (error) {
+        this.logger.warn(`Fix propagation failed for ${ruleId}: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Secure alternatives - suggests secure libraries/patterns
+   */
+  private async runSecureAlternatives(
+    findings: any[],
+    workDir: string,
+    results: DeepAnalysisResult[],
+  ): Promise<void> {
+    this.logger.log('Running secure alternatives analysis...');
+
+    // Read package.json for dependency context
+    const fs = await import('fs/promises');
+    let packageJson = '';
+    try {
+      packageJson = await fs.readFile(`${workDir}/package.json`, 'utf-8');
+    } catch {
+      // Not a Node.js project
+    }
+
+    for (const finding of findings.slice(0, 10)) {
+      try {
+        const prompt = `Suggest secure alternatives for this vulnerability:
+
+Vulnerability: ${finding.title}
+Rule: ${finding.ruleId}
+CWE: ${finding.cweId || 'N/A'}
+Code:
+\`\`\`
+${finding.snippet || 'N/A'}
+\`\`\`
+
+${packageJson ? `Current dependencies:\n${packageJson.substring(0, 2000)}` : ''}
+
+Provide:
+1. Secure library alternatives (with import/installation commands)
+2. Secure coding patterns to replace the vulnerable code
+3. Configuration changes if applicable
+
+Respond in JSON format:
+{
+  "secureLibraries": [
+    {
+      "name": "library name",
+      "installation": "npm install / pip install command",
+      "usage": "code example",
+      "whySecure": "explanation"
+    }
+  ],
+  "securePatterns": [
+    {
+      "pattern": "description",
+      "code": "secure code example",
+      "explanation": "why this is secure"
+    }
+  ],
+  "configChanges": ["config change 1", "config change 2"]
+}`;
+
+        const response = await this.aiService.analyzeWithPrompt(prompt);
+
+        results.push({
+          findingId: finding.id,
+          analysisType: 'secure_alternatives',
+          result: response,
+        });
+      } catch (error) {
+        this.logger.warn(`Secure alternatives failed for ${finding.id}: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Security test generation - creates test cases for vulnerabilities
+   */
+  private async runSecurityTestGeneration(
+    findings: any[],
+    workDir: string,
+    results: DeepAnalysisResult[],
+  ): Promise<void> {
+    this.logger.log('Running security test generation...');
+
+    for (const finding of findings.slice(0, 10)) {
+      try {
+        const prompt = `Generate security test cases for this vulnerability:
+
+Vulnerability: ${finding.title}
+Rule: ${finding.ruleId}
+CWE: ${finding.cweId || 'N/A'}
+File: ${finding.filePath}
+Code:
+\`\`\`
+${finding.snippet || 'N/A'}
+\`\`\`
+
+Generate:
+1. Unit tests that would catch this vulnerability
+2. Integration test cases
+3. Negative test cases (attack payloads)
+
+Respond in JSON format:
+{
+  "unitTests": [
+    {
+      "name": "test name",
+      "code": "test code",
+      "description": "what it tests"
+    }
+  ],
+  "integrationTests": [
+    {
+      "name": "test name",
+      "steps": ["step 1", "step 2"],
+      "expectedResult": "expected outcome"
+    }
+  ],
+  "attackPayloads": [
+    {
+      "payload": "attack string/data",
+      "vulnerability": "what it exploits",
+      "expectedBehavior": "what secure code should do"
+    }
+  ]
+}`;
+
+        const response = await this.aiService.analyzeWithPrompt(prompt);
+
+        results.push({
+          findingId: finding.id,
+          analysisType: 'security_tests',
+          result: response,
+        });
+      } catch (error) {
+        this.logger.warn(`Security test generation failed for ${finding.id}: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Architecture recommendations - suggests design improvements
+   */
+  private async runArchitectureRecommendations(
+    findings: any[],
+    workDir: string,
+    results: DeepAnalysisResult[],
+  ): Promise<void> {
+    this.logger.log('Running architecture recommendations...');
+
+    // Group findings by severity and type for holistic analysis
+    const criticalAndHigh = findings.filter(f =>
+      f.severity === 'critical' || f.severity === 'high'
+    );
+
+    if (criticalAndHigh.length === 0) return;
+
+    try {
+      const findingSummary = criticalAndHigh.slice(0, 20).map(f => ({
+        title: f.title,
+        rule: f.ruleId,
+        cwe: f.cweId,
+        file: f.filePath,
+      }));
+
+      const prompt = `Based on these security findings, provide architecture recommendations:
+
+Findings Summary:
+${JSON.stringify(findingSummary, null, 2)}
+
+Analyze:
+1. Common security patterns that are missing
+2. Architectural changes that would prevent these vulnerability classes
+3. Security controls that should be added
+4. Defense-in-depth recommendations
+
+Respond in JSON format:
+{
+  "patterns": [
+    {
+      "pattern": "pattern name",
+      "description": "what it does",
+      "implementation": "how to implement",
+      "addressedVulnerabilities": ["CWE-XX", ...]
+    }
+  ],
+  "architectureChanges": [
+    {
+      "change": "change description",
+      "rationale": "why this helps",
+      "effort": "low|medium|high",
+      "impact": "description of security improvement"
+    }
+  ],
+  "securityControls": [
+    {
+      "control": "control name",
+      "type": "preventive|detective|corrective",
+      "implementation": "how to add"
+    }
+  ],
+  "priorityOrder": ["first change", "second change", ...]
+}`;
+
+      const response = await this.aiService.analyzeWithPrompt(prompt);
+
+      results.push({
+        findingId: 'architecture', // Not tied to specific finding
+        analysisType: 'architecture',
+        result: response,
+        metadata: { analyzedFindings: criticalAndHigh.map(f => f.id) },
+      });
+    } catch (error) {
+      this.logger.warn(`Architecture recommendations failed: ${error}`);
+    }
+  }
+
+  /**
+   * Attack chain mapping - correlates findings into attack paths
+   */
+  private async runAttackChainMapping(
+    findings: any[],
+    workDir: string,
+    results: DeepAnalysisResult[],
+  ): Promise<void> {
+    this.logger.log('Running attack chain mapping...');
+
+    try {
+      const findingSummary = findings.slice(0, 30).map(f => ({
+        id: f.id,
+        title: f.title,
+        severity: f.severity,
+        cwe: f.cweId,
+        file: f.filePath,
+        line: f.startLine,
+      }));
+
+      const prompt = `Analyze these security findings to identify potential attack chains:
+
+Findings:
+${JSON.stringify(findingSummary, null, 2)}
+
+Identify:
+1. How findings could be chained together for attacks
+2. Attack scenarios that combine multiple vulnerabilities
+3. Critical paths an attacker might take
+4. Kill chain stages these vulnerabilities enable
+
+Respond in JSON format:
+{
+  "attackChains": [
+    {
+      "name": "attack chain name",
+      "description": "what the attack achieves",
+      "steps": [
+        {
+          "step": 1,
+          "findingId": "finding id used",
+          "action": "what attacker does",
+          "outcome": "what they gain"
+        }
+      ],
+      "impact": "final impact",
+      "likelihood": "high|medium|low"
+    }
+  ],
+  "killChainMapping": {
+    "reconnaissance": ["finding ids"],
+    "weaponization": ["finding ids"],
+    "delivery": ["finding ids"],
+    "exploitation": ["finding ids"],
+    "installation": ["finding ids"],
+    "command_control": ["finding ids"],
+    "actions_on_objectives": ["finding ids"]
+  },
+  "criticalPaths": [
+    {
+      "path": "entry -> step -> step -> impact",
+      "risk": "high|medium|low",
+      "mitigationPriority": 1
+    }
+  ]
+}`;
+
+      const response = await this.aiService.analyzeWithPrompt(prompt);
+
+      results.push({
+        findingId: 'attack_chain',
+        analysisType: 'attack_chain',
+        result: response,
+        metadata: { analyzedFindings: findings.map(f => f.id) },
+      });
+    } catch (error) {
+      this.logger.warn(`Attack chain mapping failed: ${error}`);
+    }
+  }
+
+  /**
+   * Store deep analysis results
+   */
+  private async storeDeepAnalysisResults(
+    scanId: string,
+    results: DeepAnalysisResult[],
+  ): Promise<void> {
+    // Store results in scan's deepAnalysisResults field
+    await this.prisma.scan.update({
+      where: { id: scanId },
+      data: {
+        deepAnalysisOptions: {
+          results,
+          completedAt: new Date().toISOString(),
+          resultCount: results.length,
+        },
+      },
+    });
+
+    // Also update individual findings with their analysis
+    for (const result of results) {
+      if (result.findingId && !['architecture', 'attack_chain'].includes(result.findingId)) {
+        try {
+          await this.prisma.finding.update({
+            where: { id: result.findingId },
+            data: {
+              aiAnalysis: JSON.stringify({
+                ...JSON.parse((await this.prisma.finding.findUnique({
+                  where: { id: result.findingId },
+                  select: { aiAnalysis: true }
+                }))?.aiAnalysis || '{}'),
+                [result.analysisType]: result.result,
+              }),
+            },
+          });
+        } catch (error) {
+          this.logger.warn(`Failed to update finding ${result.findingId} with analysis: ${error}`);
+        }
+      }
+    }
+  }
+}
+
+interface DeepAnalysisResult {
+  findingId: string;
+  analysisType: string;
+  result: any;
+  metadata?: Record<string, any>;
 }

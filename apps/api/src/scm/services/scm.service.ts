@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from './crypto.service';
 import { GitHubProvider, GitLabProvider, ScmProvider, ScmRepository } from '../providers';
 import { QueueService } from '../../queue/services/queue.service';
-import { ScanJobData } from '../../queue/jobs';
+import { ScanJobData, DeepAnalysisOptions } from '../../queue/jobs';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -594,7 +594,14 @@ export class ScmService {
   }
 
   // Scan operations
-  async triggerScan(tenantId: string, repositoryId: string, branch?: string, pullRequestId?: string): Promise<string> {
+  async triggerScan(
+    tenantId: string,
+    repositoryId: string,
+    branch?: string,
+    pullRequestId?: string,
+    scanType?: 'standard' | 'deep-analysis',
+    deepAnalysisOptions?: DeepAnalysisOptions,
+  ): Promise<string> {
     const repository = await this.prisma.repository.findFirst({
       where: { id: repositoryId, tenantId },
       include: { connection: true, scanConfig: true },
@@ -642,6 +649,7 @@ export class ScmService {
       }
     }
 
+    const effectiveScanType = scanType || 'standard';
     const scan = await this.prisma.scan.create({
       data: {
         tenantId,
@@ -649,11 +657,13 @@ export class ScmService {
         projectId: repository.projectId,
         commitSha: commit.sha,
         branch: targetBranch,
-        triggeredBy: triggerEvent,
+        triggeredBy: effectiveScanType === 'deep-analysis' ? 'deep_analysis' : triggerEvent,
         pullRequestId,
         status: 'queued',
         scanners: enabledScanners,
         checkRunId,
+        scanType: effectiveScanType,
+        deepAnalysisOptions: deepAnalysisOptions ? deepAnalysisOptions as any : undefined,
       },
     });
 
@@ -670,6 +680,8 @@ export class ScmService {
       checkRunId,
       pullRequestId,
       triggeredBy: triggerEvent,
+      scanType: effectiveScanType,
+      deepAnalysisOptions,
       config: {
         enableSast: effectiveConfig.enableSast,
         enableSca: effectiveConfig.enableSca,

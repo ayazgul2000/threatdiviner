@@ -11,6 +11,18 @@ export interface ScanJobData {
   checkRunId?: string;
   triggeredBy?: string;
   config: ScanConfig;
+  scanType?: 'standard' | 'deep-analysis';
+  deepAnalysisOptions?: DeepAnalysisOptions;
+}
+
+export interface DeepAnalysisOptions {
+  similarVulns?: boolean;
+  callChain?: boolean;
+  fixPropagation?: boolean;
+  secureAlternatives?: boolean;
+  securityTests?: boolean;
+  architecture?: boolean;
+  attackChain?: boolean;
 }
 
 export interface ScanConfig {

@@ -81,4 +81,25 @@ export class GeminiProvider implements AiProviderInterface {
       return null;
     }
   }
+
+  async analyzeWithPrompt(prompt: string): Promise<string | null> {
+    if (!this.model) {
+      return null;
+    }
+
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      if (!text) {
+        throw new Error('Empty response from Gemini');
+      }
+
+      return text;
+    } catch (error) {
+      this.logger.error(`Gemini analysis failed: ${error}`);
+      return null;
+    }
+  }
 }

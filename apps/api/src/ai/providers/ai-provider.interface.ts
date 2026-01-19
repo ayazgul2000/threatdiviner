@@ -78,6 +78,11 @@ export interface AiProviderInterface {
    * Generate an auto-fix for a vulnerability
    */
   generateFix(request: AutoFixRequest): Promise<AutoFixResult | null>;
+
+  /**
+   * Run a generic prompt for deep analysis features
+   */
+  analyzeWithPrompt(prompt: string): Promise<string | null>;
 }
 
 /**
