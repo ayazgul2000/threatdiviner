@@ -133,6 +133,51 @@ export class UpdateScanConfigDto {
   @IsOptional()
   @IsString()
   blockPrOnSeverity?: string;
+
+  // Triage mode
+  @IsOptional()
+  @IsString()
+  triageMode?: string;
+
+  // CLI/Pipeline settings
+  @IsOptional()
+  @IsBoolean()
+  applySettingsForCLI?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  cliWriteBackPRComments?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  cliWriteBackPRSummary?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  cliWriteBackCheckStatus?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  cliWriteBackAnnotations?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  cliWriteBackSarif?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  cliCommentSeverities?: string[];
+
+  @IsOptional()
+  cliMaxComments?: number;
+
+  @IsOptional()
+  @IsString()
+  cliFailOnSeverity?: string;
+
+  @IsOptional()
+  cliFailOnCount?: number;
 }
 
 export class TriggerScanDto {

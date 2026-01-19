@@ -250,7 +250,7 @@ export default function RepositorySettingsPage() {
       // Navigate back to the page we came from after short delay
       setTimeout(() => {
         if (fromBranch && branchId) {
-          router.push(`/dashboard/repos/${repoId}/branch/${branchId}`);
+          router.push(`/dashboard/repos/${repoId}/branch/${encodeURIComponent(branchId)}`);
         } else {
           router.push(`/dashboard/repos/${repoId}`);
         }
@@ -291,7 +291,7 @@ export default function RepositorySettingsPage() {
         <div>
           <div className="flex items-center gap-3">
             <Link
-              href={fromBranch && branchId ? `/dashboard/repos/${repoId}/branch/${branchId}` : `/dashboard/repos/${repoId}`}
+              href={fromBranch && branchId ? `/dashboard/repos/${repoId}/branch/${encodeURIComponent(branchId)}` : `/dashboard/repos/${repoId}`}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

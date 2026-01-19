@@ -490,6 +490,19 @@ export class ScmService {
     inlineAnnotations: boolean;
     sarifUploadEnabled: boolean;
     blockPrOnSeverity: string;
+    // Triage mode
+    triageMode: string;
+    // CLI/Pipeline settings
+    applySettingsForCLI: boolean;
+    cliWriteBackPRComments: boolean;
+    cliWriteBackPRSummary: boolean;
+    cliWriteBackCheckStatus: boolean;
+    cliWriteBackAnnotations: boolean;
+    cliWriteBackSarif: boolean;
+    cliCommentSeverities: string[];
+    cliMaxComments: number;
+    cliFailOnSeverity: string;
+    cliFailOnCount: number;
   }>) {
     this.logger.log(`Updating scan config for repository ${repositoryId}, config: ${JSON.stringify(config)}`);
 
@@ -543,6 +556,21 @@ export class ScmService {
     if (config.inlineAnnotations !== undefined) updateData.inlineAnnotations = config.inlineAnnotations;
     if (config.sarifUploadEnabled !== undefined) updateData.sarifUploadEnabled = config.sarifUploadEnabled;
     if (config.blockPrOnSeverity !== undefined) updateData.blockPrOnSeverity = config.blockPrOnSeverity;
+
+    // Handle triage mode
+    if (config.triageMode !== undefined) updateData.triageMode = config.triageMode;
+
+    // Handle CLI/Pipeline settings
+    if (config.applySettingsForCLI !== undefined) updateData.applySettingsForCLI = config.applySettingsForCLI;
+    if (config.cliWriteBackPRComments !== undefined) updateData.cliWriteBackPRComments = config.cliWriteBackPRComments;
+    if (config.cliWriteBackPRSummary !== undefined) updateData.cliWriteBackPRSummary = config.cliWriteBackPRSummary;
+    if (config.cliWriteBackCheckStatus !== undefined) updateData.cliWriteBackCheckStatus = config.cliWriteBackCheckStatus;
+    if (config.cliWriteBackAnnotations !== undefined) updateData.cliWriteBackAnnotations = config.cliWriteBackAnnotations;
+    if (config.cliWriteBackSarif !== undefined) updateData.cliWriteBackSarif = config.cliWriteBackSarif;
+    if (config.cliCommentSeverities !== undefined) updateData.cliCommentSeverities = config.cliCommentSeverities;
+    if (config.cliMaxComments !== undefined) updateData.cliMaxComments = config.cliMaxComments;
+    if (config.cliFailOnSeverity !== undefined) updateData.cliFailOnSeverity = config.cliFailOnSeverity;
+    if (config.cliFailOnCount !== undefined) updateData.cliFailOnCount = config.cliFailOnCount;
 
     // Use upsert to create ScanConfig if it doesn't exist
     this.logger.log(`Upserting scan config with data: ${JSON.stringify(updateData)}`);
