@@ -25,7 +25,8 @@ import { AiService, TriageRequest } from '../../ai/ai.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { FindingEnrichmentService } from '../../vulndb/finding-enrichment.service';
 
-type ScanStatus = 'pending' | 'queued' | 'cloning' | 'scanning' | 'analyzing' | 'storing' | 'notifying' | 'completed' | 'failed';
+type ScanStatus = 'pending' | 'queued' | 'cloning' | 'scanning' | 'analyzing' | 'storing' | 'triaging' | 'notifying' | 'completed' | 'failed';
+type TriageMode = 'snippet' | 'full-file' | 'none';
 
 @Injectable()
 export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
@@ -36,6 +37,7 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly aiTriageBatchSize: number;
   private readonly aiSuggestionsEnabled: boolean;
   private readonly aiSuggestionsMinConfidence: number;
+  private readonly defaultTriageMode: TriageMode = 'snippet';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -191,8 +193,25 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       await job.updateProgress(85);
 
       // 5. AI Auto-triage (if enabled)
-      if (this.aiTriageEnabled && storedCount > 0) {
-        await this.runAutoTriage(scanId, repositoryId, job.data);
+      // Get effective triage mode for this scan
+      const triageMode = await this.getEffectiveTriageMode(repositoryId, job.data.branch);
+
+      // Update scan with triage mode
+      await this.prisma.scan.update({
+        where: { id: scanId },
+        data: { triageMode },
+      });
+
+      if (this.aiTriageEnabled && storedCount > 0 && triageMode !== 'none') {
+        await this.updateScanStatus(scanId, 'triaging');
+
+        if (triageMode === 'full-file' && workDir) {
+          // Full-file mode: run triage with file access BEFORE cleanup
+          await this.runFullFileTriage(scanId, repositoryId, job.data, workDir);
+        } else {
+          // Snippet mode: run triage with just snippets (can run after cleanup)
+          await this.runAutoTriage(scanId, repositoryId, job.data);
+        }
       }
       await job.updateProgress(90);
 
@@ -873,6 +892,224 @@ export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Diff filter failed: ${error}`);
       // On error, return all findings rather than failing
       return findings;
+    }
+  }
+
+  /**
+   * Get the effective triage mode for a scan based on repo and branch settings
+   * Priority: Branch override > Repo setting > Global default
+   */
+  private async getEffectiveTriageMode(
+    repositoryId: string,
+    branch: string,
+  ): Promise<TriageMode> {
+    try {
+      const scanConfig = await this.prisma.scanConfig.findUnique({
+        where: { repositoryId },
+        select: {
+          triageMode: true,
+          branchOverrides: true,
+        },
+      });
+
+      if (!scanConfig) {
+        return this.defaultTriageMode;
+      }
+
+      // Check for branch-specific override
+      const branchOverrides = scanConfig.branchOverrides as Record<string, { triageMode?: string }> | null;
+      if (branchOverrides && branchOverrides[branch]?.triageMode) {
+        const mode = branchOverrides[branch].triageMode as TriageMode;
+        this.logger.log(`Using branch override triage mode: ${mode} for branch ${branch}`);
+        return mode;
+      }
+
+      // Use repo-level setting
+      const repoMode = (scanConfig.triageMode || this.defaultTriageMode) as TriageMode;
+      return repoMode;
+    } catch (error) {
+      this.logger.warn(`Failed to get triage mode, using default: ${error}`);
+      return this.defaultTriageMode;
+    }
+  }
+
+  /**
+   * Run full-file triage with access to the cloned repository
+   * Batches findings by file for efficient AI calls
+   */
+  private async runFullFileTriage(
+    scanId: string,
+    repositoryId: string,
+    data: ScanJobData,
+    workDir: string,
+  ): Promise<void> {
+    const triageStartTime = Date.now();
+
+    try {
+      // Check if AI is available
+      const isAvailable = await this.aiService.isAvailable();
+      if (!isAvailable) {
+        this.logger.warn('AI triage not available - skipping full-file triage');
+        return;
+      }
+
+      // Get the repository info for context
+      const repository = await this.prisma.repository.findUnique({
+        where: { id: repositoryId },
+        select: { name: true, language: true },
+      });
+
+      // Get high and critical severity findings that haven't been triaged
+      const findings = await this.prisma.finding.findMany({
+        where: {
+          scanId,
+          severity: { in: ['critical', 'high'] },
+          aiTriagedAt: null,
+        },
+        take: this.aiTriageBatchSize,
+        orderBy: [
+          { severity: 'asc' },
+          { createdAt: 'asc' },
+        ],
+      });
+
+      if (findings.length === 0) {
+        this.logger.log('No high/critical findings to auto-triage');
+        return;
+      }
+
+      this.logger.log(`Full-file triaging ${findings.length} high/critical findings...`);
+
+      // Group findings by file for batched processing
+      const findingsByFile = new Map<string, typeof findings>();
+      for (const finding of findings) {
+        const filePath = finding.filePath;
+        if (!findingsByFile.has(filePath)) {
+          findingsByFile.set(filePath, []);
+        }
+        findingsByFile.get(filePath)!.push(finding);
+      }
+
+      this.logger.log(`Grouped findings into ${findingsByFile.size} files for batched triage`);
+
+      let triaged = 0;
+      let fixesGenerated = 0;
+
+      // Process each file's findings together
+      for (const [filePath, fileFindings] of findingsByFile) {
+        try {
+          // Read the full file content
+          const fullFilePath = `${workDir}/${filePath}`;
+          let fileContent: string;
+
+          try {
+            const fs = await import('fs/promises');
+            fileContent = await fs.readFile(fullFilePath, 'utf-8');
+          } catch (readError) {
+            this.logger.warn(`Could not read file ${filePath}: ${readError}`);
+            // Fall back to snippet-only for this file
+            fileContent = '';
+          }
+
+          // Build triage requests for all findings in this file
+          const requests: TriageRequest[] = fileFindings.map((f) => ({
+            finding: {
+              id: f.id,
+              title: f.title,
+              description: f.description || '',
+              severity: f.severity,
+              ruleId: f.ruleId,
+              filePath: f.filePath,
+              startLine: f.startLine || 0,
+              snippet: f.snippet || undefined,
+              cweId: f.cweId || undefined,
+            },
+            repositoryContext: {
+              name: repository?.name || data.fullName,
+              language: repository?.language || 'unknown',
+            },
+            fileContent: fileContent || undefined, // Include full file content
+          }));
+
+          // Run batch triage for this file
+          const results = await this.aiService.batchTriageFindings(requests);
+
+          // Update findings with AI triage results and generate code fixes
+          for (const finding of fileFindings) {
+            const result = results.get(finding.id);
+            if (result) {
+              // Update triage data
+              await this.prisma.finding.update({
+                where: { id: finding.id },
+                data: {
+                  aiAnalysis: result.analysis,
+                  aiConfidence: result.confidence,
+                  aiSeverity: result.suggestedSeverity,
+                  aiFalsePositive: result.isLikelyFalsePositive,
+                  aiExploitability: result.exploitability,
+                  aiRemediation: result.remediation,
+                  aiTriagedAt: new Date(),
+                },
+              });
+              triaged++;
+
+              // Generate actual code fix with full file context
+              if (!result.isLikelyFalsePositive && fileContent) {
+                try {
+                  const fixResult = await this.aiService.generateAutoFix({
+                    finding: {
+                      ruleId: finding.ruleId,
+                      title: finding.title,
+                      description: finding.description || '',
+                      severity: finding.severity,
+                      filePath: finding.filePath,
+                      startLine: finding.startLine || 1,
+                      endLine: finding.endLine || undefined,
+                      snippet: finding.snippet || '',
+                      cweId: finding.cweId || undefined,
+                    },
+                    fileContent, // Full file content for better fixes
+                  });
+
+                  if (fixResult && fixResult.fixedCode) {
+                    await this.prisma.finding.update({
+                      where: { id: finding.id },
+                      data: {
+                        autoFix: fixResult.fixedCode,
+                        aiRemediation: fixResult.explanation,
+                        aiConfidence: fixResult.confidence,
+                      },
+                    });
+                    fixesGenerated++;
+                  }
+                } catch (fixError) {
+                  this.logger.warn(`Failed to generate fix for finding ${finding.id}: ${fixError}`);
+                }
+              }
+            }
+          }
+        } catch (fileError) {
+          this.logger.warn(`Failed to process file ${filePath}: ${fileError}`);
+        }
+      }
+
+      // Update scan with triage stats
+      const triageDuration = Date.now() - triageStartTime;
+      await this.prisma.scan.update({
+        where: { id: scanId },
+        data: {
+          triageStartedAt: new Date(triageStartTime),
+          triageCompletedAt: new Date(),
+          findingsTriaged: triaged,
+          fixesGenerated,
+        },
+      });
+
+      this.logger.log(
+        `Full-file triage completed: ${triaged} findings triaged, ${fixesGenerated} fixes generated in ${Math.round(triageDuration / 1000)}s`,
+      );
+    } catch (error) {
+      this.logger.error(`Full-file triage failed: ${error}`);
     }
   }
 }

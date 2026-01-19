@@ -17,6 +17,8 @@ export interface TriageRequest {
     cweId?: string;
   };
   codeContext?: string;
+  // Full file content for full-file triage mode (better context for fixes)
+  fileContent?: string;
   repositoryContext?: {
     name: string;
     language: string;

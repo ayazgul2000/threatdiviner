@@ -251,7 +251,18 @@ model ScanConfig {
   cliFailOnSeverity        String     @default("critical") @map("cli_fail_on_severity") // none, critical, high, medium, low
   cliFailOnCount           Int        @default(0) @map("cli_fail_on_count") // 0 = disabled
 
+  // AI Features
+  aiSuggestionsEnabled     Boolean    @default(true) @map("ai_suggestions_enabled") // Post AI fix suggestions to PRs
+  aiSuggestionsMinConfidence Float    @default(0.8) @map("ai_suggestions_min_confidence") // Minimum confidence to post
+
+  // Triage Mode: snippet (default), full-file, or none
+  // - snippet: Fast triage using only code snippets (post-scan, cheap)
+  // - full-file: Better context by reading full files during scan (before cleanup)
+  // - none: Skip AI triage entirely
+  triageMode               String     @default("snippet") @map("triage_mode")
+
   // Branch-level overrides (JSON map of branchName -> partial config)
+  // Can include: triageMode, enableSast, enableSca, etc.
   branchOverrides      Json?      @map("branch_overrides")
   createdAt            DateTime   @default(now()) @map("created_at")
   updatedAt            DateTime   @updatedAt @map("updated_at")
@@ -289,6 +300,18 @@ model Scan {
   cliWriteBackConfig   String[]  @default([]) @map("cli_write_back_config") // Write-back options enabled for this scan
   cliFailOnSeverity    String?   @map("cli_fail_on_severity") // Pipeline gate: fail on this severity
   cliFailOnCount       Int?      @map("cli_fail_on_count") // Pipeline gate: fail if count exceeds
+
+  // Triage settings for this scan
+  // scanType: standard (normal scan), deep-analysis (comprehensive repo analysis)
+  scanType             String    @default("standard") @map("scan_type")
+  // triageMode used: snippet, full-file, or none
+  triageMode           String    @default("snippet") @map("triage_mode")
+  // Deep analysis options (JSON): { similarVulns, callChain, fixPropagation, securityTests, architecture, attackChain }
+  deepAnalysisOptions  Json?     @map("deep_analysis_options")
+  triageStartedAt      DateTime? @map("triage_started_at")
+  triageCompletedAt    DateTime? @map("triage_completed_at")
+  findingsTriaged      Int?      @map("findings_triaged")
+  fixesGenerated       Int?      @map("fixes_generated")
 
   findings       Finding[]
   project        Project?   @relation(fields: [projectId], references: [id])

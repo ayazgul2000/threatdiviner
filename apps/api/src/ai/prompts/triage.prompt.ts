@@ -5,7 +5,7 @@ import { TriageRequest } from '../providers/ai-provider.interface';
  * This prompt is shared across all AI providers for consistency
  */
 export function buildTriagePrompt(request: TriageRequest): string {
-  const { finding, codeContext, repositoryContext } = request;
+  const { finding, codeContext, fileContent, repositoryContext } = request;
 
   let prompt = `You are a security expert analyzing a vulnerability finding from a security scanner.
 
@@ -20,14 +20,40 @@ ${finding.cweId ? `- **CWE**: ${finding.cweId}` : ''}
 
   if (finding.snippet) {
     prompt += `
-## Code Snippet
+## Code Snippet (Vulnerable Code)
 \`\`\`
 ${finding.snippet}
 \`\`\`
 `;
   }
 
-  if (codeContext) {
+  // If full file content is provided (full-file triage mode), include it for better context
+  if (fileContent) {
+    // Truncate if too long (keep around the vulnerable lines)
+    const maxFileLength = 8000;
+    let truncatedContent = fileContent;
+
+    if (fileContent.length > maxFileLength) {
+      // Extract context around the vulnerable lines
+      const lines = fileContent.split('\n');
+      const startLine = Math.max(0, (finding.startLine || 1) - 30);
+      const endLine = Math.min(lines.length, (finding.endLine || finding.startLine || 1) + 30);
+      truncatedContent = lines.slice(startLine, endLine).join('\n');
+      prompt += `
+## Full File Context (lines ${startLine + 1}-${endLine} of ${lines.length})
+\`\`\`
+${truncatedContent}
+\`\`\`
+`;
+    } else {
+      prompt += `
+## Full File Content
+\`\`\`
+${fileContent}
+\`\`\`
+`;
+    }
+  } else if (codeContext) {
     prompt += `
 ## Additional Code Context
 \`\`\`
