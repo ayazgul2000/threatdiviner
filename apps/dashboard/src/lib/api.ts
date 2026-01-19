@@ -53,6 +53,10 @@ export interface ScanConfig {
   excludePaths: string[];
   targetUrls: string[];
   containerImages: string[];
+  // AI Triage mode: snippet (default), full-file, or none
+  triageMode?: 'snippet' | 'full-file' | 'none';
+  // Branch-level overrides
+  branchOverrides?: Record<string, { triageMode?: string }>;
 }
 
 export interface Scan {

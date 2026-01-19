@@ -82,6 +82,7 @@ export default function RepositorySettingsPage() {
 
   // AI Triage
   const [aiTriageEnabled, setAiTriageEnabled] = useState(true);
+  const [triageMode, setTriageMode] = useState<'snippet' | 'full-file' | 'none'>('snippet');
 
   // PR Settings
   const [prSettings, setPrSettings] = useState({
@@ -156,6 +157,10 @@ export default function RepositorySettingsPage() {
             failOnSeverity: config.cliFailOnSeverity ?? 'critical',
             failOnCount: config.cliFailOnCount ?? 0,
           });
+          // Load triage mode
+          if (config.triageMode) {
+            setTriageMode(config.triageMode as 'snippet' | 'full-file' | 'none');
+          }
         }
       } catch (err) {
         console.error('Failed to fetch repository:', err);
@@ -237,6 +242,8 @@ export default function RepositorySettingsPage() {
         cliMaxComments: cliSettings.maxComments,
         cliFailOnSeverity: cliSettings.failOnSeverity,
         cliFailOnCount: cliSettings.failOnCount,
+        // Triage mode
+        triageMode,
       });
 
       setSuccess('Settings saved successfully');
@@ -545,21 +552,75 @@ export default function RepositorySettingsPage() {
           <CardTitle>AI Triage</CardTitle>
         </CardHeader>
         <CardContent>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={aiTriageEnabled}
-              onChange={(e) => setAiTriageEnabled(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              Enable AI-powered triage for findings in this repository
-            </span>
-          </label>
-          <p className="text-xs text-gray-500 mt-2">
-            When enabled, findings will be automatically analyzed by AI to determine false positive likelihood,
-            severity accuracy, and remediation suggestions.
-          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Triage Mode
+              </label>
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="triageMode"
+                    value="snippet"
+                    checked={triageMode === 'snippet'}
+                    onChange={() => setTriageMode('snippet')}
+                    className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900 dark:text-white">Snippet-only</span>
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">Default</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Fast and cost-effective. AI analyzes only the code snippets flagged by scanners. Best for CI/CD pipelines where speed matters.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="triageMode"
+                    value="full-file"
+                    checked={triageMode === 'full-file'}
+                    onChange={() => setTriageMode('full-file')}
+                    className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900 dark:text-white">Full-file context</span>
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">Better fixes</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      AI reads the entire file for each finding. Provides better context for accurate triage and generates more complete code fixes. Slightly slower than snippet-only.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="triageMode"
+                    value="none"
+                    checked={triageMode === 'none'}
+                    onChange={() => setTriageMode('none')}
+                    className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900 dark:text-white">Disabled</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Skip AI triage entirely. Findings will be stored without AI analysis or code fix generation.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {triageMode !== 'none' && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  <strong>Note:</strong> AI triage runs on high and critical severity findings. It analyzes each finding to determine false positive likelihood, suggests remediation, and generates code fixes where possible.
+                </p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
