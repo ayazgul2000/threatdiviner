@@ -1,7 +1,7 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { Queue, Job } from 'bullmq';
-import { QUEUE_NAMES, JOB_NAMES, SCAN_JOB_OPTIONS, NOTIFY_JOB_OPTIONS } from '../queue.constants';
-import { ScanJobData, NotifyJobData, CleanupJobData } from '../jobs';
+import { QUEUE_NAMES, JOB_NAMES, SCAN_JOB_OPTIONS, NOTIFY_JOB_OPTIONS, ANALYSIS_JOB_OPTIONS } from '../queue.constants';
+import { ScanJobData, NotifyJobData, CleanupJobData, AnalysisJobData } from '../jobs';
 
 @Injectable()
 export class QueueService {
@@ -11,6 +11,7 @@ export class QueueService {
     @Inject(`BullQueue_${QUEUE_NAMES.SCAN}`) private readonly scanQueue: Queue,
     @Inject(`BullQueue_${QUEUE_NAMES.NOTIFY}`) private readonly notifyQueue: Queue,
     @Inject(`BullQueue_${QUEUE_NAMES.CLEANUP}`) private readonly cleanupQueue: Queue,
+    @Inject(`BullQueue_${QUEUE_NAMES.ANALYSIS}`) private readonly analysisQueue: Queue,
   ) {}
 
   async enqueueScan(data: ScanJobData): Promise<Job<ScanJobData>> {
@@ -69,6 +70,56 @@ export class QueueService {
     );
 
     return job;
+  }
+
+  async enqueueAnalysis(data: AnalysisJobData): Promise<Job<AnalysisJobData>> {
+    this.logger.log(`Enqueueing analysis job for threat model ${data.threatModelId}`);
+
+    try {
+      const job = await this.analysisQueue.add(
+        JOB_NAMES.RUN_ANALYSIS,
+        data,
+        {
+          ...ANALYSIS_JOB_OPTIONS,
+          jobId: `analysis-${data.analysisRunId}`,
+        },
+      );
+
+      this.logger.log(`Analysis job ${job.id} created for run ${data.analysisRunId}`);
+
+      // Log queue stats for debugging
+      const [waiting, active] = await Promise.all([
+        this.analysisQueue.getWaitingCount(),
+        this.analysisQueue.getActiveCount(),
+      ]);
+      this.logger.log(`Analysis queue stats: ${waiting} waiting, ${active} active`);
+
+      return job;
+    } catch (error) {
+      this.logger.error(`Failed to enqueue analysis job: ${error}`);
+      throw error;
+    }
+  }
+
+  async getAnalysisJob(analysisRunId: string): Promise<Job<AnalysisJobData> | null> {
+    const job = await this.analysisQueue.getJob(`analysis-${analysisRunId}`);
+    return job || null;
+  }
+
+  async cancelAnalysis(analysisRunId: string): Promise<boolean> {
+    const job = await this.getAnalysisJob(analysisRunId);
+    if (!job) return false;
+
+    const state = await job.getState();
+    if (state === 'active') {
+      await job.moveToFailed(new Error('Cancelled by user'), 'cancelled');
+      return true;
+    } else if (state === 'waiting' || state === 'delayed') {
+      await job.remove();
+      return true;
+    }
+
+    return false;
   }
 
   async getScanJob(scanId: string): Promise<Job<ScanJobData> | null> {

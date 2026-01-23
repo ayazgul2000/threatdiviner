@@ -95,3 +95,20 @@ export interface CleanupJobData {
   workDir: string;
   scanId: string;
 }
+
+export interface AnalysisJobData {
+  analysisRunId: string;
+  threatModelId: string;
+  tenantId: string;
+  userId: string;
+  yaml: string;
+}
+
+export type AnalysisStage =
+  | 'queued'
+  | 'validating'
+  | 'generating'
+  | 'running'
+  | 'processing'
+  | 'completed'
+  | 'failed';

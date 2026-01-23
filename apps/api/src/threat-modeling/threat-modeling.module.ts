@@ -1,14 +1,20 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { ThreatModelingController } from './threat-modeling.controller';
 import { ThreatModelingService } from './threat-modeling.service';
 import { StrideAnalyzer } from './analyzers/stride.analyzer';
 import { EnterpriseStrideAnalyzer } from './analyzers/enterprise-stride.analyzer';
 import { ThreatModelDiagramService } from './services/diagram.service';
 import { ThreatModelExportService } from './services/export.service';
+import { ThreagileService } from './services/threagile.service';
+import { YamlGeneratorService } from './services/yaml-generator.service';
+import { RiskParserService } from './services/risk-parser.service';
+import { AnalysisProcessor } from '../queue/processors';
 import { PrismaModule } from '../prisma/prisma.module';
+import { QueueModule } from '../queue/queue.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, ConfigModule, QueueModule],
   controllers: [ThreatModelingController],
   providers: [
     ThreatModelingService,
@@ -16,6 +22,10 @@ import { PrismaModule } from '../prisma/prisma.module';
     EnterpriseStrideAnalyzer,
     ThreatModelDiagramService,
     ThreatModelExportService,
+    ThreagileService,
+    YamlGeneratorService,
+    RiskParserService,
+    AnalysisProcessor,
   ],
   exports: [
     ThreatModelingService,
@@ -23,6 +33,9 @@ import { PrismaModule } from '../prisma/prisma.module';
     EnterpriseStrideAnalyzer,
     ThreatModelDiagramService,
     ThreatModelExportService,
+    ThreagileService,
+    YamlGeneratorService,
+    RiskParserService,
   ],
 })
 export class ThreatModelingModule {}

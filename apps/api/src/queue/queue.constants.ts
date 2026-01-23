@@ -6,6 +6,7 @@ export const QUEUE_NAMES = {
   SECRETS: 'secrets-jobs',
   NOTIFY: 'notify-jobs',
   CLEANUP: 'cleanup-jobs',
+  ANALYSIS: 'analysis-jobs',
 } as const;
 
 export const JOB_NAMES = {
@@ -16,6 +17,7 @@ export const JOB_NAMES = {
   RUN_SECRETS: 'run-secrets',
   NOTIFY_GITHUB: 'notify-github',
   CLEANUP_WORKDIR: 'cleanup-workdir',
+  RUN_ANALYSIS: 'run-analysis',
 } as const;
 
 export const DEFAULT_JOB_OPTIONS = {
@@ -55,4 +57,11 @@ export const NOTIFY_JOB_OPTIONS = {
   ...DEFAULT_JOB_OPTIONS,
   timeout: 60000, // 1 minute
   priority: 5,
+};
+
+export const ANALYSIS_JOB_OPTIONS = {
+  ...DEFAULT_JOB_OPTIONS,
+  timeout: 180000, // 3 minutes max (Threagile has 120s timeout)
+  priority: 2,
+  attempts: 1, // No retry for analysis - user can manually re-trigger
 };

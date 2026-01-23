@@ -720,10 +720,12 @@ model ComplianceFramework {
   description String
   sourceUrl   String              @map("source_url")
   lastUpdated DateTime            @map("last_updated")
+  isActive    Boolean             @default(true) @map("is_active")
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
   controls    ComplianceControl[]
 
+  @@index([isActive])
   @@map("compliance_frameworks")
 }
 
@@ -731,17 +733,23 @@ model ComplianceControl {
   id             String              @id @default(uuid())
   frameworkId    String              @map("framework_id")
   controlId      String              @map("control_id")
+  parentId       String?             @map("parent_id")
   category       String
   name           String
   description    String
   guidance       String?
   testProcedures Json?               @map("test_procedures")
+  level          Int                 @default(1) // 1 = category, 2 = control, 3 = sub-control
   createdAt      DateTime            @default(now()) @map("created_at")
   updatedAt      DateTime            @updatedAt @map("updated_at")
   framework      ComplianceFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  parent         ComplianceControl?  @relation("ControlHierarchy", fields: [parentId], references: [id])
+  children       ComplianceControl[] @relation("ControlHierarchy")
+  riskMappings   RiskControlMapping[]
 
   @@unique([frameworkId, controlId])
   @@index([frameworkId])
+  @@index([parentId])
   @@map("compliance_controls")
 }
 
@@ -886,31 +894,41 @@ model DataSyncStatus {
 }
 
 model ThreatModel {
-  id             String                 @id @default(uuid())
-  tenantId       String                 @map("tenant_id")
-  name           String
-  description    String?
-  methodology    String                 @default("stride")
-  status         String                 @default("draft")
-  repositoryId   String?                @map("repository_id")
-  version        Int                    @default(1)
-  createdBy      String                 @map("created_by")
-  lastModifiedBy String?                @map("last_modified_by")
-  completedAt    DateTime?              @map("completed_at")
-  archivedAt     DateTime?              @map("archived_at")
-  createdAt      DateTime               @default(now()) @map("created_at")
-  updatedAt      DateTime               @updatedAt @map("updated_at")
-  projectId      String?                @map("project_id")
-  mitigations    ThreatMitigation[]
-  components     ThreatModelComponent[]
-  dataFlows      ThreatModelDataFlow[]
-  project        Project?               @relation(fields: [projectId], references: [id])
-  threats        Threat[]
+  id                String                 @id @default(uuid())
+  tenantId          String                 @map("tenant_id")
+  name              String
+  description       String?
+  methodology       String                 @default("stride")
+  status            String                 @default("draft")
+  repositoryId      String?                @map("repository_id")
+  version           Int                    @default(1)
+  createdBy         String                 @map("created_by")
+  lastModifiedBy    String?                @map("last_modified_by")
+  completedAt       DateTime?              @map("completed_at")
+  archivedAt        DateTime?              @map("archived_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  projectId         String?                @map("project_id")
+  // New fields for enhanced threat modeling
+  diagramXml        String?                @map("diagram_xml") @db.Text
+  analysisStatus    String?                @map("analysis_status") // idle, validating, running, completed, failed
+  lastAnalysisAt    DateTime?              @map("last_analysis_at")
+  lastAnalysisRunId String?                @map("last_analysis_run_id")
+  businessCriticality String               @default("important") @map("business_criticality") // important, critical, mission-critical
+  mitigations       ThreatMitigation[]
+  components        ThreatModelComponent[]
+  dataFlows         ThreatModelDataFlow[]
+  project           Project?               @relation(fields: [projectId], references: [id])
+  threats           Threat[]
+  diagramVersions   DiagramVersion[]
+  lock              ThreatModelLock?
+  analysisRuns      AnalysisRun[]
 
   @@index([tenantId])
   @@index([projectId])
   @@index([repositoryId])
   @@index([status])
+  @@index([analysisStatus])
   @@map("threat_models")
 }
 
@@ -997,15 +1015,28 @@ model Threat {
   skillsRequired     String?                   @map("skills_required")
   threatActor        String?                   @map("threat_actor")
   vulnerability      String?
+  // v2.4.0 - Risk parsing fields
+  fingerprint        String?                   @map("fingerprint")
+  cweId              String?                   @map("cwe_id")
+  createdBy          String?                   @map("created_by")
+  canonicalRiskId    String?                   @map("canonical_risk_id")
+  analysisRunId      String?                   @map("analysis_run_id")
+  lastDetectedAt     DateTime?                 @map("last_detected_at")
+  // Relations
   components         ThreatComponentMapping[]
   dataFlows          ThreatDataFlowMapping[]
   mitigations        ThreatMitigationMapping[]
   threatModel        ThreatModel               @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
+  canonicalRisk      CanonicalRisk?            @relation(fields: [canonicalRiskId], references: [id])
+  analysisRun        AnalysisRun?              @relation(fields: [analysisRunId], references: [id])
 
   @@index([threatModelId])
   @@index([category])
   @@index([status])
   @@index([riskScore])
+  @@index([fingerprint])
+  @@index([canonicalRiskId])
+  @@index([analysisRunId])
   @@map("threats")
 }
 
@@ -1477,4 +1508,270 @@ model PenTestFinding {
   @@index([status])
   @@index([scanner])
   @@map("pentest_findings")
+}
+
+// ============================================
+// THREAT MODEL EXTENSION TABLES
+// ============================================
+
+model DiagramVersion {
+  id            String      @id @default(uuid())
+  threatModelId String      @map("threat_model_id")
+  versionNumber Int         @map("version_number")
+  versionName   String?     @map("version_name")
+  xmlContent    String      @map("xml_content") @db.Text
+  createdBy     String      @map("created_by")
+  isAutoSave    Boolean     @default(false) @map("is_auto_save")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  threatModel   ThreatModel @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
+
+  @@unique([threatModelId, versionNumber])
+  @@index([threatModelId])
+  @@map("diagram_versions")
+}
+
+model ThreatModelLock {
+  id            String      @id @default(uuid())
+  threatModelId String      @unique @map("threat_model_id")
+  lockedBy      String      @map("locked_by")
+  lockedByName  String?     @map("locked_by_name")
+  lockedAt      DateTime    @default(now()) @map("locked_at")
+  expiresAt     DateTime    @map("expires_at")
+  threatModel   ThreatModel @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
+
+  @@map("threat_model_locks")
+}
+
+model AnalysisRun {
+  id            String      @id @default(uuid())
+  threatModelId String      @map("threat_model_id")
+  tenantId      String      @map("tenant_id")
+  status        String      @default("queued") // queued, running, completed, failed, cancelled
+  engine        String      @default("threagile") // threagile, stride, dread
+  triggeredBy   String      @map("triggered_by")
+  startedAt     DateTime?   @map("started_at")
+  completedAt   DateTime?   @map("completed_at")
+  durationMs    Int?        @map("duration_ms")
+  riskCount     Int         @default(0) @map("risk_count")
+  criticalCount Int         @default(0) @map("critical_count")
+  highCount     Int         @default(0) @map("high_count")
+  mediumCount   Int         @default(0) @map("medium_count")
+  lowCount      Int         @default(0) @map("low_count")
+  errorMessage  String?     @map("error_message")
+  yamlInput     String?     @map("yaml_input") @db.Text
+  rawOutput     Json?       @map("raw_output")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  threatModel   ThreatModel @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
+  threats       Threat[]    // v2.4.0 - Threats detected in this analysis run
+
+  @@index([threatModelId])
+  @@index([tenantId])
+  @@index([status])
+  @@map("analysis_runs")
+}
+
+// ============================================
+// ADMIN SCHEMA - Configuration Management
+// ============================================
+
+model ShapeMapping {
+  id                    String   @id @default(uuid())
+  drawioStyle           String   @unique @map("drawio_style")
+  stylePattern          String?  @map("style_pattern")
+  threagileType         String   @map("threagile_type")
+  machineType           String   @default("virtual") @map("machine_type")
+  defaultInternetFacing Boolean  @default(false) @map("default_internet_facing")
+  defaultEncryption     String   @default("none") @map("default_encryption")
+  defaultAuthentication String   @default("none") @map("default_authentication")
+  defaultMultiTenant    Boolean  @default(false) @map("default_multi_tenant")
+  displayName           String   @map("display_name")
+  category              String   // aws, azure, gcp, generic
+  iconUrl               String?  @map("icon_url")
+  status                String   @default("pending") // pending, review, live
+  aiSuggested           Boolean  @default(false) @map("ai_suggested")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  createdBy             String?  @map("created_by")
+
+  @@index([category])
+  @@index([status])
+  @@map("shape_mappings")
+}
+
+model CanonicalRisk {
+  id              String                @id @default(uuid())
+  tenantId        String                @map("tenant_id") // v2.4.0 - Multi-tenant support
+  canonicalId     String                @unique @map("canonical_id")
+  title           String
+  description     String?
+  defaultSeverity String                @default("medium") @map("default_severity")
+  cweId           String?               @map("cwe_id")
+  cweName         String?               @map("cwe_name")
+  capecIds        String[]              @default([]) @map("capec_ids")
+  attackIds       String[]              @default([]) @map("attack_ids")
+  status          String                @default("pending") // pending, review, live
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  sources         CanonicalRiskSource[]
+  controlMappings RiskControlMapping[]
+  playbooks       RemediationPlaybook[]
+  threats         Threat[]              // v2.4.0 - Threats linked to this canonical risk
+
+  @@index([tenantId])
+  @@index([cweId])
+  @@index([status])
+  @@map("canonical_risks")
+}
+
+model CanonicalRiskSource {
+  id              String        @id @default(uuid())
+  canonicalRiskId String        @map("canonical_risk_id")
+  source          String        // threagile, cis, prowler, trivy, semgrep
+  sourceRuleId    String        @map("source_rule_id")
+  sourceTitle     String?       @map("source_title")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  canonicalRisk   CanonicalRisk @relation(fields: [canonicalRiskId], references: [id], onDelete: Cascade)
+
+  @@unique([canonicalRiskId, source, sourceRuleId])
+  @@index([source])
+  @@map("canonical_risk_sources")
+}
+
+model RiskControlMapping {
+  id                String            @id @default(uuid())
+  canonicalRiskId   String            @map("canonical_risk_id")
+  complianceControlId String          @map("compliance_control_id")
+  relevance         String            @default("primary") // primary, secondary, related
+  aiConfidence      Float?            @map("ai_confidence")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  canonicalRisk     CanonicalRisk     @relation(fields: [canonicalRiskId], references: [id], onDelete: Cascade)
+  control           ComplianceControl @relation(fields: [complianceControlId], references: [id], onDelete: Cascade)
+
+  @@unique([canonicalRiskId, complianceControlId])
+  @@index([canonicalRiskId])
+  @@index([complianceControlId])
+  @@map("risk_control_mappings")
+}
+
+model RemediationPlaybook {
+  id              String               @id @default(uuid())
+  canonicalRiskId String               @map("canonical_risk_id")
+  title           String
+  description     String?
+  totalEffort     String?              @map("total_effort")
+  status          String               @default("pending") // pending, review, live
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  canonicalRisk   CanonicalRisk        @relation(fields: [canonicalRiskId], references: [id], onDelete: Cascade)
+  steps           PlaybookStep[]
+  iacSnippets     PlaybookIacSnippet[]
+
+  @@index([canonicalRiskId])
+  @@index([status])
+  @@map("remediation_playbooks")
+}
+
+model PlaybookStep {
+  id               String              @id @default(uuid())
+  playbookId       String              @map("playbook_id")
+  stepNumber       Int                 @map("step_number")
+  title            String
+  description      String
+  effort           String?             // low, medium, high
+  role             String?             // developer, devops, security, architect
+  estimatedMinutes Int?                @map("estimated_minutes")
+  automatable      Boolean             @default(false)
+  createdAt        DateTime            @default(now()) @map("created_at")
+  playbook         RemediationPlaybook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+
+  @@unique([playbookId, stepNumber])
+  @@index([playbookId])
+  @@map("playbook_steps")
+}
+
+model PlaybookIacSnippet {
+  id          String              @id @default(uuid())
+  playbookId  String              @map("playbook_id")
+  platform    String              // terraform, cloudformation, kubernetes, pulumi
+  code        String              @db.Text
+  description String?
+  createdAt   DateTime            @default(now()) @map("created_at")
+  playbook    RemediationPlaybook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
+
+  @@unique([playbookId, platform])
+  @@index([playbookId])
+  @@map("playbook_iac_snippets")
+}
+
+model WizardQuestion {
+  id           String         @id @default(uuid())
+  questionId   String         @unique @map("question_id")
+  text         String
+  helpText     String?        @map("help_text")
+  type         String         // single-select, multi-select, text, toggle
+  orderIndex   Int            @map("order_index")
+  isEntryPoint Boolean        @default(false) @map("is_entry_point")
+  isTerminal   Boolean        @default(false) @map("is_terminal")
+  conditions   Json           @default("[]")
+  status       String         @default("pending") // pending, review, live
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  options      WizardOption[]
+
+  @@index([orderIndex])
+  @@index([status])
+  @@map("wizard_questions")
+}
+
+model WizardOption {
+  id             String         @id @default(uuid())
+  questionId     String         @map("question_id")
+  value          String
+  label          String
+  description    String?
+  iconUrl        String?        @map("icon_url")
+  nextQuestionId String?        @map("next_question_id")
+  triggers       Json           @default("{}") // { addNodes, addBoundaries, addLinks, setProperties }
+  createdAt      DateTime       @default(now()) @map("created_at")
+  question       WizardQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, value])
+  @@index([questionId])
+  @@map("wizard_options")
+}
+
+model FeedConfig {
+  id           String        @id @default(uuid())
+  feedId       String        @unique @map("feed_id") // cwe, capec, nist, attack, cis
+  name         String
+  description  String?
+  sourceUrl    String        @map("source_url")
+  schedule     String        @default("0 0 * * 0") // cron expression, default weekly
+  isEnabled    Boolean       @default(true) @map("is_enabled")
+  lastSyncAt   DateTime?     @map("last_sync_at")
+  nextSyncAt   DateTime?     @map("next_sync_at")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  syncRuns     FeedSyncRun[]
+
+  @@index([isEnabled])
+  @@map("feed_configs")
+}
+
+model FeedSyncRun {
+  id           String     @id @default(uuid())
+  feedConfigId String     @map("feed_config_id")
+  status       String     @default("pending") // pending, running, completed, failed
+  startedAt    DateTime?  @map("started_at")
+  completedAt  DateTime?  @map("completed_at")
+  recordsAdded Int        @default(0) @map("records_added")
+  recordsUpdated Int      @default(0) @map("records_updated")
+  recordsDeleted Int      @default(0) @map("records_deleted")
+  errorMessage String?    @map("error_message")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  feedConfig   FeedConfig @relation(fields: [feedConfigId], references: [id], onDelete: Cascade)
+
+  @@index([feedConfigId])
+  @@index([status])
+  @@map("feed_sync_runs")
 }
