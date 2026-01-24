@@ -771,3 +771,239 @@ export const playbooksApi = {
   deleteIacSnippet: (playbookId: string, snippetId: string) =>
     fetchApi<{ success: boolean }>(`/admin/playbooks/${playbookId}/iac-snippets/${snippetId}`, { method: 'DELETE' }),
 };
+
+// Wizard Question Types
+export interface WizardCondition {
+  property: string;
+  operator: string;
+  value: string;
+}
+
+export interface WizardTriggerNode {
+  name: string;
+  ref: string;
+  technology?: string;
+  machineType?: string;
+  placementBoundary?: string;
+  internetFacing?: boolean;
+  multiTenant?: boolean;
+  encryption?: string;
+  authentication?: string;
+}
+
+export interface WizardTriggerBoundary {
+  name: string;
+  ref: string;
+  type: string;
+}
+
+export interface WizardTriggerLink {
+  sourceRef: string;
+  targetRef: string;
+  protocol?: string;
+  authentication?: string;
+  encryption?: string;
+}
+
+export interface WizardTrigger {
+  addNodes?: WizardTriggerNode[];
+  addBoundaries?: WizardTriggerBoundary[];
+  addLinks?: WizardTriggerLink[];
+  setProperties?: Record<string, string>;
+}
+
+export interface WizardOption {
+  id: string;
+  questionId: string;
+  value: string;
+  label: string;
+  description: string | null;
+  iconUrl: string | null;
+  nextQuestionId: string | null;
+  triggers: WizardTrigger;
+  createdAt: string;
+}
+
+export interface WizardQuestion {
+  id: string;
+  questionId: string;
+  text: string;
+  helpText: string | null;
+  type: 'single-select' | 'multi-select' | 'text' | 'toggle';
+  orderIndex: number;
+  isEntryPoint: boolean;
+  isTerminal: boolean;
+  conditions: WizardCondition[];
+  status: 'pending' | 'review' | 'live';
+  createdAt: string;
+  updatedAt: string;
+  options?: WizardOption[];
+  _count?: { options: number };
+}
+
+export interface WizardDecisionTree {
+  questions: Array<{
+    id: string;
+    questionId: string;
+    text: string;
+    type: string;
+    orderIndex: number;
+    isEntryPoint: boolean;
+    isTerminal: boolean;
+    status: string;
+    options: Array<{
+      id: string;
+      value: string;
+      label: string;
+      nextQuestionId: string | null;
+    }>;
+  }>;
+  edges: Array<{
+    from: string;
+    to: string;
+    label: string;
+  }>;
+}
+
+export interface WizardTestFlowResult {
+  globalProperties: Record<string, string>;
+  nodes: Array<{ name: string; ref: string; technology?: string }>;
+  boundaries: Array<{ name: string; ref: string; type: string }>;
+  links: Array<{ sourceRef: string; targetRef: string; protocol?: string }>;
+  path: Array<{ questionId: string; selectedValue: string; questionText: string }>;
+}
+
+export interface WizardStats {
+  totalQuestions: number;
+  byStatus: Record<string, number>;
+  byType: Record<string, number>;
+  entryPoints: number;
+  terminalQuestions: number;
+  orphanedQuestions: number;
+}
+
+export interface WizardQuestionListQuery {
+  search?: string;
+  type?: string;
+  status?: string;
+  isEntryPoint?: string;
+}
+
+export interface CreateWizardQuestionData {
+  questionId: string;
+  text: string;
+  helpText?: string;
+  type: string;
+  orderIndex: number;
+  isEntryPoint?: boolean;
+  isTerminal?: boolean;
+  conditions?: WizardCondition[];
+}
+
+export interface CreateWizardOptionData {
+  value: string;
+  label: string;
+  description?: string;
+  iconUrl?: string;
+  nextQuestionId?: string;
+  triggers?: WizardTrigger;
+}
+
+export interface WizardImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
+// Wizard API
+export const wizardApi = {
+  // Question endpoints
+  listQuestions: (query: WizardQuestionListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.search) params.set('search', query.search);
+    if (query.type) params.set('type', query.type);
+    if (query.status) params.set('status', query.status);
+    if (query.isEntryPoint) params.set('isEntryPoint', query.isEntryPoint);
+    const qs = params.toString();
+    return fetchApi<{ questions: WizardQuestion[]; total: number }>(`/admin/wizard/questions${qs ? `?${qs}` : ''}`);
+  },
+
+  getQuestion: (id: string) =>
+    fetchApi<WizardQuestion>(`/admin/wizard/questions/${id}`),
+
+  createQuestion: (data: CreateWizardQuestionData) =>
+    fetchApi<WizardQuestion>('/admin/wizard/questions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateQuestion: (id: string, data: Partial<CreateWizardQuestionData> & { status?: string }) =>
+    fetchApi<WizardQuestion>(`/admin/wizard/questions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteQuestion: (id: string) =>
+    fetchApi<void>(`/admin/wizard/questions/${id}`, { method: 'DELETE' }),
+
+  reorderQuestions: (questionIds: string[]) =>
+    fetchApi<void>('/admin/wizard/questions/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ questionIds }),
+    }),
+
+  submitForReview: (id: string) =>
+    fetchApi<{ id: string; questionId: string; status: string }>(`/admin/wizard/questions/${id}/submit-for-review`, { method: 'POST' }),
+
+  approve: (id: string) =>
+    fetchApi<{ id: string; questionId: string; status: string }>(`/admin/wizard/questions/${id}/approve`, { method: 'POST' }),
+
+  // Option endpoints
+  listOptions: (questionId: string) =>
+    fetchApi<WizardOption[]>(`/admin/wizard/questions/${questionId}/options`),
+
+  getOption: (optionId: string) =>
+    fetchApi<WizardOption>(`/admin/wizard/options/${optionId}`),
+
+  createOption: (questionId: string, data: CreateWizardOptionData) =>
+    fetchApi<WizardOption>(`/admin/wizard/questions/${questionId}/options`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateOption: (optionId: string, data: Partial<CreateWizardOptionData>) =>
+    fetchApi<WizardOption>(`/admin/wizard/options/${optionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteOption: (optionId: string) =>
+    fetchApi<void>(`/admin/wizard/options/${optionId}`, { method: 'DELETE' }),
+
+  // Decision tree & test flow
+  getDecisionTree: () =>
+    fetchApi<WizardDecisionTree>('/admin/wizard/decision-tree'),
+
+  testFlow: (answers: Array<{ questionId: string; selectedValue: string }>) =>
+    fetchApi<WizardTestFlowResult>('/admin/wizard/test-flow', {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    }),
+
+  // Stats & metadata
+  getStats: () =>
+    fetchApi<WizardStats>('/admin/wizard/stats'),
+
+  getQuestionTypes: () =>
+    fetchApi<string[]>('/admin/wizard/question-types'),
+
+  getConditionOperators: () =>
+    fetchApi<string[]>('/admin/wizard/condition-operators'),
+
+  // Bulk import
+  bulkImport: (questions: Array<CreateWizardQuestionData & { options?: CreateWizardOptionData[] }>) =>
+    fetchApi<WizardImportResult>('/admin/wizard/bulk-import', {
+      method: 'POST',
+      body: JSON.stringify({ questions }),
+    }),
+};

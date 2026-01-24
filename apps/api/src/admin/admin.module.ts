@@ -7,6 +7,8 @@ import { ComplianceFrameworksController } from './compliance-frameworks/complian
 import { ComplianceFrameworksService } from './compliance-frameworks/compliance-frameworks.service';
 import { PlaybooksController } from './playbooks/playbooks.controller';
 import { PlaybooksService } from './playbooks/playbooks.service';
+import { WizardController } from './wizard/wizard.controller';
+import { WizardService } from './wizard/wizard.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
@@ -16,18 +18,21 @@ import { PrismaModule } from '../prisma/prisma.module';
     CanonicalRisksController,
     ComplianceFrameworksController,
     PlaybooksController,
+    WizardController,
   ],
   providers: [
     ShapeMappingsService,
     CanonicalRisksService,
     ComplianceFrameworksService,
     PlaybooksService,
+    WizardService,
   ],
   exports: [
     ShapeMappingsService,
     CanonicalRisksService,
     ComplianceFrameworksService,
     PlaybooksService,
+    WizardService,
   ],
 })
 export class AdminModule {}

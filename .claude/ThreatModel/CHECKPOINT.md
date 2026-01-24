@@ -1,6 +1,6 @@
 # ThreatDiviner Threat Modeling - Implementation Checkpoint
 
-## Current Checkpoint: v3.5.0
+## Current Checkpoint: v3.6.0
 **Status:** AWAITING APPROVAL
 **Date:** 2026-01-24
 **Phase:** 3 - Admin Console (IN PROGRESS)
@@ -1243,14 +1243,181 @@ API TypeScript: No errors
 Admin TypeScript: No errors
 ```
 
+**Status: APPROVED** — Proceeding to v3.6.0
+
+---
+
+# Checkpoint v3.6.0: Wizard Question CRUD
+
+## What Was Built
+
+Full CRUD operations for Wizard Questions and Options in the Admin Console, including conditional logic, trigger configuration, and test flow simulator.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] List view page at `/admin/wizard` with search and filters (type, status, isEntryPoint)
+- [x] Question editor with all types (single-select, multi-select, text, toggle)
+- [x] Option editor with triggers and next question navigation
+- [x] Test flow simulator for wizard preview
+- [x] Condition builder (property/operator/value)
+- [x] Status workflow (pending → review → live)
+
+## Backend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/admin/wizard/dto/wizard.dto.ts` | DTOs with class-validator |
+| `apps/api/src/admin/wizard/wizard.service.ts` | Business logic service |
+| `apps/api/src/admin/wizard/wizard.controller.ts` | REST API controller |
+| `apps/api/src/admin/wizard/wizard.service.spec.ts` | 38 unit tests |
+| `apps/api/src/admin/admin.module.ts` | Updated - Added WizardController/Service |
+
+## Frontend Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/admin/src/lib/api.ts` | Added wizardApi with all endpoints + types |
+| `apps/admin/src/app/(dashboard)/wizard/page.tsx` | Full CRUD UI with test flow |
+
+## API Endpoints Implemented
+
+```
+GET    /admin/wizard/questions                          List with filters
+GET    /admin/wizard/questions/:id                      Get single question with options
+POST   /admin/wizard/questions                          Create new question
+PUT    /admin/wizard/questions/:id                      Update question
+DELETE /admin/wizard/questions/:id                      Delete question
+POST   /admin/wizard/questions/reorder                  Reorder questions
+POST   /admin/wizard/questions/:id/submit-for-review    Submit for review
+POST   /admin/wizard/questions/:id/approve              Approve (SuperAdmin only)
+
+GET    /admin/wizard/questions/:questionId/options      List options for question
+GET    /admin/wizard/options/:optionId                  Get single option
+POST   /admin/wizard/questions/:questionId/options      Create option
+PUT    /admin/wizard/options/:optionId                  Update option
+DELETE /admin/wizard/options/:optionId                  Delete option
+
+GET    /admin/wizard/decision-tree                      Get full decision tree
+POST   /admin/wizard/test-flow                          Simulate wizard flow
+GET    /admin/wizard/stats                              Get wizard statistics
+GET    /admin/wizard/question-types                     Get question types
+GET    /admin/wizard/condition-operators                Get condition operators
+POST   /admin/wizard/bulk-import                        Bulk import questions
+```
+
+## UI Features
+
+- List view showing questions with questionId, type, status, entry/terminal badges
+- Stats panel: total questions, live/review/pending counts, entry points, orphaned
+- Search across question ID and text
+- Filter by type, status
+- Question cards with:
+  - Up/down reorder arrows
+  - Options list showing value, label, next question link
+  - Edit/Delete actions
+  - Submit for Review / Approve status actions
+- Question modal for create/edit:
+  - Question ID, Order Index
+  - Question Text, Help Text
+  - Type dropdown (single-select, multi-select, text, toggle)
+  - Entry Point and Terminal checkboxes
+  - Conditions section with property/operator/value rows
+- Option modal for create/edit:
+  - Value, Label fields
+  - Description, Icon URL
+  - Next Question ID dropdown
+  - Set Global Properties key/value pairs
+- Test Flow modal:
+  - Simulator showing all live/review questions
+  - Radio buttons to select answers
+  - Run Test button
+  - Results panel showing:
+    - Path taken (question → answer)
+    - Global properties accumulated
+    - Boundaries added
+    - Nodes added
+    - Links added
+- Delete confirmation modal
+
+## Tests Run
+
+```
+Wizard Service Tests (38 tests):
+  WizardService
+    listQuestions
+      √ should list all questions
+      √ should filter by search
+      √ should filter by type
+      √ should filter by status
+    getQuestionById
+      √ should return question with options
+      √ should throw NotFoundException if question not found
+    createQuestion
+      √ should create a question
+      √ should throw ConflictException if questionId already exists
+      √ should throw ConflictException if entry point already exists
+    updateQuestion
+      √ should update a question
+      √ should throw NotFoundException if question not found
+      √ should throw ConflictException on duplicate questionId
+    deleteQuestion
+      √ should delete a question
+      √ should throw NotFoundException if question not found
+      √ should throw ConflictException if question is referenced
+    reorderQuestions
+      √ should reorder questions
+    createOption
+      √ should create an option
+      √ should throw NotFoundException if question not found
+      √ should throw ConflictException on duplicate value
+      √ should validate nextQuestionId exists
+      √ should prevent circular reference
+    updateOption
+      √ should update an option
+      √ should throw NotFoundException if option not found
+    deleteOption
+      √ should delete an option
+      √ should throw NotFoundException if option not found
+    submitForReview
+      √ should submit question for review
+      √ should throw ConflictException if not in pending status
+    approve
+      √ should approve question
+      √ should throw ConflictException if not in review status
+    getDecisionTree
+      √ should return decision tree with edges
+    testFlow
+      √ should simulate flow and aggregate triggers
+      √ should throw BadRequestException for invalid question
+      √ should throw BadRequestException for invalid option
+    bulkImport
+      √ should import questions with options
+      √ should skip existing questions
+    getStats
+      √ should return statistics
+    getQuestionTypes
+      √ should return question types
+    getConditionOperators
+      √ should return condition operators
+
+Test Suites: 1 passed, 1 total
+Tests:       38 passed, 38 total
+```
+
+## TypeScript Compilation
+
+```
+API TypeScript: No errors
+Admin TypeScript: No errors
+```
+
 ## Next Task (DO NOT START)
 
-**Checkpoint v3.6.0: Wizard Question CRUD**
+**Checkpoint v3.7.0: Feed Sync Dashboard**
 Per 09_implementation_plan.md:
-- List view page with decision tree visualization
-- Question editor (all question types)
-- Option editor with triggers and next question
-- Test simulator for wizard flow preview
+- Dashboard showing all security feeds (CWE, CAPEC, NVD, ATT&CK, CIS)
+- Per-feed sync status, last sync, item counts
+- Manual sync trigger buttons
+- Sync history logs
 
 ---
 
