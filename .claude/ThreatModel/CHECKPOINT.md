@@ -513,6 +513,48 @@ Full "Run Analysis" flow works end-to-end with progress tracking, gap detection 
 - Polls `GET /api/threat-modeling/:id/analysis-runs/:runId` for progress
 - Calls `POST /api/threat-modeling/:id/gaps/fill` for batch updates
 
+#### Tests Run (v2.6.1)
+
+**useAnalysis.test.ts (10 tests)**
+```
+√ should have correct initial state
+√ should start analysis successfully and return analysisRunId
+√ should handle 422 response with gap detection result
+√ should handle API error response
+√ should handle network error
+√ should pass skipGapCheck query parameter when option is true
+√ should set isStarting to true during analysis
+√ should reset all state (clearAnalysis)
+√ should clear error state
+√ should clear gaps state
+```
+
+**AnalysisProgressModal.test.tsx (16 tests)**
+```
+√ should render modal when isOpen is true
+√ should not render content when isOpen is false
+√ should display all stage labels
+√ should show validating stage with 5% progress
+√ should show generating stage with 20% progress
+√ should show running stage with 60% progress
+√ should show processing stage with 80% progress
+√ should show triaging stage with 95% progress
+√ should poll status endpoint on mount
+√ should not poll when analysisRunId is null
+√ should call onComplete with riskCount when analysis completes
+√ should call onComplete with 0 when riskCount is undefined
+√ should call onError when analysis fails
+√ should call onError when fetch fails
+√ should call onError with default message when errorMessage is undefined
+√ should show disabled Analyzing button when in progress
+```
+
+**Test Summary:**
+```
+Test Suites: 2 passed, 2 total
+Tests:       26 passed, 26 total
+```
+
 ---
 
 ### Next: Checkpoint v2.7.0
