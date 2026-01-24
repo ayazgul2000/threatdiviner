@@ -30,22 +30,22 @@ export interface GapDetectionResult {
 interface GapFillDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  gapResult: GapDetectionResult;
-  onFillGaps: (updates: {
-    assetUpdates: Array<{ id: string; fields: Record<string, any> }>;
-    linkUpdates: Array<{ id: string; fields: Record<string, any> }>;
-    boundaryUpdates: Array<{ id: string; fields: Record<string, any> }>;
-  }) => Promise<void>;
+  gaps: GapDetectionResult;
+  threatModelId: string;
+  onComplete: () => void;
   onSkip?: () => void;
 }
 
 type GapUpdate = Record<string, Record<string, any>>;
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export function GapFillDialog({
   isOpen,
   onClose,
-  gapResult,
-  onFillGaps,
+  gaps: gapResult,
+  threatModelId,
+  onComplete,
   onSkip,
 }: GapFillDialogProps) {
   const [updates, setUpdates] = useState<{
@@ -136,13 +136,25 @@ export function GapFillDialog({
         fields,
       }));
 
-      await onFillGaps({
-        assetUpdates,
-        linkUpdates,
-        boundaryUpdates,
+      // Call the batch fill gaps API
+      const res = await fetch(`${API_URL}/threat-modeling/${threatModelId}/gaps/fill`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assetUpdates,
+          linkUpdates,
+          boundaryUpdates,
+        }),
       });
 
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fill gaps');
+      }
+
       onClose();
+      onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update fields');
     } finally {

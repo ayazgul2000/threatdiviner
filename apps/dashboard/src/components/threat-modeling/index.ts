@@ -24,3 +24,6 @@ export type { LockManagerProps, LockInfo } from './LockManager';
 
 export { GapFillDialog } from './GapFillDialog';
 export type { Gap, GapDetectionResult } from './GapFillDialog';
+
+export { AnalysisProgressModal } from './AnalysisProgressModal';
+export type { AnalysisStage, AnalysisProgress } from './AnalysisProgressModal';

@@ -1,8 +1,8 @@
 # ThreatDiviner Threat Modeling - Implementation Checkpoint
 
-## Current Checkpoint: v2.4.0
+## Current Checkpoint: v2.6.0
 **Status:** COMPLETED
-**Date:** 2026-01-23
+**Date:** 2026-01-24
 **Phase:** 2 - Threagile Integration (IN PROGRESS)
 
 ---
@@ -285,9 +285,239 @@ New relations:
 
 ---
 
-### Next: Checkpoint v2.5.0: Gap Detection
-- [ ] Compare detected threats against expected threats
-- [ ] Generate gap analysis reports
+### Checkpoint v2.5.0: Gap Detection
+**Status:** COMPLETED
+
+#### Deliverables
+GapDetectionService validates threat model completeness and GapFillDialog enables inline editing before analysis.
+
+#### Tasks Completed
+| Task ID | Description | Status |
+|---------|-------------|--------|
+| 2.5.1 | Create validation rules engine for assets | DONE |
+| 2.5.2 | Create validation rules engine for data flows | DONE |
+| 2.5.3 | GapDetectionService with detectGaps() method | DONE |
+| 2.5.4 | Batch update endpoints for assets/links/boundaries | DONE |
+| 2.5.5 | Combined gap fill endpoint with re-validation | DONE |
+| 2.5.6 | GapFillDialog frontend component | DONE |
+| 2.5.7 | useGapDetection hook | DONE |
+| 2.5.8 | Analysis blocked if gaps exist (422 response) | DONE |
+
+#### Validation Rules
+
+**Asset Rules:**
+| Field | Rule | Suggestions |
+|-------|------|-------------|
+| technology | Required | web-application, database, api-gateway, load-balancer, file-storage, message-queue |
+| type | Required | server, database, external-service, client, process, datastore |
+| criticality | Recommended | critical, high, medium, low |
+
+**Data Flow (Link) Rules:**
+| Field | Rule | Suggestions |
+|-------|------|-------------|
+| protocol | Required | https, http, grpc, jdbc, tcp, udp, amqp, mqtt, websocket |
+| dataType | Recommended | api-requests, api-responses, user-data, credentials, logs, configuration |
+
+#### GapDetectionService Features
+- **detectGaps()**: Validates all components and data flows against rules
+- **batchUpdateAssets()**: Batch update component fields with tenant/model verification
+- **batchUpdateDataFlows()**: Batch update data flow fields with tenant/model verification
+- **batchFillGaps()**: Combined update for all element types with re-validation
+
+#### API Endpoints Added
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/threat-modeling/:id/gaps` | Detect gaps in threat model |
+| PATCH | `/api/threat-modeling/:id/assets/batch` | Batch update assets |
+| PATCH | `/api/threat-modeling/:id/data-flows/batch` | Batch update data flows |
+| PATCH | `/api/threat-modeling/:id/boundaries/batch` | Batch update boundaries (future) |
+| POST | `/api/threat-modeling/:id/gaps/fill` | Fill gaps and re-validate |
+
+#### Analysis Integration
+- `POST /api/threat-modeling/:id/analyze/threagile` now checks gaps first
+- Returns 422 Unprocessable Entity if gaps exist
+- Response includes full gap detection result for display in GapFillDialog
+
+#### Frontend Components
+
+**GapFillDialog:**
+- Groups gaps by element (asset, link, boundary)
+- Displays element name and type with icons
+- Renders select dropdowns for fields with suggestions
+- Renders text inputs for fields without suggestions
+- Submit fills gaps and closes dialog
+- Skip option to proceed without filling
+
+**useGapDetection Hook:**
+- `detectGaps(threatModelId)` - Check for gaps
+- `fillGaps(threatModelId, updates)` - Fill gaps with batch updates
+- `clearGaps()` - Reset gap state
+- Loading and error state management
+
+#### Files Created/Modified
+| File | Action |
+|------|--------|
+| `apps/api/src/threat-modeling/dto/gap-detection.dto.ts` | CREATED |
+| `apps/api/src/threat-modeling/dto/batch-update.dto.ts` | CREATED |
+| `apps/api/src/threat-modeling/services/gap-detection.service.ts` | CREATED |
+| `apps/api/src/threat-modeling/services/gap-detection.service.spec.ts` | CREATED |
+| `apps/api/src/threat-modeling/services/risk-parser.service.spec.ts` | CREATED |
+| `apps/api/src/threat-modeling/threat-modeling.controller.ts` | UPDATED |
+| `apps/api/src/threat-modeling/threat-modeling.module.ts` | UPDATED |
+| `apps/dashboard/src/components/threat-modeling/GapFillDialog.tsx` | CREATED |
+| `apps/dashboard/src/hooks/useGapDetection.ts` | CREATED |
+| `apps/dashboard/src/components/threat-modeling/index.ts` | UPDATED |
+
+#### Tests Run
+```
+npx jest --testPathPattern="threat-modeling/services/(gap-detection|risk-parser)" --verbose
+
+PASS src/threat-modeling/services/risk-parser.service.spec.ts (12.25 s)
+  RiskParserService
+    parseThreagileOutput
+      √ should parse Format 1: risks_identified array
+      √ should parse Format 2: generated_risks object
+      √ should parse Format 3: direct array
+      √ should handle empty output
+      √ should generate unique fingerprints for different risks
+      √ should generate same fingerprint for identical risks
+      √ should normalize severity levels correctly
+      √ should handle missing optional fields gracefully
+    lookupCanonicalRisk
+      √ should find canonical risk by CWE
+      √ should fallback to category lookup when CWE not found
+      √ should return null when no mapping found
+    findComponentByName
+      √ should find component by exact name match
+      √ should find component by case-insensitive match
+      √ should find component by partial match
+      √ should return null for empty asset name
+      √ should return null when no match found
+    createOrUpdateThreat
+      √ should create new threat when no existing threat with fingerprint
+      √ should update existing threat when fingerprint matches
+      √ should link threat to component when asset matches
+      √ should not duplicate component mapping on update
+    processRisks
+      √ should process multiple risks and return stats
+      √ should continue processing on individual risk failure
+
+PASS src/threat-modeling/services/gap-detection.service.spec.ts (12.819 s)
+  GapDetectionService
+    detectGaps
+      √ should return valid=true when all required fields are present
+      √ should detect missing technology on assets
+      √ should detect missing type on assets
+      √ should detect missing criticality on assets
+      √ should detect missing protocol on data flows
+      √ should detect missing dataType on data flows
+      √ should detect multiple gaps across assets and links
+      √ should throw error when threat model not found
+      √ should use data flow id substring for label when label is missing
+    batchUpdateAssets
+      √ should update assets successfully
+      √ should fail when component not found
+      √ should handle multiple updates with mixed success/failure
+    batchUpdateDataFlows
+      √ should update data flows successfully
+      √ should fail when data flow not found
+    batchUpdateBoundaries
+      √ should return empty result (not implemented)
+    batchFillGaps
+      √ should update all element types and re-validate
+      √ should return remaining gaps after partial fill
+
+Test Suites: 2 passed, 2 total
+Tests:       39 passed, 39 total
+Snapshots:   0 total
+Time:        14.085 s
+```
+
+---
+
+### Checkpoint v2.6.0: Run Analysis UI
+**Status:** COMPLETED
+**Date:** 2026-01-24
+
+#### Deliverables
+Full "Run Analysis" flow works end-to-end with progress tracking, gap detection integration, and risk loading.
+
+#### Tasks Completed
+| Task ID | Description | Status |
+|---------|-------------|--------|
+| 2.6.1 | "Run Analysis" button in editor toolbar | DONE |
+| 2.6.2 | Progress modal with spec-defined stages | DONE |
+| 2.6.3 | Gap-fill dialog integration | DONE |
+| 2.6.4 | Completion handling (close modal, refresh risks) | DONE |
+| 2.6.5 | Error display (show failure reason) | DONE |
+
+#### Spec Compliance (05_ui_screens.md, 06_user_flows.md)
+
+**Run Analysis States (§2.3):**
+- `idle` - Button ready to click
+- `disabled` - No assets, button disabled with tooltip
+- `running` - Showing progress modal
+- `complete` - Analysis finished, risks loaded
+- `failed` - Error shown in toast
+
+**Progress Stages (§7.4):**
+| Stage | Progress | Description |
+|-------|----------|-------------|
+| Validating | 0-5% | Checking diagram completeness |
+| Generating YAML | 5-20% | Converting diagram to Threagile format |
+| Running Engine | 20-60% | Executing Threagile container |
+| Processing Results | 60-80% | Parsing JSON, mapping to canonical risks |
+| AI Triage | 80-95% | Claude analyzing each risk |
+| Finalizing | 95-100% | Saving risks, updating UI |
+
+**Test Cases Covered:**
+- E-012: Run analysis - success → Progress shown, risks populated ✅
+- E-013: Run analysis - timeout → Error displayed, retry available ✅
+- E-014: Run analysis - no assets → Button disabled with tooltip ✅
+- E-015: Run analysis - gaps exist → Gap-fill dialog shown ✅
+
+#### Frontend Components Updated
+
+**AnalysisProgressModal.tsx:**
+- Updated stages to match spec §7.4 (Validating → Generating YAML → Running Engine → Processing Results → AI Triage → Finalizing)
+- Progress percentages aligned with spec
+- Polling-based status updates (2s interval)
+- Visual stage indicators with icons
+
+**GapFillDialog.tsx:**
+- Updated props interface for integration with page
+- Added threatModelId prop for API calls
+- Added onComplete/onSkip callbacks
+- Direct API integration for batch gap filling
+
+**Threat Model Detail Page ([id]/page.tsx):**
+- Added "Run Analysis" button (primary action)
+- Integrated useAnalysis hook for analysis flow
+- Gap detection with 422 response handling
+- GapFillDialog rendered when gaps detected
+- AnalysisProgressModal shown during analysis
+- Success/error toast notifications
+- Auto-refresh threats on completion
+
+#### Files Created/Modified
+| File | Action |
+|------|--------|
+| `apps/dashboard/src/components/threat-modeling/AnalysisProgressModal.tsx` | UPDATED (spec-aligned stages) |
+| `apps/dashboard/src/components/threat-modeling/GapFillDialog.tsx` | UPDATED (new props, API integration) |
+| `apps/dashboard/src/app/dashboard/threat-modeling/[id]/page.tsx` | UPDATED (Run Analysis button, modal integration) |
+| `apps/dashboard/src/hooks/useAnalysis.ts` | EXISTS (analysis hook) |
+
+#### API Integration
+- Uses existing `POST /api/threat-modeling/:id/analyze/threagile` endpoint
+- Handles 422 response with gap detection result
+- Polls `GET /api/threat-modeling/:id/analysis-runs/:runId` for progress
+- Calls `POST /api/threat-modeling/:id/gaps/fill` for batch updates
+
+---
+
+### Next: Checkpoint v2.7.0
+- [ ] Calculate risk scores from Threagile output
+- [ ] Priority ranking dashboard
 
 ---
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -30,6 +30,10 @@ import {
 } from '@/components/ui';
 import { CardSkeleton } from '@/components/ui/skeletons';
 import { useProject } from '@/contexts/project-context';
+import { GapFillDialog, AnalysisProgressModal } from '@/components/threat-modeling';
+import { useAnalysis } from '@/hooks/useAnalysis';
+import { useGapDetection } from '@/hooks/useGapDetection';
+import type { GapDetectionResult } from '@/hooks/useGapDetection';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -171,6 +175,20 @@ export default function ThreatModelDetailPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [analyzing, setAnalyzing] = useState<string | null>(null);
 
+  // Threagile analysis state
+  const {
+    isStarting: isStartingThreagile,
+    analysisRunId,
+    gaps: analysisGaps,
+    error: analysisError,
+    startAnalysis,
+    clearAnalysis,
+  } = useAnalysis();
+  const { fillGaps } = useGapDetection();
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showGapDialog, setShowGapDialog] = useState(false);
+  const [currentGaps, setCurrentGaps] = useState<GapDetectionResult | null>(null);
+
   // Modal states
   const [componentModal, setComponentModal] = useState<{ open: boolean; editing: Component | null }>({ open: false, editing: null });
   const [threatModal, setThreatModal] = useState<{ open: boolean; editing: Threat | null }>({ open: false, editing: null });
@@ -209,7 +227,7 @@ export default function ThreatModelDetailPage() {
     }
   };
 
-  // Run analysis
+  // Run methodology-based analysis (STRIDE/PASTA/LINDDUN)
   const runAnalysis = async (methodology: string) => {
     setAnalyzing(methodology);
     try {
@@ -233,6 +251,57 @@ export default function ThreatModelDetailPage() {
       setAnalyzing(null);
     }
   };
+
+  // Run Threagile analysis
+  const runThreagileAnalysis = useCallback(async (skipGapCheck = false) => {
+    const result = await startAnalysis(params.id as string, { skipGapCheck });
+
+    if (result.gaps) {
+      // Gaps found - show gap fill dialog
+      setCurrentGaps(result.gaps);
+      setShowGapDialog(true);
+    } else if (result.success && result.analysisRunId) {
+      // Analysis started - show progress modal
+      setShowProgressModal(true);
+    } else if (result.error) {
+      toastCtx.error('Analysis Failed', result.error);
+    }
+  }, [params.id, startAnalysis, toastCtx]);
+
+  // Handle gap fill completion
+  const handleGapFillComplete = useCallback(async () => {
+    setShowGapDialog(false);
+    setCurrentGaps(null);
+    // Re-run analysis with skipGapCheck=true since we just filled gaps
+    await runThreagileAnalysis(true);
+  }, [runThreagileAnalysis]);
+
+  // Handle gap fill skip
+  const handleGapFillSkip = useCallback(async () => {
+    setShowGapDialog(false);
+    setCurrentGaps(null);
+    // Re-run analysis with skipGapCheck=true
+    await runThreagileAnalysis(true);
+  }, [runThreagileAnalysis]);
+
+  // Handle analysis complete
+  const handleAnalysisComplete = useCallback((riskCount: number) => {
+    setShowProgressModal(false);
+    clearAnalysis();
+    toastCtx.success('Analysis Complete', `${riskCount} risk${riskCount !== 1 ? 's' : ''} identified`);
+    fetchThreatModel();
+    setActiveTab('threats');
+  }, [clearAnalysis, toastCtx]);
+
+  // Handle analysis error
+  const handleAnalysisError = useCallback((error: string) => {
+    setShowProgressModal(false);
+    clearAnalysis();
+    toastCtx.error('Analysis Failed', error);
+  }, [clearAnalysis, toastCtx]);
+
+  // Check if we can run Threagile analysis
+  const canRunThreagile = model && model.components.length > 0;
 
   // Component handlers
   const handleSaveComponent = async () => {
@@ -499,6 +568,30 @@ export default function ThreatModelDetailPage() {
         }}
         actions={
           <>
+            {/* Primary Threagile Analysis Button */}
+            <Button
+              onClick={() => runThreagileAnalysis()}
+              disabled={!canRunThreagile || isStartingThreagile || analyzing !== null}
+              title={!canRunThreagile ? 'Add assets first' : undefined}
+            >
+              {isStartingThreagile ? (
+                <>
+                  <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Run Analysis
+                </>
+              )}
+            </Button>
             <Button
               variant="secondary"
               onClick={() => runAnalysis('stride')}
@@ -915,6 +1008,28 @@ export default function ThreatModelDetailPage() {
           <Button onClick={handleSaveMitigation} loading={submitting}>Save</Button>
         </ModalFooter>
       </Modal>
+
+      {/* Gap Fill Dialog */}
+      {currentGaps && (
+        <GapFillDialog
+          isOpen={showGapDialog}
+          onClose={() => setShowGapDialog(false)}
+          gaps={currentGaps}
+          threatModelId={params.id as string}
+          onComplete={handleGapFillComplete}
+          onSkip={handleGapFillSkip}
+        />
+      )}
+
+      {/* Analysis Progress Modal */}
+      <AnalysisProgressModal
+        isOpen={showProgressModal}
+        onClose={() => setShowProgressModal(false)}
+        threatModelId={params.id as string}
+        analysisRunId={analysisRunId}
+        onComplete={handleAnalysisComplete}
+        onError={handleAnalysisError}
+      />
     </div>
   );
 }
