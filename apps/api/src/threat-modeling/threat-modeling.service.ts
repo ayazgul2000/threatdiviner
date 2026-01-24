@@ -794,4 +794,225 @@ export class ThreatModelingService {
 
     return lines.join('\n');
   }
+
+  // ===== LOCKING =====
+
+  async getLock(tenantId: string, threatModelId: string) {
+    const model = await this.prisma.threatModel.findFirst({
+      where: { id: threatModelId, tenantId },
+      include: { lock: true },
+    });
+
+    if (!model) {
+      throw new NotFoundException('Threat model not found');
+    }
+
+    return model.lock;
+  }
+
+  async acquireLock(
+    tenantId: string,
+    threatModelId: string,
+    lockedBy: string,
+    lockedByName?: string,
+    durationMinutes: number = 5,
+  ) {
+    const model = await this.prisma.threatModel.findFirst({
+      where: { id: threatModelId, tenantId },
+    });
+
+    if (!model) {
+      throw new NotFoundException('Threat model not found');
+    }
+
+    // Delete any existing expired lock
+    await this.prisma.threatModelLock.deleteMany({
+      where: {
+        threatModelId,
+        expiresAt: { lt: new Date() },
+      },
+    });
+
+    // Create new lock
+    const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
+
+    return this.prisma.threatModelLock.create({
+      data: {
+        threatModelId,
+        lockedBy,
+        lockedByName,
+        expiresAt,
+      },
+    });
+  }
+
+  async refreshLock(
+    tenantId: string,
+    threatModelId: string,
+    userId: string,
+    durationMinutes: number = 5,
+  ) {
+    const model = await this.prisma.threatModel.findFirst({
+      where: { id: threatModelId, tenantId },
+      include: { lock: true },
+    });
+
+    if (!model) {
+      throw new NotFoundException('Threat model not found');
+    }
+
+    if (!model.lock || model.lock.lockedBy !== userId) {
+      throw new NotFoundException('Lock not found or not owned by user');
+    }
+
+    const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
+
+    return this.prisma.threatModelLock.update({
+      where: { id: model.lock.id },
+      data: { expiresAt },
+    });
+  }
+
+  async releaseLock(tenantId: string, threatModelId: string) {
+    const model = await this.prisma.threatModel.findFirst({
+      where: { id: threatModelId, tenantId },
+      include: { lock: true },
+    });
+
+    if (!model) {
+      throw new NotFoundException('Threat model not found');
+    }
+
+    if (model.lock) {
+      await this.prisma.threatModelLock.delete({
+        where: { id: model.lock.id },
+      });
+    }
+
+    return { released: true };
+  }
+
+  // ===== VERSIONING =====
+
+  async listVersions(tenantId: string, threatModelId: string, limit: number = 20) {
+    const model = await this.prisma.threatModel.findFirst({
+      where: { id: threatModelId, tenantId },
+    });
+
+    if (!model) {
+      throw new NotFoundException('Threat model not found');
+    }
+
+    return this.prisma.diagramVersion.findMany({
+      where: { threatModelId },
+      orderBy: { versionNumber: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        versionNumber: true,
+        versionName: true,
+        createdBy: true,
+        isAutoSave: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async createVersion(
+    tenantId: string,
+    threatModelId: string,
+    createdBy: string,
+    xmlContent: string,
+    isAutoSave: boolean = false,
+    versionName?: string,
+  ) {
+    const model = await this.prisma.threatModel.findFirst({
+      where: { id: threatModelId, tenantId },
+    });
+
+    if (!model) {
+      throw new NotFoundException('Threat model not found');
+    }
+
+    // Get the latest version number
+    const latestVersion = await this.prisma.diagramVersion.findFirst({
+      where: { threatModelId },
+      orderBy: { versionNumber: 'desc' },
+    });
+
+    const versionNumber = (latestVersion?.versionNumber || 0) + 1;
+
+    // Create the version
+    const version = await this.prisma.diagramVersion.create({
+      data: {
+        threatModelId,
+        versionNumber,
+        versionName,
+        xmlContent,
+        createdBy,
+        isAutoSave,
+      },
+    });
+
+    // Update the threat model's diagramXml
+    await this.prisma.threatModel.update({
+      where: { id: threatModelId },
+      data: { diagramXml: xmlContent },
+    });
+
+    return version;
+  }
+
+  async getVersion(tenantId: string, versionId: string) {
+    const version = await this.prisma.diagramVersion.findFirst({
+      where: { id: versionId },
+      include: { threatModel: true },
+    });
+
+    if (!version || version.threatModel.tenantId !== tenantId) {
+      throw new NotFoundException('Version not found');
+    }
+
+    return version;
+  }
+
+  // ===== ANALYSIS RUNS =====
+
+  async createAnalysisRun(
+    tenantId: string,
+    threatModelId: string,
+    triggeredBy: string,
+    yamlInput: string,
+  ) {
+    const model = await this.prisma.threatModel.findFirst({
+      where: { id: threatModelId, tenantId },
+    });
+
+    if (!model) {
+      throw new NotFoundException('Threat model not found');
+    }
+
+    // Create the analysis run record
+    const analysisRun = await this.prisma.analysisRun.create({
+      data: {
+        threatModelId,
+        tenantId,
+        status: 'queued',
+        engine: 'threagile',
+        triggeredBy,
+        yamlInput,
+      },
+    });
+
+    // Update threat model status
+    await this.prisma.threatModel.update({
+      where: { id: threatModelId },
+      data: {
+        analysisStatus: 'queued',
+        lastAnalysisRunId: analysisRun.id,
+      },
+    });
+
+    return analysisRun;
+  }
 }
