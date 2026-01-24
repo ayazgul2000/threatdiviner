@@ -1,6 +1,6 @@
 # ThreatDiviner Threat Modeling - Implementation Checkpoint
 
-## Current Checkpoint: v4.1.0
+## Current Checkpoint: v4.2.0
 **Status:** AWAITING APPROVAL
 **Date:** 2026-01-25
 **Phase:** 4 - Compliance Module (IN PROGRESS)
@@ -1808,6 +1808,97 @@ Tests:       16 passed, 16 total
 
 ```
 API TypeScript: No errors
+```
+
+---
+
+**Status: COMPLETED** — Approved, proceeding to v4.2.0
+
+---
+
+# Checkpoint v4.2.0: Compliance Tab UI
+
+## What Was Built
+
+Compliance Tab UI for the threat model detail page, allowing users to view compliance status across frameworks.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] 4.2.0: Compliance tab renders on model detail | After tab shows frameworks
+
+## Frontend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/dashboard/src/components/compliance/ComplianceProgress.tsx` | Progress bar component |
+| `apps/dashboard/src/components/compliance/GapCard.tsx` | Individual gap display card |
+| `apps/dashboard/src/components/compliance/GapList.tsx` | List of compliance gaps with filtering |
+| `apps/dashboard/src/components/compliance/ComplianceCard.tsx` | Framework compliance summary card |
+| `apps/dashboard/src/components/compliance/FrameworkSelector.tsx` | Checkbox selector for frameworks |
+| `apps/dashboard/src/components/compliance/ControlDetailModal.tsx` | Modal showing full control details |
+| `apps/dashboard/src/components/compliance/ComplianceTab.tsx` | Main tab container component |
+| `apps/dashboard/src/components/compliance/index.ts` | Component exports |
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/dashboard/src/app/dashboard/threat-modeling/[id]/page.tsx` | Added Compliance tab trigger and content |
+
+## UI Components Implemented (per 05_ui_screens.md Section 6)
+
+### ComplianceTab
+- Framework selector at top
+- Grid of ComplianceCards showing % compliant per framework
+- GapList showing controls that need attention
+- ControlDetailModal for viewing full control info
+
+### FrameworkSelector
+- Checkbox list of available frameworks
+- Auto-selects first two frameworks on load
+- Loads frameworks from `/compliance/frameworks` API
+
+### ComplianceCard
+- Shows framework name and version
+- Large percentage display
+- Progress bar (color-coded: green >= 80%, yellow >= 50%, red < 50%)
+- Stats breakdown: Satisfied/Partial/Gaps counts
+- View Details button
+
+### GapList
+- Filter by framework
+- Filter by status (gaps/partial)
+- Empty state when fully compliant
+- Renders GapCard for each gap
+
+### GapCard
+- Control ID and name
+- Framework badge
+- Related risks with severity indicator
+- Gap status (gap/partial/satisfied)
+- View Remediation link (placeholder for future playbook integration)
+
+### ControlDetailModal
+- Full control information
+- Related risks list with severity
+- Mapping relevance
+- View Remediation button
+
+## API Integration
+
+Uses existing endpoints from v4.1.0:
+- `GET /compliance/frameworks` - List available frameworks
+- `GET /threat-modeling/:id/compliance?frameworks=` - Get compliance data
+
+## Tests Run
+
+```
+ThreatModelComplianceService Tests (16 tests):
+  √ All 16 tests passing (unchanged from v4.1.0)
+
+TypeScript Compilation:
+  API: No errors
+  Dashboard: New compliance components compile without errors
+  (Pre-existing errors in other files not related to this checkpoint)
 ```
 
 ---

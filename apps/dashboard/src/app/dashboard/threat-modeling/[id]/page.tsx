@@ -31,6 +31,7 @@ import {
 import { CardSkeleton } from '@/components/ui/skeletons';
 import { useProject } from '@/contexts/project-context';
 import { GapFillDialog, AnalysisProgressModal } from '@/components/threat-modeling';
+import { ComplianceTab } from '@/components/compliance';
 import { useAnalysis } from '@/hooks/useAnalysis';
 import { useGapDetection } from '@/hooks/useGapDetection';
 import type { GapDetectionResult } from '@/hooks/useGapDetection';
@@ -661,6 +662,7 @@ export default function ThreatModelDetailPage() {
           <TabsTrigger value="dataflows">Data Flows ({model.dataFlows.length})</TabsTrigger>
           <TabsTrigger value="threats">Threats ({model.threats.length})</TabsTrigger>
           <TabsTrigger value="mitigations">Mitigations ({model.mitigations.length})</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -852,6 +854,11 @@ export default function ThreatModelDetailPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Compliance Tab */}
+        <TabsContent value="compliance">
+          <ComplianceTab threatModelId={model.id} />
         </TabsContent>
       </Tabs>
 
