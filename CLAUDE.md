@@ -1,5 +1,28 @@
 # ThreatDiviner Threat Modeling — Claude CLI Instructions
 
+---
+
+## ⚠️ HIGHEST PRIORITY — CHECKPOINT COMPLETION PROTOCOL ⚠️
+
+**THIS IS A STRICT CONTROL. DO NOT SKIP ANY STEP.**
+
+After completing ANY checkpoint, you MUST execute these steps in exact order:
+
+1. Generate repomix output: `npx repomix --output repomix-output.xml`
+2. Zip the file and place in `.claude/ThreatModel/`:
+   ```bash
+   powershell -Command "Compress-Archive -Path 'repomix-output.xml' -DestinationPath '.claude/ThreatModel/repomix-output.zip' -Force"
+   ```
+3. Ensure `CHECKPOINT.md` is updated in `.claude/ThreatModel/CHECKPOINT.md`
+4. Commit and tag the checkpoint
+5. **RUN THE TRIGGER SCRIPT**: `python test_claude_trigger.py`
+
+**The zip file MUST be named `repomix-output.zip` and MUST be in `.claude/ThreatModel/` folder, overwriting any previous version.**
+
+**DO NOT proceed to the next checkpoint until ALL steps are complete.**
+
+---
+
 ## MANDATORY: Read Before Any Action
 
 You MUST read and follow these specification documents in `.claude/ThreatModel/` before writing ANY code:
