@@ -563,14 +563,361 @@ Phase 2 (Threagile Integration) completed at v2.6.0. Ready to proceed to Phase 3
 
 ---
 
-### Next: Phase 3 - Admin Console
+---
 
-**Checkpoint v3.1.0: Admin Shell**
+# Checkpoint v3.1.0: Admin Shell
+
+## What Was Built
+
+Admin console shell with full navigation structure for threat modeling configuration management.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] Admin layout with sidebar menu - Extended with sectioned navigation
+- [x] Role check (redirect if not admin) - Already existed in auth-context.tsx
+- [x] Navigation links to all admin sections - Added 9 new sections
+- [x] Dashboard with overview metrics (empty OK) - Already existed with system health + stats
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `apps/admin/src/components/admin-layout.tsx` | Modified - Added sectioned navigation with 3 groups: Platform, Threat Modeling Config, Operations |
+| `apps/admin/src/app/(dashboard)/shape-mappings/page.tsx` | Created - Placeholder page for shape mappings |
+| `apps/admin/src/app/(dashboard)/canonical-risks/page.tsx` | Created - Placeholder page for canonical risks |
+| `apps/admin/src/app/(dashboard)/compliance/page.tsx` | Created - Placeholder page for compliance frameworks |
+| `apps/admin/src/app/(dashboard)/playbooks/page.tsx` | Created - Placeholder page for remediation playbooks |
+| `apps/admin/src/app/(dashboard)/wizard/page.tsx` | Created - Placeholder page for wizard questions |
+| `apps/admin/src/app/(dashboard)/feeds/page.tsx` | Created - Placeholder page for feed sync |
+| `apps/admin/src/app/(dashboard)/ai-queue/page.tsx` | Created - Placeholder page for AI suggestions queue |
+| `apps/admin/src/app/(dashboard)/sandbox/page.tsx` | Created - Placeholder page for sandbox testing |
+| `apps/admin/src/app/(dashboard)/audit-log/page.tsx` | Created - Placeholder page for audit log viewer |
+
+## Navigation Structure
+
+```
+Platform
+├── Dashboard
+├── Tenants
+└── Settings
+
+Threat Modeling Config
+├── Shape Mappings (v3.2.0)
+├── Canonical Risks (v3.3.0)
+├── Compliance (v3.4.0)
+├── Playbooks (v3.5.0)
+└── Wizard (v3.6.0)
+
+Operations
+├── Feed Sync (v3.7.0)
+├── AI Queue (v3.8.0)
+├── Sandbox (v3.8.0)
+└── Audit Log
+```
+
+## Tests Run
+
+```
+> admin@0.1.0 lint
+> next lint
+
+./src/lib/auth-context.tsx
+23:6  Warning: React Hook useEffect has a missing dependency: 'checkAuth'.
+
+TypeScript: No errors
+```
+
+## Verification
+
+- [x] Admin layout renders with navigation sections
+- [x] All placeholder pages accessible
+- [x] TypeScript compiles without errors
+- [x] Lint passes (1 pre-existing warning)
+- [x] Auth redirect works (already tested in existing code)
+
+## Existing Features Verified
+
+Per the spec and existing codebase:
+- Role-based access via `admin.isSuperAdmin` flag in auth context
+- JWT validation on every request
+- Redirect to /login if unauthenticated
+
+## Next Task (DO NOT START)
+
+**Checkpoint v3.2.0: Shape Mapping CRUD**
+- List view page at `/admin/shape-mappings`
+- Create/edit form with full property editing
+- Bulk CSV import with preview
+- Status badges (Pending/Review/Live)
+
+---
+
+**Status: APPROVED** — Proceeding to v3.2.0
+
+---
+
+# Checkpoint v3.2.0: Shape Mapping CRUD
+
+## What Was Built
+
+Full CRUD operations for Shape Mapping management in the Admin Console.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] List view page at `/admin/shape-mappings` with search, category/status filters
+- [x] Create/edit form with full property editing (all Threagile properties)
+- [x] Bulk CSV/JSON import with preview
+- [x] Status badges (Pending/Review/Live)
+- [x] Delete with confirmation
+- [x] Submit for review / Approve workflow
+
+## Backend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/admin/admin.module.ts` | Admin module registration |
+| `apps/api/src/admin/shape-mappings/shape-mappings.controller.ts` | REST API controller |
+| `apps/api/src/admin/shape-mappings/shape-mappings.service.ts` | Business logic service |
+| `apps/api/src/admin/shape-mappings/dto/shape-mapping.dto.ts` | DTOs with validation |
+
+## Frontend Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/admin/src/lib/api.ts` | Added shapeMappingsApi with all endpoints |
+| `apps/admin/src/app/(dashboard)/shape-mappings/page.tsx` | Full CRUD UI with modals |
+
+## API Endpoints Implemented
+
+```
+GET    /admin/shape-mappings           List with filters (search, category, status)
+GET    /admin/shape-mappings/:id       Get single mapping
+POST   /admin/shape-mappings           Create new mapping
+PUT    /admin/shape-mappings/:id       Update mapping
+DELETE /admin/shape-mappings/:id       Delete mapping
+POST   /admin/shape-mappings/:id/submit   Submit for review
+POST   /admin/shape-mappings/:id/approve  Approve (SuperAdmin only)
+POST   /admin/shape-mappings/import    Bulk import
+GET    /admin/shape-mappings/categories   Get all categories
+```
+
+## UI Features
+
+- Grouped by category (AWS, Azure, GCP, etc.)
+- Search across style, display name, technology
+- Filter by category and status
+- Edit modal with all Threagile properties
+- Import modal with CSV/JSON parsing and preview
+- Status workflow: Pending → Review → Live
+- Delete with inline confirmation
+- SuperAdmin-only approve button
+
+## Tests Run
+
+```
+API TypeScript: No errors
+Admin TypeScript: No errors
+Admin Lint: 1 pre-existing warning
+
+Shape Mappings Service Tests (25 tests):
+  ShapeMappingsService
+    list
+      √ should return mappings with total count
+      √ should filter by search term
+      √ should filter by category
+      √ should filter by status
+    getById
+      √ should return mapping by id
+      √ should throw NotFoundException when mapping not found
+    create
+      √ should create a new mapping
+      √ should throw ConflictException for duplicate drawioStyle
+    update
+      √ should update existing mapping
+      √ should reset status to pending on update
+      √ should throw NotFoundException when mapping not found
+      √ should throw ConflictException when changing to duplicate drawioStyle
+    delete
+      √ should delete existing mapping
+      √ should throw NotFoundException when mapping not found
+    submitForReview
+      √ should change status from pending to review
+      √ should throw NotFoundException when mapping not found
+      √ should throw ConflictException when not in pending status
+    approve
+      √ should change status from review to live for SuperAdmin
+      √ should throw ForbiddenException for non-SuperAdmin
+      √ should throw NotFoundException when mapping not found
+      √ should throw ConflictException when not in review status
+    bulkImport
+      √ should import new mappings
+      √ should skip duplicates and report them
+      √ should handle create errors gracefully
+    getCategories
+      √ should return unique categories
+
+Test Suites: 1 passed, 1 total
+Tests:       25 passed, 25 total
+```
+
+## Next Task (DO NOT START)
+
+**Checkpoint v3.3.0: Canonical Risk CRUD**
 Per 09_implementation_plan.md:
-- [ ] Admin layout with sidebar menu
-- [ ] Role check (redirect if not admin)
-- [ ] Navigation links to all admin sections
-- [ ] Dashboard with overview metrics (empty OK)
+- List/create/edit canonical risks
+- CWE/CAPEC reference linking
+- Severity defaults
+- Source mappings
+
+---
+
+**Status: APPROVED** — Proceeding to v3.3.0
+
+---
+
+# Checkpoint v3.3.0: Canonical Risk CRUD
+
+## What Was Built
+
+Full CRUD operations for Canonical Risk management in the Admin Console, including source mapping management.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] List view page at `/admin/canonical-risks` with search, source/severity/status filters
+- [x] Create/edit form with title, description, severity, CWE/CAPEC/ATT&CK references
+- [x] Source mapping management (add/remove source mappings inline)
+- [x] Expandable rows showing sources, description, external references
+- [x] Bulk CSV/JSON import with preview
+- [x] Status badges (Pending/Review/Live) + Severity badges
+- [x] Delete with confirmation
+- [x] Submit for review / Approve workflow
+
+## Backend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/admin/canonical-risks/dto/canonical-risk.dto.ts` | DTOs with validation |
+| `apps/api/src/admin/canonical-risks/canonical-risks.service.ts` | Business logic service |
+| `apps/api/src/admin/canonical-risks/canonical-risks.controller.ts` | REST API controller |
+| `apps/api/src/admin/canonical-risks/canonical-risks.service.spec.ts` | 33 unit tests |
+| `apps/api/src/admin/admin.module.ts` | Updated - Added CanonicalRisksController/Service |
+
+## Frontend Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/admin/src/lib/api.ts` | Added canonicalRisksApi with all endpoints + types |
+| `apps/admin/src/app/(dashboard)/canonical-risks/page.tsx` | Full CRUD UI with modals |
+
+## API Endpoints Implemented
+
+```
+GET    /admin/canonical-risks           List with filters (search, source, severity, status)
+GET    /admin/canonical-risks/:id       Get single risk with sources
+POST   /admin/canonical-risks           Create new risk
+PUT    /admin/canonical-risks/:id       Update risk
+DELETE /admin/canonical-risks/:id       Delete risk
+POST   /admin/canonical-risks/:id/sources        Add source mapping
+DELETE /admin/canonical-risks/:id/sources/:sourceId  Remove source mapping
+POST   /admin/canonical-risks/:id/submit         Submit for review
+POST   /admin/canonical-risks/:id/approve        Approve (SuperAdmin only)
+POST   /admin/canonical-risks/import             Bulk import
+GET    /admin/canonical-risks/sources            Get all sources
+GET    /admin/canonical-risks/severities         Get severity levels
+```
+
+## UI Features
+
+- List view with expandable rows showing sources and references
+- Search across canonical ID, title, CWE, description
+- Filter by source, severity, and status
+- Edit modal with all fields:
+  - Canonical ID, Title, Description
+  - Default Severity dropdown
+  - CWE ID and Name
+  - CAPEC IDs (comma-separated)
+  - ATT&CK Techniques (comma-separated)
+  - Source Mappings table (add/remove inline)
+- Import modal with CSV/JSON parsing and preview
+- Status workflow: Pending → Review → Live
+- Severity badges with color coding (low/medium/high/critical)
+- Delete with inline confirmation
+- SuperAdmin-only approve button
+
+## Tests Run
+
+```
+Canonical Risks Service Tests (33 tests):
+  CanonicalRisksService
+    list
+      √ should return risks with total count
+      √ should filter by search term
+      √ should filter by source
+      √ should filter by severity
+      √ should filter by status
+    getById
+      √ should return risk by id
+      √ should throw NotFoundException when risk not found
+    create
+      √ should create a new risk
+      √ should throw ConflictException for duplicate canonicalId
+    update
+      √ should update existing risk
+      √ should reset status to pending on update
+      √ should throw NotFoundException when risk not found
+      √ should throw ConflictException when changing to duplicate canonicalId
+    delete
+      √ should delete existing risk
+      √ should throw NotFoundException when risk not found
+    addSource
+      √ should add source mapping to risk
+      √ should throw NotFoundException when risk not found
+      √ should throw ConflictException for duplicate source mapping
+      √ should reset risk status to pending when adding source
+    removeSource
+      √ should remove source mapping
+      √ should throw NotFoundException when source not found
+    submitForReview
+      √ should change status from pending to review
+      √ should throw NotFoundException when risk not found
+      √ should throw ConflictException when not in pending status
+    approve
+      √ should change status from review to live for SuperAdmin
+      √ should throw ForbiddenException for non-SuperAdmin
+      √ should throw NotFoundException when risk not found
+      √ should throw ConflictException when not in review status
+    bulkImport
+      √ should import new risks
+      √ should skip duplicates and report them
+      √ should handle create errors gracefully
+    getSources
+      √ should return unique sources
+    getSeverities
+      √ should return severity levels
+
+Test Suites: 1 passed, 1 total
+Tests:       33 passed, 33 total
+```
+
+## TypeScript Compilation
+
+```
+API TypeScript: No errors
+Admin TypeScript: No errors
+```
+
+## Next Task (DO NOT START)
+
+**Checkpoint v3.4.0: Compliance Framework CRUD**
+Per 09_implementation_plan.md:
+- List/create/edit compliance frameworks
+- Control tree view (hierarchical display)
+- Control editor (add/edit/delete controls)
+- Risk-control mapping
+
+---
+
+**Status: AWAITING APPROVAL**
+
+Upload repomix-output.xml and this file to Claude.
+Respond with: APPROVED / FIX: [details] / REJECT: [reason]
 
 ---
 

@@ -272,3 +272,123 @@ export const shapeMappingsApi = {
   getCategories: () =>
     fetchApi<{ categories: string[] }>('/admin/shape-mappings/categories'),
 };
+
+// Canonical Risk Types
+export interface CanonicalRiskSource {
+  id: string;
+  source: string;
+  sourceRuleId: string;
+  sourceTitle: string | null;
+  createdAt: string;
+}
+
+export interface CanonicalRisk {
+  id: string;
+  canonicalId: string;
+  title: string;
+  description: string | null;
+  defaultSeverity: string;
+  cweId: string | null;
+  cweName: string | null;
+  capecIds: string[];
+  attackIds: string[];
+  status: 'pending' | 'review' | 'live';
+  createdAt: string;
+  updatedAt: string;
+  sources?: CanonicalRiskSource[];
+  _count?: { sources: number };
+}
+
+export interface CanonicalRiskListQuery {
+  search?: string;
+  source?: string;
+  severity?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateCanonicalRiskData {
+  canonicalId: string;
+  title: string;
+  description?: string;
+  defaultSeverity?: string;
+  cweId?: string;
+  cweName?: string;
+  capecIds?: string[];
+  attackIds?: string[];
+}
+
+export interface AddSourceData {
+  source: string;
+  sourceRuleId: string;
+  sourceTitle?: string;
+}
+
+export interface CanonicalRiskImportResult {
+  imported: number;
+  skipped: number;
+  errors: Array<{ canonicalId: string; error: string }>;
+}
+
+// Canonical Risks API
+export const canonicalRisksApi = {
+  list: (query: CanonicalRiskListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.search) params.set('search', query.search);
+    if (query.source) params.set('source', query.source);
+    if (query.severity) params.set('severity', query.severity);
+    if (query.status) params.set('status', query.status);
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.offset) params.set('offset', String(query.offset));
+    const qs = params.toString();
+    return fetchApi<{ risks: CanonicalRisk[]; total: number }>(`/admin/canonical-risks${qs ? `?${qs}` : ''}`);
+  },
+
+  get: (id: string) =>
+    fetchApi<{ risk: CanonicalRisk }>(`/admin/canonical-risks/${id}`),
+
+  create: (data: CreateCanonicalRiskData) =>
+    fetchApi<{ risk: CanonicalRisk }>('/admin/canonical-risks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<CreateCanonicalRiskData>) =>
+    fetchApi<{ risk: CanonicalRisk }>(`/admin/canonical-risks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<{ success: boolean }>(`/admin/canonical-risks/${id}`, { method: 'DELETE' }),
+
+  addSource: (riskId: string, data: AddSourceData) =>
+    fetchApi<{ source: CanonicalRiskSource }>(`/admin/canonical-risks/${riskId}/sources`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  removeSource: (riskId: string, sourceId: string) =>
+    fetchApi<{ success: boolean }>(`/admin/canonical-risks/${riskId}/sources/${sourceId}`, {
+      method: 'DELETE',
+    }),
+
+  submitForReview: (id: string) =>
+    fetchApi<{ risk: CanonicalRisk }>(`/admin/canonical-risks/${id}/submit`, { method: 'POST' }),
+
+  approve: (id: string) =>
+    fetchApi<{ risk: CanonicalRisk }>(`/admin/canonical-risks/${id}/approve`, { method: 'POST' }),
+
+  bulkImport: (risks: CreateCanonicalRiskData[]) =>
+    fetchApi<CanonicalRiskImportResult>('/admin/canonical-risks/import', {
+      method: 'POST',
+      body: JSON.stringify({ risks }),
+    }),
+
+  getSources: () =>
+    fetchApi<{ sources: string[] }>('/admin/canonical-risks/sources'),
+
+  getSeverities: () =>
+    fetchApi<{ severities: string[] }>('/admin/canonical-risks/severities'),
+};
