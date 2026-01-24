@@ -1,9 +1,9 @@
 # ThreatDiviner Threat Modeling - Implementation Checkpoint
 
-## Current Checkpoint: v2.6.0
-**Status:** COMPLETED
+## Current Checkpoint: v3.4.0
+**Status:** AWAITING APPROVAL
 **Date:** 2026-01-24
-**Phase:** 2 - Threagile Integration (IN PROGRESS)
+**Phase:** 3 - Admin Console (IN PROGRESS)
 
 ---
 
@@ -911,6 +911,164 @@ Per 09_implementation_plan.md:
 - Control tree view (hierarchical display)
 - Control editor (add/edit/delete controls)
 - Risk-control mapping
+
+---
+
+**Status: APPROVED** — Proceeding to v3.4.0
+
+---
+
+# Checkpoint v3.4.0: Compliance Framework CRUD
+
+## What Was Built
+
+Full CRUD operations for Compliance Framework management in the Admin Console, including hierarchical control tree and risk-control mappings.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] List view page at `/admin/compliance-frameworks` with search, status filters
+- [x] Framework form (create/edit) with id, name, version, description, sourceUrl, isActive
+- [x] Control tree view (hierarchical display with expandable sections)
+- [x] Control editor (add/edit/delete controls with parent selection)
+- [x] Risk-control mapping (add/remove canonical risk mappings per control)
+- [x] Framework stats (controls count, mappings count)
+- [x] Delete with confirmation
+
+## Backend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/admin/compliance-frameworks/dto/compliance-framework.dto.ts` | DTOs with validation |
+| `apps/api/src/admin/compliance-frameworks/compliance-frameworks.service.ts` | Business logic service |
+| `apps/api/src/admin/compliance-frameworks/compliance-frameworks.controller.ts` | REST API controller |
+| `apps/api/src/admin/compliance-frameworks/compliance-frameworks.service.spec.ts` | 34 unit tests |
+| `apps/api/src/admin/admin.module.ts` | Updated - Added ComplianceFrameworksController/Service |
+
+## Frontend Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/admin/src/lib/api.ts` | Added complianceFrameworksApi with all endpoints + types |
+| `apps/admin/src/app/(dashboard)/compliance-frameworks/page.tsx` | Full CRUD UI with tree view |
+
+## API Endpoints Implemented
+
+```
+GET    /admin/compliance-frameworks                     List with filters (search, isActive)
+GET    /admin/compliance-frameworks/:id                 Get single framework with controls
+POST   /admin/compliance-frameworks                     Create new framework
+PUT    /admin/compliance-frameworks/:id                 Update framework
+DELETE /admin/compliance-frameworks/:id                 Delete framework
+GET    /admin/compliance-frameworks/:id/controls        List controls with filters
+GET    /admin/compliance-frameworks/:id/controls/tree   Get hierarchical control tree
+GET    /admin/compliance-frameworks/:id/controls/categories  Get control categories
+GET    /admin/compliance-frameworks/:id/controls/:controlId  Get single control
+POST   /admin/compliance-frameworks/:id/controls        Create control
+PUT    /admin/compliance-frameworks/:id/controls/:controlId  Update control
+DELETE /admin/compliance-frameworks/:id/controls/:controlId  Delete control
+GET    /admin/compliance-frameworks/controls/:controlId/mappings        Get risk mappings
+POST   /admin/compliance-frameworks/controls/:controlId/mappings        Add risk mapping
+DELETE /admin/compliance-frameworks/controls/:controlId/mappings/:mappingId  Remove risk mapping
+POST   /admin/compliance-frameworks/import              Bulk import frameworks
+GET    /admin/compliance-frameworks/:id/mappings-count  Get total mappings count
+```
+
+## UI Features
+
+- List view with frameworks showing controls count and mappings count
+- Search across framework ID, name, description
+- Filter by active status
+- Framework modal for create/edit:
+  - ID, Name, Version fields
+  - Description textarea
+  - Source URL field
+  - Active toggle
+- Split view: framework list + control tree for selected framework
+- Hierarchical control tree with expand/collapse:
+  - Indentation by level
+  - Control ID and name display
+  - Children count and mappings count badges
+  - Edit/Delete actions on hover
+- Control modal for create/edit:
+  - Control ID, Category, Name fields
+  - Description and Guidance textareas
+  - Parent control dropdown (hierarchical)
+  - Level selection
+  - Risk Mappings table (add/remove inline)
+- Delete confirmation modal for frameworks and controls
+
+## Tests Run
+
+```
+Compliance Frameworks Service Tests (34 tests):
+  ComplianceFrameworksService
+    listFrameworks
+      √ should return frameworks with total count
+      √ should filter by search term
+      √ should filter by isActive
+    getFrameworkById
+      √ should return framework with controls
+      √ should throw NotFoundException when not found
+    createFramework
+      √ should create a new framework
+      √ should throw ConflictException for duplicate id
+    updateFramework
+      √ should update existing framework
+      √ should throw NotFoundException when not found
+    deleteFramework
+      √ should delete existing framework
+      √ should throw NotFoundException when not found
+    listControls
+      √ should return controls for framework
+      √ should throw NotFoundException when framework not found
+      √ should filter by category
+    createControl
+      √ should create a new control
+      √ should throw NotFoundException when framework not found
+      √ should throw ConflictException for duplicate controlId
+      √ should validate parent exists
+    updateControl
+      √ should update existing control
+      √ should throw NotFoundException when control not found
+      √ should prevent self-referencing parent
+    deleteControl
+      √ should delete existing control
+      √ should throw NotFoundException when control not found
+    addRiskMapping
+      √ should add risk mapping
+      √ should throw NotFoundException when control not found
+      √ should throw NotFoundException when risk not found
+      √ should throw ConflictException for duplicate mapping
+    removeRiskMapping
+      √ should remove risk mapping
+      √ should throw NotFoundException when mapping not found
+    getCategories
+      √ should return unique categories
+      √ should throw NotFoundException when framework not found
+    getControlTree
+      √ should return hierarchical control tree
+      √ should throw NotFoundException when framework not found
+    getMappingsCount
+      √ should return mappings count for framework
+
+Test Suites: 1 passed, 1 total
+Tests:       34 passed, 34 total
+```
+
+## TypeScript Compilation
+
+```
+API TypeScript: No errors
+Admin TypeScript: No errors
+```
+
+## Next Task (DO NOT START)
+
+**Checkpoint v3.5.0: Remediation Playbook CRUD**
+Per 09_implementation_plan.md:
+- List/create/edit remediation playbooks
+- Step editor (ordered steps)
+- IaC snippet management
+- Risk linkage
 
 ---
 

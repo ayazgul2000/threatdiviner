@@ -392,3 +392,190 @@ export const canonicalRisksApi = {
   getSeverities: () =>
     fetchApi<{ severities: string[] }>('/admin/canonical-risks/severities'),
 };
+
+// Compliance Framework Types
+export interface ComplianceFramework {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  sourceUrl: string;
+  lastUpdated: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  controls?: ComplianceControl[];
+  _count?: { controls: number };
+}
+
+export interface ComplianceControl {
+  id: string;
+  frameworkId: string;
+  controlId: string;
+  parentId: string | null;
+  category: string;
+  name: string;
+  description: string;
+  guidance: string | null;
+  level: number;
+  createdAt: string;
+  updatedAt: string;
+  children?: ComplianceControl[];
+  riskMappings?: RiskControlMapping[];
+  _count?: { children: number; riskMappings: number };
+}
+
+export interface RiskControlMapping {
+  id: string;
+  canonicalRiskId: string;
+  complianceControlId: string;
+  relevance: string;
+  aiConfidence: number | null;
+  createdAt: string;
+  canonicalRisk?: {
+    id: string;
+    canonicalId: string;
+    title: string;
+    status: string;
+  };
+}
+
+export interface ComplianceFrameworkListQuery {
+  search?: string;
+  isActive?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ComplianceControlListQuery {
+  search?: string;
+  category?: string;
+  level?: string;
+  parentId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateComplianceFrameworkData {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  sourceUrl?: string;
+  isActive?: boolean;
+}
+
+export interface CreateComplianceControlData {
+  controlId: string;
+  parentId?: string;
+  category: string;
+  name: string;
+  description?: string;
+  guidance?: string;
+  level?: number;
+}
+
+export interface AddRiskMappingData {
+  canonicalRiskId: string;
+  relevance?: string;
+  aiConfidence?: number;
+}
+
+export interface FrameworkImportResult {
+  frameworksImported: number;
+  controlsImported: number;
+  errors: Array<{ item: string; error: string }>;
+}
+
+// Compliance Frameworks API
+export const complianceFrameworksApi = {
+  list: (query: ComplianceFrameworkListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.search) params.set('search', query.search);
+    if (query.isActive) params.set('isActive', query.isActive);
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.offset) params.set('offset', String(query.offset));
+    const qs = params.toString();
+    return fetchApi<{ frameworks: ComplianceFramework[]; total: number }>(`/admin/compliance-frameworks${qs ? `?${qs}` : ''}`);
+  },
+
+  get: (id: string) =>
+    fetchApi<{ framework: ComplianceFramework }>(`/admin/compliance-frameworks/${id}`),
+
+  create: (data: CreateComplianceFrameworkData) =>
+    fetchApi<{ framework: ComplianceFramework }>('/admin/compliance-frameworks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<Omit<CreateComplianceFrameworkData, 'id'>>) =>
+    fetchApi<{ framework: ComplianceFramework }>(`/admin/compliance-frameworks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<{ success: boolean }>(`/admin/compliance-frameworks/${id}`, { method: 'DELETE' }),
+
+  getMappingsCount: (id: string) =>
+    fetchApi<{ count: number }>(`/admin/compliance-frameworks/${id}/mappings-count`),
+
+  // Control endpoints
+  listControls: (frameworkId: string, query: ComplianceControlListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.search) params.set('search', query.search);
+    if (query.category) params.set('category', query.category);
+    if (query.level) params.set('level', query.level);
+    if (query.parentId !== undefined) params.set('parentId', query.parentId);
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.offset) params.set('offset', String(query.offset));
+    const qs = params.toString();
+    return fetchApi<{ controls: ComplianceControl[]; total: number }>(`/admin/compliance-frameworks/${frameworkId}/controls${qs ? `?${qs}` : ''}`);
+  },
+
+  getControlTree: (frameworkId: string) =>
+    fetchApi<{ controls: ComplianceControl[] }>(`/admin/compliance-frameworks/${frameworkId}/controls/tree`),
+
+  getCategories: (frameworkId: string) =>
+    fetchApi<{ categories: string[] }>(`/admin/compliance-frameworks/${frameworkId}/controls/categories`),
+
+  getControl: (frameworkId: string, controlId: string) =>
+    fetchApi<{ control: ComplianceControl }>(`/admin/compliance-frameworks/${frameworkId}/controls/${controlId}`),
+
+  createControl: (frameworkId: string, data: CreateComplianceControlData) =>
+    fetchApi<{ control: ComplianceControl }>(`/admin/compliance-frameworks/${frameworkId}/controls`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateControl: (frameworkId: string, controlId: string, data: Partial<CreateComplianceControlData>) =>
+    fetchApi<{ control: ComplianceControl }>(`/admin/compliance-frameworks/${frameworkId}/controls/${controlId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteControl: (frameworkId: string, controlId: string) =>
+    fetchApi<{ success: boolean }>(`/admin/compliance-frameworks/${frameworkId}/controls/${controlId}`, { method: 'DELETE' }),
+
+  // Risk mapping endpoints
+  getRiskMappings: (controlId: string) =>
+    fetchApi<{ mappings: RiskControlMapping[] }>(`/admin/compliance-frameworks/controls/${controlId}/mappings`),
+
+  addRiskMapping: (controlId: string, data: AddRiskMappingData) =>
+    fetchApi<{ mapping: RiskControlMapping }>(`/admin/compliance-frameworks/controls/${controlId}/mappings`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  removeRiskMapping: (controlId: string, mappingId: string) =>
+    fetchApi<{ success: boolean }>(`/admin/compliance-frameworks/controls/${controlId}/mappings/${mappingId}`, {
+      method: 'DELETE',
+    }),
+
+  // Bulk import
+  bulkImport: (data: CreateComplianceFrameworkData & { controls?: CreateComplianceControlData[] }) =>
+    fetchApi<FrameworkImportResult>('/admin/compliance-frameworks/import', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
