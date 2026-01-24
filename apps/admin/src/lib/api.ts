@@ -579,3 +579,195 @@ export const complianceFrameworksApi = {
       body: JSON.stringify(data),
     }),
 };
+
+// Remediation Playbook Types
+export interface PlaybookStep {
+  id: string;
+  playbookId: string;
+  stepNumber: number;
+  title: string;
+  description: string;
+  effort: string | null;
+  role: string | null;
+  estimatedMinutes: number | null;
+  automatable: boolean;
+  createdAt: string;
+}
+
+export interface PlaybookIacSnippet {
+  id: string;
+  playbookId: string;
+  platform: string;
+  code: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface RemediationPlaybook {
+  id: string;
+  canonicalRiskId: string;
+  title: string;
+  description: string | null;
+  totalEffort: string | null;
+  status: 'pending' | 'review' | 'live';
+  createdAt: string;
+  updatedAt: string;
+  canonicalRisk?: {
+    id: string;
+    canonicalId: string;
+    title: string;
+    cweId?: string;
+    cweName?: string;
+  };
+  steps?: PlaybookStep[];
+  iacSnippets?: PlaybookIacSnippet[];
+  _count?: { steps: number; iacSnippets: number };
+}
+
+export interface PlaybookStats {
+  totalSteps: number;
+  automatableSteps: number;
+  totalMinutes: number;
+  roles: string[];
+  platforms: string[];
+}
+
+export interface PlaybookListQuery {
+  search?: string;
+  effort?: string;
+  hasIac?: string;
+  status?: string;
+  canonicalRiskId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreatePlaybookData {
+  canonicalRiskId: string;
+  title: string;
+  description?: string;
+  totalEffort?: string;
+}
+
+export interface CreateStepData {
+  title: string;
+  description: string;
+  effort?: string;
+  role?: string;
+  estimatedMinutes?: number;
+  automatable?: boolean;
+}
+
+export interface CreateIacSnippetData {
+  platform: string;
+  code: string;
+  description?: string;
+}
+
+export interface PlaybookImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
+// Playbooks API
+export const playbooksApi = {
+  list: (query: PlaybookListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.search) params.set('search', query.search);
+    if (query.effort) params.set('effort', query.effort);
+    if (query.hasIac) params.set('hasIac', query.hasIac);
+    if (query.status) params.set('status', query.status);
+    if (query.canonicalRiskId) params.set('canonicalRiskId', query.canonicalRiskId);
+    if (query.page) params.set('page', String(query.page));
+    if (query.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return fetchApi<{ playbooks: RemediationPlaybook[]; total: number; page: number; limit: number; totalPages: number }>(`/admin/playbooks${qs ? `?${qs}` : ''}`);
+  },
+
+  get: (id: string) =>
+    fetchApi<{ playbook: RemediationPlaybook }>(`/admin/playbooks/${id}`),
+
+  getStats: (id: string) =>
+    fetchApi<{ stats: PlaybookStats }>(`/admin/playbooks/${id}/stats`),
+
+  create: (data: CreatePlaybookData) =>
+    fetchApi<{ playbook: RemediationPlaybook }>('/admin/playbooks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<CreatePlaybookData>) =>
+    fetchApi<{ playbook: RemediationPlaybook }>(`/admin/playbooks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<{ success: boolean }>(`/admin/playbooks/${id}`, { method: 'DELETE' }),
+
+  submitForReview: (id: string) =>
+    fetchApi<{ playbook: RemediationPlaybook }>(`/admin/playbooks/${id}/submit`, { method: 'POST' }),
+
+  approve: (id: string) =>
+    fetchApi<{ playbook: RemediationPlaybook }>(`/admin/playbooks/${id}/approve`, { method: 'POST' }),
+
+  bulkImport: (playbooks: Array<CreatePlaybookData & { steps?: Array<CreateStepData & { stepNumber: number }>; iacSnippets?: CreateIacSnippetData[] }>) =>
+    fetchApi<PlaybookImportResult>('/admin/playbooks/import', {
+      method: 'POST',
+      body: JSON.stringify({ playbooks }),
+    }),
+
+  getEffortOptions: () =>
+    fetchApi<{ options: string[] }>('/admin/playbooks/options/effort'),
+
+  getRoleOptions: () =>
+    fetchApi<{ options: string[] }>('/admin/playbooks/options/roles'),
+
+  getPlatformOptions: () =>
+    fetchApi<{ options: string[] }>('/admin/playbooks/options/platforms'),
+
+  // Step endpoints
+  listSteps: (playbookId: string) =>
+    fetchApi<{ steps: PlaybookStep[] }>(`/admin/playbooks/${playbookId}/steps`),
+
+  createStep: (playbookId: string, data: CreateStepData) =>
+    fetchApi<{ step: PlaybookStep }>(`/admin/playbooks/${playbookId}/steps`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateStep: (playbookId: string, stepId: string, data: Partial<CreateStepData>) =>
+    fetchApi<{ step: PlaybookStep }>(`/admin/playbooks/${playbookId}/steps/${stepId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteStep: (playbookId: string, stepId: string) =>
+    fetchApi<{ success: boolean }>(`/admin/playbooks/${playbookId}/steps/${stepId}`, { method: 'DELETE' }),
+
+  reorderSteps: (playbookId: string, stepIds: string[]) =>
+    fetchApi<{ steps: PlaybookStep[] }>(`/admin/playbooks/${playbookId}/steps/reorder`, {
+      method: 'POST',
+      body: JSON.stringify({ stepIds }),
+    }),
+
+  // IaC Snippet endpoints
+  listIacSnippets: (playbookId: string) =>
+    fetchApi<{ snippets: PlaybookIacSnippet[] }>(`/admin/playbooks/${playbookId}/iac-snippets`),
+
+  createIacSnippet: (playbookId: string, data: CreateIacSnippetData) =>
+    fetchApi<{ snippet: PlaybookIacSnippet }>(`/admin/playbooks/${playbookId}/iac-snippets`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateIacSnippet: (playbookId: string, snippetId: string, data: Partial<Omit<CreateIacSnippetData, 'platform'>>) =>
+    fetchApi<{ snippet: PlaybookIacSnippet }>(`/admin/playbooks/${playbookId}/iac-snippets/${snippetId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteIacSnippet: (playbookId: string, snippetId: string) =>
+    fetchApi<{ success: boolean }>(`/admin/playbooks/${playbookId}/iac-snippets/${snippetId}`, { method: 'DELETE' }),
+};

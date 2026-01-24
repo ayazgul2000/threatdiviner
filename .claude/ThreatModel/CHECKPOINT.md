@@ -1,6 +1,6 @@
 # ThreatDiviner Threat Modeling - Implementation Checkpoint
 
-## Current Checkpoint: v3.4.0
+## Current Checkpoint: v3.5.0
 **Status:** AWAITING APPROVAL
 **Date:** 2026-01-24
 **Phase:** 3 - Admin Console (IN PROGRESS)
@@ -1061,14 +1061,196 @@ API TypeScript: No errors
 Admin TypeScript: No errors
 ```
 
+**Status: APPROVED** — Proceeding to v3.5.0
+
+---
+
+# Checkpoint v3.5.0: Remediation Playbook CRUD
+
+## What Was Built
+
+Full CRUD operations for Remediation Playbooks in the Admin Console, including step management with reordering and IaC snippet editor.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] List view page at `/admin/playbooks` with search and filters (effort, hasIac, status)
+- [x] Playbook form (create/edit) with canonical risk selection, title, description, total effort
+- [x] Step builder with add/edit/delete and drag-drop ordering (up/down arrows)
+- [x] IaC snippet editor with platform tabs (Terraform, CloudFormation, Kubernetes, Pulumi)
+- [x] Preview mode with formatted playbook output
+- [x] Link to canonical risk (required association)
+- [x] Status workflow (pending → review → live)
+
+## Backend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/admin/playbooks/dto/playbook.dto.ts` | DTOs with class-validator |
+| `apps/api/src/admin/playbooks/playbooks.service.ts` | Business logic service |
+| `apps/api/src/admin/playbooks/playbooks.controller.ts` | REST API controller |
+| `apps/api/src/admin/playbooks/playbooks.service.spec.ts` | 47 unit tests |
+| `apps/api/src/admin/admin.module.ts` | Updated - Added PlaybooksController/Service |
+
+## Frontend Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/admin/src/lib/api.ts` | Added playbooksApi with all endpoints + types |
+| `apps/admin/src/app/(dashboard)/playbooks/page.tsx` | Full CRUD UI with step builder |
+
+## API Endpoints Implemented
+
+```
+GET    /admin/playbooks                              List with filters
+GET    /admin/playbooks/:id                          Get single playbook with steps & snippets
+GET    /admin/playbooks/:id/stats                    Get playbook statistics
+POST   /admin/playbooks                              Create new playbook
+PUT    /admin/playbooks/:id                          Update playbook
+DELETE /admin/playbooks/:id                          Delete playbook
+POST   /admin/playbooks/:id/submit                   Submit for review
+POST   /admin/playbooks/:id/approve                  Approve (SuperAdmin only)
+POST   /admin/playbooks/import                       Bulk import playbooks
+
+GET    /admin/playbooks/options/effort               Get effort options
+GET    /admin/playbooks/options/roles                Get role options
+GET    /admin/playbooks/options/platforms            Get platform options
+
+GET    /admin/playbooks/:id/steps                    List steps
+POST   /admin/playbooks/:id/steps                    Create step
+PUT    /admin/playbooks/:id/steps/:stepId            Update step
+DELETE /admin/playbooks/:id/steps/:stepId            Delete step
+POST   /admin/playbooks/:id/steps/reorder            Reorder steps
+
+GET    /admin/playbooks/:id/iac-snippets             List IaC snippets
+POST   /admin/playbooks/:id/iac-snippets             Create IaC snippet
+PUT    /admin/playbooks/:id/iac-snippets/:snippetId  Update IaC snippet
+DELETE /admin/playbooks/:id/iac-snippets/:snippetId  Delete IaC snippet
+```
+
+## UI Features
+
+- List view with playbooks showing canonical risk, title, steps count, IaC indicator, effort, status
+- Search across playbook title, description, canonical risk ID/title
+- Filter by effort level, has IaC, status
+- Playbook modal for create/edit:
+  - Canonical Risk dropdown (fetches live risks only)
+  - Title, Description, Total Effort fields
+  - Steps section (only when editing):
+    - Add Step button
+    - Step cards with up/down reorder arrows
+    - Each step shows: number, title, automatable badge, effort, role, time
+    - Edit/Delete actions per step
+  - IaC Snippets section (only when editing):
+    - Platform tabs (Terraform/CloudFormation/Kubernetes/Pulumi)
+    - Code preview with edit/delete actions
+    - Add Snippet button (disabled when all platforms used)
+- Step modal for create/edit:
+  - Title (required), Description (required)
+  - Effort dropdown, Role dropdown
+  - Estimated Minutes input
+  - Automatable checkbox
+- IaC Snippet modal:
+  - Platform dropdown (auto-selects first available)
+  - Description field
+  - Code textarea (monospace font)
+- Preview modal showing formatted playbook:
+  - Header with title, risk reference, CWE
+  - Stats: effort, steps, time, roles
+  - Step-by-step instructions with indentation
+  - IaC code blocks with syntax styling
+- Delete confirmation (inline)
+- Status workflow actions: Submit for Review, Approve
+
+## Tests Run
+
+```
+Playbooks Service Tests (47 tests):
+  PlaybooksService
+    listPlaybooks
+      √ should return playbooks with total count
+      √ should filter by search term
+      √ should filter by effort
+      √ should filter by hasIac=true
+      √ should filter by hasIac=false
+      √ should filter by status
+    getPlaybookById
+      √ should return playbook with steps and snippets
+      √ should throw NotFoundException when not found
+    createPlaybook
+      √ should create a new playbook
+      √ should throw NotFoundException when canonical risk not found
+    updatePlaybook
+      √ should update existing playbook
+      √ should throw NotFoundException when not found
+      √ should reset status to pending on update
+    deletePlaybook
+      √ should delete existing playbook
+      √ should throw NotFoundException when not found
+    submitForReview
+      √ should change status from pending to review
+      √ should throw NotFoundException when not found
+      √ should throw ConflictException when not in pending status
+    approve
+      √ should change status from review to live for SuperAdmin
+      √ should throw ForbiddenException for non-SuperAdmin
+      √ should throw NotFoundException when not found
+      √ should throw ConflictException when not in review status
+    createStep
+      √ should create a new step
+      √ should throw NotFoundException when playbook not found
+    updateStep
+      √ should update existing step
+      √ should throw NotFoundException when step not found
+    deleteStep
+      √ should delete existing step
+      √ should throw NotFoundException when step not found
+      √ should renumber remaining steps after deletion
+    reorderSteps
+      √ should reorder steps
+      √ should throw NotFoundException when playbook not found
+      √ should throw NotFoundException when step not in playbook
+    createIacSnippet
+      √ should create a new IaC snippet
+      √ should throw NotFoundException when playbook not found
+      √ should throw ConflictException for duplicate platform
+    updateIacSnippet
+      √ should update existing IaC snippet
+      √ should throw NotFoundException when snippet not found
+    deleteIacSnippet
+      √ should delete existing IaC snippet
+      √ should throw NotFoundException when snippet not found
+    bulkImport
+      √ should import new playbooks
+      √ should skip when canonical risk not found
+      √ should handle create errors gracefully
+    getPlaybookStats
+      √ should return playbook statistics
+      √ should throw NotFoundException when playbook not found
+    getEffortOptions
+      √ should return effort levels
+    getRoleOptions
+      √ should return role options
+    getPlatformOptions
+      √ should return platform options
+
+Test Suites: 1 passed, 1 total
+Tests:       47 passed, 47 total
+```
+
+## TypeScript Compilation
+
+```
+API TypeScript: No errors
+Admin TypeScript: No errors
+```
+
 ## Next Task (DO NOT START)
 
-**Checkpoint v3.5.0: Remediation Playbook CRUD**
+**Checkpoint v3.6.0: Wizard Question CRUD**
 Per 09_implementation_plan.md:
-- List/create/edit remediation playbooks
-- Step editor (ordered steps)
-- IaC snippet management
-- Risk linkage
+- List view page with decision tree visualization
+- Question editor (all question types)
+- Option editor with triggers and next question
+- Test simulator for wizard flow preview
 
 ---
 
