@@ -1,6 +1,6 @@
 # ThreatDiviner Threat Modeling - Implementation Checkpoint
 
-## Current Checkpoint: v3.6.0
+## Current Checkpoint: v3.7.0
 **Status:** AWAITING APPROVAL
 **Date:** 2026-01-24
 **Phase:** 3 - Admin Console (IN PROGRESS)
@@ -1410,14 +1410,150 @@ API TypeScript: No errors
 Admin TypeScript: No errors
 ```
 
+**Status: APPROVED** — Proceeding to v3.7.0
+
+---
+
+# Checkpoint v3.7.0: Feed Configuration
+
+## What Was Built
+
+Full CRUD operations for Feed Configuration management in the Admin Console, including sync scheduling, connection testing, and sync history tracking.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] Feed list page at `/admin/feeds` with search and enable/disable filters
+- [x] Feed config form (feedId, name, description, URL, schedule, isEnabled)
+- [x] Cron selector (Daily/Weekly/Monthly/Manual/Custom)
+- [x] Test connection (validates feed URL with response time)
+- [x] Sync history (past runs with status, duration, records affected)
+- [x] Manual sync triggers (Sync Now button, Sync All button)
+- [x] Toggle enable/disable feeds
+
+## Backend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/admin/feeds/dto/feed.dto.ts` | DTOs with class-validator |
+| `apps/api/src/admin/feeds/feeds.service.ts` | Business logic service |
+| `apps/api/src/admin/feeds/feeds.controller.ts` | REST API controller |
+| `apps/api/src/admin/feeds/feeds.service.spec.ts` | 26 unit tests |
+| `apps/api/src/admin/admin.module.ts` | Updated - Added FeedsController/Service |
+
+## Frontend Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/admin/src/lib/api.ts` | Added feedsApi with all endpoints + types |
+| `apps/admin/src/app/(dashboard)/feeds/page.tsx` | Full CRUD UI with sync history |
+
+## API Endpoints Implemented
+
+```
+GET    /admin/feeds                              List with filters (search, isEnabled)
+GET    /admin/feeds/:id                          Get single feed with recent sync runs
+GET    /admin/feeds/by-feed-id/:feedId           Get by feedId
+POST   /admin/feeds                              Create new feed config
+PUT    /admin/feeds/:id                          Update feed config
+DELETE /admin/feeds/:id                          Delete feed config
+POST   /admin/feeds/:id/schedule                 Set schedule (preset or custom cron)
+POST   /admin/feeds/test-connection              Test URL connectivity
+
+POST   /admin/feeds/:id/sync                     Trigger manual sync
+POST   /admin/feeds/sync-all                     Trigger sync on all enabled feeds
+
+GET    /admin/feeds/:feedConfigId/sync-runs      List sync history
+GET    /admin/feeds/sync-runs/:syncRunId         Get single sync run
+
+GET    /admin/feeds/stats                        Get feed statistics
+GET    /admin/feeds/schedule-presets             Get available schedule presets
+```
+
+## UI Features
+
+- Stats panel showing: Total Feeds, Enabled, Disabled, Syncs (24h), Failed (24h)
+- Feed cards with:
+  - Name and status indicator (Healthy/Warning/Error/Disabled)
+  - Source URL display
+  - Toggle switch for enable/disable
+  - Last Sync, Next Sync, Schedule (cron), Total Runs
+  - Last run details: status badge, records added/updated/deleted
+  - Actions: View Log, Sync Now, Schedule, Configure, Delete
+- Config modal for create/edit:
+  - Feed ID (create only), Name, Description
+  - Source URL with Test Connection button
+  - Schedule (cron expression)
+  - Enable checkbox
+- Schedule modal:
+  - Preset radio buttons (Daily, Weekly, Monthly, Manual, Custom)
+  - Custom cron expression input
+- Sync Log modal:
+  - Scrollable list of past sync runs
+  - Each run shows: status badge, timestamp, duration, records stats
+  - Error message display for failed runs
+- Sync All button in header
+- Delete confirmation (inline)
+
+## Tests Run
+
+```
+Feeds Service Tests (26 tests):
+  FeedsService
+    listFeedConfigs
+      √ should return all feed configs with last run info
+      √ should filter by search term
+      √ should filter by isEnabled
+    getFeedConfigById
+      √ should return feed config with sync runs
+      √ should throw NotFoundException for invalid id
+    createFeedConfig
+      √ should create a new feed config
+      √ should throw ConflictException for duplicate feedId
+    updateFeedConfig
+      √ should update feed config
+      √ should throw NotFoundException for invalid id
+    deleteFeedConfig
+      √ should delete feed config
+      √ should throw NotFoundException for invalid id
+    setSchedule
+      √ should set daily schedule preset
+      √ should set manual schedule (disable)
+      √ should set custom cron expression
+      √ should throw BadRequestException for custom preset without cron
+    testConnection
+      √ should return success for valid URL
+      √ should return failure for non-OK response
+      √ should return failure for network error
+    triggerSync
+      √ should create a new sync run
+      √ should throw NotFoundException for invalid feed
+      √ should throw ConflictException if sync already running
+    listSyncRuns
+      √ should return sync runs for feed
+      √ should filter by status
+    getStats
+      √ should return feed statistics
+    getSchedulePresets
+      √ should return available schedule presets
+
+Test Suites: 1 passed, 1 total
+Tests:       26 passed, 26 total
+```
+
+## TypeScript Compilation
+
+```
+API TypeScript: No errors
+Admin TypeScript: No errors
+```
+
 ## Next Task (DO NOT START)
 
-**Checkpoint v3.7.0: Feed Sync Dashboard**
+**Checkpoint v3.8.0: AI Suggestions Queue**
 Per 09_implementation_plan.md:
-- Dashboard showing all security feeds (CWE, CAPEC, NVD, ATT&CK, CIS)
-- Per-feed sync status, last sync, item counts
-- Manual sync trigger buttons
-- Sync history logs
+- AI review queue interface
+- Approve/reject suggestions UI
+- Bulk actions
+- Sandbox testing area
 
 ---
 

@@ -9,6 +9,8 @@ import { PlaybooksController } from './playbooks/playbooks.controller';
 import { PlaybooksService } from './playbooks/playbooks.service';
 import { WizardController } from './wizard/wizard.controller';
 import { WizardService } from './wizard/wizard.service';
+import { FeedsController } from './feeds/feeds.controller';
+import { FeedsService } from './feeds/feeds.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
@@ -19,6 +21,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     ComplianceFrameworksController,
     PlaybooksController,
     WizardController,
+    FeedsController,
   ],
   providers: [
     ShapeMappingsService,
@@ -26,6 +29,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     ComplianceFrameworksService,
     PlaybooksService,
     WizardService,
+    FeedsService,
   ],
   exports: [
     ShapeMappingsService,
@@ -33,6 +37,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     ComplianceFrameworksService,
     PlaybooksService,
     WizardService,
+    FeedsService,
   ],
 })
 export class AdminModule {}

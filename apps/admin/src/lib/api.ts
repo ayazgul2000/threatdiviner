@@ -1007,3 +1007,173 @@ export const wizardApi = {
       body: JSON.stringify({ questions }),
     }),
 };
+
+// Feed Config Types
+export interface FeedSyncRun {
+  id: string;
+  feedConfigId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  startedAt: string | null;
+  completedAt: string | null;
+  recordsAdded: number;
+  recordsUpdated: number;
+  recordsDeleted: number;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface FeedConfig {
+  id: string;
+  feedId: string;
+  name: string;
+  description: string | null;
+  sourceUrl: string;
+  schedule: string;
+  isEnabled: boolean;
+  lastSyncAt: string | null;
+  nextSyncAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  syncRuns?: FeedSyncRun[];
+  lastRun?: FeedSyncRun | null;
+  totalRuns?: number;
+  _count?: { syncRuns: number };
+}
+
+export interface FeedStats {
+  totalFeeds: number;
+  enabledFeeds: number;
+  disabledFeeds: number;
+  recentRuns: number;
+  failedRuns: number;
+}
+
+export interface SchedulePreset {
+  value: string;
+  label: string;
+  cron: string | null;
+}
+
+export interface FeedConfigListQuery {
+  search?: string;
+  isEnabled?: string;
+}
+
+export interface FeedSyncRunListQuery {
+  status?: string;
+  limit?: number;
+}
+
+export interface CreateFeedConfigData {
+  feedId: string;
+  name: string;
+  description?: string;
+  sourceUrl: string;
+  schedule?: string;
+  isEnabled?: boolean;
+}
+
+export interface UpdateFeedConfigData {
+  name?: string;
+  description?: string;
+  sourceUrl?: string;
+  schedule?: string;
+  isEnabled?: boolean;
+}
+
+export interface SetScheduleData {
+  preset: 'daily' | 'weekly' | 'monthly' | 'manual' | 'custom';
+  customCron?: string;
+}
+
+export interface TestConnectionResult {
+  success: boolean;
+  message: string;
+  statusCode?: number;
+  responseTime?: number;
+}
+
+export interface TriggerSyncResult {
+  syncRun: FeedSyncRun;
+  message: string;
+}
+
+export interface TriggerSyncAllResult {
+  results: Array<{
+    feedId: string;
+    status: 'triggered' | 'skipped';
+    syncRunId?: string;
+    reason?: string;
+  }>;
+  total: number;
+}
+
+// Feeds API
+export const feedsApi = {
+  list: (query: FeedConfigListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.search) params.set('search', query.search);
+    if (query.isEnabled) params.set('isEnabled', query.isEnabled);
+    const qs = params.toString();
+    return fetchApi<{ feeds: FeedConfig[]; total: number }>(`/admin/feeds${qs ? `?${qs}` : ''}`);
+  },
+
+  get: (id: string) =>
+    fetchApi<{ feed: FeedConfig }>(`/admin/feeds/${id}`),
+
+  getByFeedId: (feedId: string) =>
+    fetchApi<{ feed: FeedConfig }>(`/admin/feeds/by-feed-id/${feedId}`),
+
+  create: (data: CreateFeedConfigData) =>
+    fetchApi<{ feed: FeedConfig }>('/admin/feeds', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: UpdateFeedConfigData) =>
+    fetchApi<{ feed: FeedConfig }>(`/admin/feeds/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<void>(`/admin/feeds/${id}`, { method: 'DELETE' }),
+
+  setSchedule: (id: string, data: SetScheduleData) =>
+    fetchApi<{ feed: FeedConfig }>(`/admin/feeds/${id}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  testConnection: (url: string) =>
+    fetchApi<TestConnectionResult>('/admin/feeds/test-connection', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
+
+  // Sync endpoints
+  triggerSync: (id: string) =>
+    fetchApi<TriggerSyncResult>(`/admin/feeds/${id}/sync`, { method: 'POST' }),
+
+  triggerSyncAll: () =>
+    fetchApi<TriggerSyncAllResult>('/admin/feeds/sync-all', { method: 'POST' }),
+
+  // Sync runs
+  listSyncRuns: (feedConfigId: string, query: FeedSyncRunListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.status) params.set('status', query.status);
+    if (query.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return fetchApi<{ syncRuns: FeedSyncRun[] }>(`/admin/feeds/${feedConfigId}/sync-runs${qs ? `?${qs}` : ''}`);
+  },
+
+  getSyncRun: (syncRunId: string) =>
+    fetchApi<{ syncRun: FeedSyncRun & { feedConfig: FeedConfig } }>(`/admin/feeds/sync-runs/${syncRunId}`),
+
+  // Stats & presets
+  getStats: () =>
+    fetchApi<{ stats: FeedStats }>('/admin/feeds/stats'),
+
+  getSchedulePresets: () =>
+    fetchApi<{ presets: SchedulePreset[] }>('/admin/feeds/schedule-presets'),
+};
