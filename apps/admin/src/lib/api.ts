@@ -1177,3 +1177,246 @@ export const feedsApi = {
   getSchedulePresets: () =>
     fetchApi<{ presets: SchedulePreset[] }>('/admin/feeds/schedule-presets'),
 };
+
+// AI Suggestion Types
+export type SuggestionType = 'shape_mapping' | 'canonical_risk' | 'risk_mapping' | 'playbook' | 'control_mapping';
+export type SuggestionStatus = 'pending' | 'approved' | 'rejected' | 'edited';
+
+export interface AiSuggestion {
+  id: string;
+  type: SuggestionType;
+  source: string;
+  sourceId: string | null;
+  suggestedData: Record<string, unknown>;
+  confidence: number;
+  reason: string | null;
+  status: SuggestionStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SuggestionStats {
+  pending: number;
+  approved: number;
+  rejected: number;
+  byType: Record<string, number>;
+  avgConfidence: number;
+}
+
+export interface SuggestionListQuery {
+  type?: SuggestionType;
+  status?: SuggestionStatus;
+  minConfidence?: number;
+  maxConfidence?: number;
+  source?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// Promotion Types
+export type ConfigType = 'shape_mapping' | 'canonical_risk' | 'compliance_framework' | 'playbook' | 'wizard_question';
+export type PromotionStatus = 'pending' | 'review' | 'approved' | 'live' | 'archived';
+
+export interface PromotionItem {
+  id: string;
+  configType: ConfigType;
+  configId: string;
+  status: PromotionStatus;
+  submittedBy: string;
+  submittedAt: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewFeedback: string | null;
+  promotedBy: string | null;
+  promotedAt: string | null;
+  promotionNotes: string | null;
+  rollbackBy: string | null;
+  rollbackAt: string | null;
+  rollbackReason: string | null;
+  previousData: Record<string, unknown> | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromotionStats {
+  pending: number;
+  review: number;
+  approved: number;
+  live: number;
+  byType: Record<string, number>;
+}
+
+export interface PromotionListQuery {
+  status?: PromotionStatus;
+  configType?: ConfigType;
+  limit?: number;
+}
+
+// Sandbox Testing Types
+export interface ShapeMappingTestResult {
+  results: Array<{
+    style: string;
+    mappedTo: string | null;
+    status: 'live' | 'staging' | 'missing';
+    mappingId: string | null;
+  }>;
+  summary: { total: number; mapped: number; unmapped: number };
+}
+
+export interface DeduplicationTestResult {
+  inputRisks: string[];
+  canonicalRisk: { id: string; title: string } | null;
+  sources: string[];
+}
+
+export interface PlaybookTestResult {
+  playbook: {
+    id: string;
+    title: string;
+    steps: Array<{ stepNumber: number; title: string; description: string }>;
+  } | null;
+  renderedSteps: Array<{ stepNumber: number; title: string; description: string }>;
+}
+
+// Audit Log Types
+export interface ConfigAuditLog {
+  id: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  userId: string;
+  userName: string | null;
+  changes: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AuditLogQuery {
+  entityType?: string;
+  entityId?: string;
+  userId?: string;
+  action?: string;
+  limit?: number;
+}
+
+// Suggestions API
+export const suggestionsApi = {
+  // Queue endpoints
+  listQueue: (query: SuggestionListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.type) params.set('type', query.type);
+    if (query.status) params.set('status', query.status);
+    if (query.minConfidence) params.set('minConfidence', String(query.minConfidence));
+    if (query.maxConfidence) params.set('maxConfidence', String(query.maxConfidence));
+    if (query.source) params.set('source', query.source);
+    if (query.limit) params.set('limit', String(query.limit));
+    if (query.offset) params.set('offset', String(query.offset));
+    const qs = params.toString();
+    return fetchApi<{ suggestions: AiSuggestion[]; total: number }>(`/admin/suggestions/queue${qs ? `?${qs}` : ''}`);
+  },
+
+  getQueueStats: () =>
+    fetchApi<{ stats: SuggestionStats }>('/admin/suggestions/queue/stats'),
+
+  getSuggestion: (id: string) =>
+    fetchApi<{ suggestion: AiSuggestion }>(`/admin/suggestions/queue/${id}`),
+
+  approveSuggestion: (id: string, notes?: string) =>
+    fetchApi<{ suggestion: AiSuggestion }>(`/admin/suggestions/queue/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }),
+
+  rejectSuggestion: (id: string, reason: string) =>
+    fetchApi<{ suggestion: AiSuggestion }>(`/admin/suggestions/queue/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  editSuggestion: (id: string, suggestedData?: Record<string, unknown>, editNotes?: string) =>
+    fetchApi<{ suggestion: AiSuggestion }>(`/admin/suggestions/queue/${id}/edit`, {
+      method: 'PUT',
+      body: JSON.stringify({ suggestedData, editNotes }),
+    }),
+
+  bulkAction: (ids: string[], action: 'approve' | 'reject', reason?: string) =>
+    fetchApi<{ processed: number; failed: string[] }>('/admin/suggestions/queue/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ ids, action, reason }),
+    }),
+
+  // Promotion endpoints
+  listPromotions: (query: PromotionListQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.status) params.set('status', query.status);
+    if (query.configType) params.set('configType', query.configType);
+    if (query.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return fetchApi<{ items: PromotionItem[]; total: number }>(`/admin/suggestions/promotions${qs ? `?${qs}` : ''}`);
+  },
+
+  getPromotionStats: () =>
+    fetchApi<{ stats: PromotionStats }>('/admin/suggestions/promotions/stats'),
+
+  getPromotion: (id: string) =>
+    fetchApi<{ item: PromotionItem }>(`/admin/suggestions/promotions/${id}`),
+
+  submitForReview: (configId: string, configType: ConfigType, description?: string) =>
+    fetchApi<{ item: PromotionItem }>('/admin/suggestions/promotions/submit', {
+      method: 'POST',
+      body: JSON.stringify({ configId, configType, description }),
+    }),
+
+  reviewDecision: (id: string, decision: 'approve' | 'request_changes' | 'reject', feedback?: string) =>
+    fetchApi<{ item: PromotionItem }>(`/admin/suggestions/promotions/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, feedback }),
+    }),
+
+  promote: (itemIds: string[], testedInSandbox: boolean, understandsImpact: boolean, notes?: string) =>
+    fetchApi<{ promoted: number; failed: string[] }>('/admin/suggestions/promotions/promote', {
+      method: 'POST',
+      body: JSON.stringify({ itemIds, testedInSandbox, understandsImpact, notes }),
+    }),
+
+  rollback: (promotionId: string, reason: string) =>
+    fetchApi<{ item: PromotionItem }>('/admin/suggestions/promotions/rollback', {
+      method: 'POST',
+      body: JSON.stringify({ promotionId, reason }),
+    }),
+
+  // Sandbox endpoints
+  testShapeMappings: (diagramXml: string) =>
+    fetchApi<ShapeMappingTestResult>('/admin/suggestions/sandbox/test-shapes', {
+      method: 'POST',
+      body: JSON.stringify({ diagramXml }),
+    }),
+
+  testDeduplication: (riskIds: string[]) =>
+    fetchApi<DeduplicationTestResult>('/admin/suggestions/sandbox/test-deduplication', {
+      method: 'POST',
+      body: JSON.stringify({ riskIds }),
+    }),
+
+  testPlaybook: (playbookId: string, assetName?: string, technology?: string) =>
+    fetchApi<PlaybookTestResult>('/admin/suggestions/sandbox/test-playbook', {
+      method: 'POST',
+      body: JSON.stringify({ playbookId, assetName, technology }),
+    }),
+
+  // Audit logs
+  listAuditLogs: (query: AuditLogQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.entityType) params.set('entityType', query.entityType);
+    if (query.entityId) params.set('entityId', query.entityId);
+    if (query.userId) params.set('userId', query.userId);
+    if (query.action) params.set('action', query.action);
+    if (query.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return fetchApi<{ logs: ConfigAuditLog[]; total: number }>(`/admin/suggestions/audit-logs${qs ? `?${qs}` : ''}`);
+  },
+};

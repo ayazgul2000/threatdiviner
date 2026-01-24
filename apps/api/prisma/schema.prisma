@@ -1775,3 +1775,74 @@ model FeedSyncRun {
   @@index([status])
   @@map("feed_sync_runs")
 }
+
+// ============================================
+// AI Suggestions & Promotion Workflow
+// ============================================
+
+model AiSuggestion {
+  id            String    @id @default(uuid())
+  type          String    // shape_mapping, canonical_risk, risk_mapping, playbook, control_mapping
+  source        String    // feed_sync, user_upload, manual
+  sourceId      String?   @map("source_id")
+  suggestedData Json      @map("suggested_data")
+  confidence    Float     @default(0)
+  reason        String?
+  status        String    @default("pending") // pending, approved, rejected, edited
+  reviewedBy    String?   @map("reviewed_by")
+  reviewedAt    DateTime? @map("reviewed_at")
+  reviewNotes   String?   @map("review_notes")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([status])
+  @@index([confidence])
+  @@map("ai_suggestions")
+}
+
+model PromotionItem {
+  id              String    @id @default(uuid())
+  configType      String    @map("config_type") // shape_mapping, canonical_risk, compliance_framework, playbook, wizard_question
+  configId        String    @map("config_id")
+  status          String    @default("pending") // pending, review, approved, live, archived
+  submittedBy     String    @map("submitted_by")
+  submittedAt     DateTime  @map("submitted_at")
+  reviewedBy      String?   @map("reviewed_by")
+  reviewedAt      DateTime? @map("reviewed_at")
+  reviewFeedback  String?   @map("review_feedback")
+  promotedBy      String?   @map("promoted_by")
+  promotedAt      DateTime? @map("promoted_at")
+  promotionNotes  String?   @map("promotion_notes")
+  rollbackBy      String?   @map("rollback_by")
+  rollbackAt      DateTime? @map("rollback_at")
+  rollbackReason  String?   @map("rollback_reason")
+  previousData    Json?     @map("previous_data")
+  description     String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([configType])
+  @@index([configId])
+  @@index([status])
+  @@map("promotion_items")
+}
+
+model ConfigAuditLog {
+  id         String   @id @default(uuid())
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  action     String
+  userId     String   @map("user_id")
+  userName   String?  @map("user_name")
+  changes    Json?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType])
+  @@index([entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("config_audit_logs")
+}

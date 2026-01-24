@@ -11,6 +11,8 @@ import { WizardController } from './wizard/wizard.controller';
 import { WizardService } from './wizard/wizard.service';
 import { FeedsController } from './feeds/feeds.controller';
 import { FeedsService } from './feeds/feeds.service';
+import { SuggestionsController } from './suggestions/suggestions.controller';
+import { SuggestionsService } from './suggestions/suggestions.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
@@ -22,6 +24,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     PlaybooksController,
     WizardController,
     FeedsController,
+    SuggestionsController,
   ],
   providers: [
     ShapeMappingsService,
@@ -30,6 +33,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     PlaybooksService,
     WizardService,
     FeedsService,
+    SuggestionsService,
   ],
   exports: [
     ShapeMappingsService,
@@ -38,6 +42,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     PlaybooksService,
     WizardService,
     FeedsService,
+    SuggestionsService,
   ],
 })
 export class AdminModule {}
