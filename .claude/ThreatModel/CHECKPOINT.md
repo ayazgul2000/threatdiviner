@@ -1,9 +1,9 @@
 # ThreatDiviner Threat Modeling - Implementation Checkpoint
 
-## Current Checkpoint: v3.8.0
+## Current Checkpoint: v4.1.0
 **Status:** AWAITING APPROVAL
-**Date:** 2026-01-24
-**Phase:** 3 - Admin Console (IN PROGRESS)
+**Date:** 2026-01-25
+**Phase:** 4 - Compliance Module (IN PROGRESS)
 
 ---
 
@@ -1693,6 +1693,115 @@ Suggestions Service Tests (25 tests):
 
 Test Suites: 1 passed, 1 total
 Tests:       25 passed, 25 total
+```
+
+## TypeScript Compilation
+
+```
+API TypeScript: No errors
+```
+
+---
+
+**Status: APPROVED** — Proceeding to v4.1.0
+
+---
+
+# Checkpoint v4.1.0: ComplianceService
+
+## What Was Built
+
+ThreatModelComplianceService for calculating compliance gaps using RiskControlMapping with Redis caching.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] 4.1.1: Create `ComplianceService` - Gap calculation logic
+- [x] 4.1.2: Risk→Control matching using `RiskControlMapping`
+- [x] 4.1.3: Score calculation (% compliant per framework)
+- [x] 4.1.4: Gap identification (controls not satisfied)
+- [x] 4.1.5: Cache compliance scores in Redis
+
+## Backend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/threat-modeling/services/threat-model-compliance.service.ts` | Compliance gap calculation service |
+| `apps/api/src/threat-modeling/services/threat-model-compliance.service.spec.ts` | 16 unit tests |
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/api/src/threat-modeling/threat-modeling.module.ts` | Added ThreatModelComplianceService |
+| `apps/api/src/threat-modeling/threat-modeling.controller.ts` | Added 6 compliance endpoints |
+
+## API Endpoints Implemented
+
+```
+GET    /threat-modeling/:id/compliance                    Full compliance gaps for all frameworks
+GET    /threat-modeling/:id/compliance/summary            Gap summary with severity breakdown
+GET    /threat-modeling/:id/compliance/framework/:id      Score for specific framework
+POST   /threat-modeling/:id/compliance/invalidate         Invalidate compliance cache
+GET    /threat-modeling/compliance/controls-for-risk/:id  Controls mapped to a canonical risk
+GET    /threat-modeling/compliance/risks-for-control/:id  Risks mapped to a control
+```
+
+## Service Features
+
+**ThreatModelComplianceService:**
+- `calculateComplianceGaps()` - Full gap analysis with Redis caching (5 min TTL)
+- `getComplianceGapSummary()` - Severity breakdown (critical/high/medium/low gaps)
+- `getFrameworkComplianceScore()` - Score for single framework
+- `getControlsForRisk()` - Risk→Control lookup via RiskControlMapping
+- `getRisksForControl()` - Control→Risk reverse lookup
+- `invalidateCache()` - Clear cache on threat model changes
+
+**Gap Calculation Logic:**
+1. Get threat model with all threats (including canonicalRisk and mitigations)
+2. Get active frameworks with controls and riskMappings
+3. For each control, check if related threats have mitigations:
+   - No risks → Satisfied
+   - Risks without mitigation → Gap
+   - Risks with in-progress mitigation → Partial
+   - Risks with completed mitigation → Satisfied
+4. Calculate score: (satisfied + partial*0.5) / total * 100
+
+**Caching Strategy:**
+- Key format: `tm-compliance:{threatModelId}:{frameworkIds}`
+- TTL: 300 seconds (5 minutes)
+- Invalidation: On threat/mitigation changes
+
+## Tests Run
+
+```
+ThreatModelComplianceService Tests (16 tests):
+  ThreatModelComplianceService
+    √ should be defined
+    calculateComplianceGaps
+      √ should return cached result if available
+      √ should calculate compliance gaps when cache miss
+      √ should throw NotFoundException for invalid threat model
+      √ should correctly identify gap controls
+      √ should calculate compliance percentage correctly
+      √ should filter by framework IDs when specified
+    getComplianceGapSummary
+      √ should return gap summary with severity breakdown
+      √ should filter by framework when specified
+    getFrameworkComplianceScore
+      √ should return score for specific framework
+      √ should return null for non-existent framework
+    getControlsForRisk
+      √ should return controls mapped to a canonical risk
+    getRisksForControl
+      √ should return risks mapped to a control
+    invalidateCache
+      √ should delete cache pattern for threat model
+    partial mitigation handling
+      √ should mark control as partial when mitigation is in progress
+    severity calculation
+      √ should calculate critical severity for high likelihood and high impact
+
+Test Suites: 1 passed, 1 total
+Tests:       16 passed, 16 total
 ```
 
 ## TypeScript Compilation

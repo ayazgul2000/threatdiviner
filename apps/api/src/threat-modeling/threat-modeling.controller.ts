@@ -27,6 +27,7 @@ import { ThreatModelExportService } from './services/export.service';
 import { ThreagileService } from './services/threagile.service';
 import { YamlGeneratorService } from './services/yaml-generator.service';
 import { GapDetectionService } from './services/gap-detection.service';
+import { ThreatModelComplianceService } from './services/threat-model-compliance.service';
 import { QueueService } from '../queue/services/queue.service';
 import { BatchUpdateAssetsDto, BatchUpdateLinksDto, BatchUpdateBoundariesDto } from './dto/batch-update.dto';
 
@@ -49,6 +50,7 @@ export class ThreatModelingController {
     private readonly threagileService: ThreagileService,
     private readonly yamlGeneratorService: YamlGeneratorService,
     private readonly gapDetectionService: GapDetectionService,
+    private readonly complianceService: ThreatModelComplianceService,
     private readonly queueService: QueueService,
   ) {}
 
@@ -549,6 +551,77 @@ export class ThreatModelingController {
       body.linkUpdates || [],
       body.boundaryUpdates || [],
     );
+  }
+
+  // ===== COMPLIANCE (v4.1.0) =====
+
+  @Get(':id/compliance')
+  async getComplianceGaps(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Query('frameworks') frameworks?: string,
+  ) {
+    // Verify access to threat model
+    await this.service.getThreatModel(req.user.tenantId, id);
+
+    const frameworkIds = frameworks ? frameworks.split(',').map(f => f.trim()) : undefined;
+    return this.complianceService.calculateComplianceGaps(id, frameworkIds);
+  }
+
+  @Get(':id/compliance/summary')
+  async getComplianceGapSummary(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Query('framework') frameworkId?: string,
+  ) {
+    // Verify access to threat model
+    await this.service.getThreatModel(req.user.tenantId, id);
+
+    return this.complianceService.getComplianceGapSummary(id, frameworkId);
+  }
+
+  @Get(':id/compliance/framework/:frameworkId')
+  async getFrameworkComplianceScore(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Param('frameworkId') frameworkId: string,
+  ) {
+    // Verify access to threat model
+    await this.service.getThreatModel(req.user.tenantId, id);
+
+    const score = await this.complianceService.getFrameworkComplianceScore(id, frameworkId);
+    if (!score) {
+      throw new BadRequestException(`Framework not found: ${frameworkId}`);
+    }
+    return score;
+  }
+
+  @Post(':id/compliance/invalidate')
+  async invalidateComplianceCache(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    // Verify access to threat model
+    await this.service.getThreatModel(req.user.tenantId, id);
+
+    await this.complianceService.invalidateCache(id);
+    return { success: true, message: 'Compliance cache invalidated' };
+  }
+
+  @Get('compliance/controls-for-risk/:canonicalRiskId')
+  async getControlsForRisk(
+    @Param('canonicalRiskId') canonicalRiskId: string,
+  ) {
+    const controls = await this.complianceService.getControlsForRisk(canonicalRiskId);
+    return { controls };
+  }
+
+  @Get('compliance/risks-for-control/:controlId')
+  async getRisksForControl(
+    @Param('controlId') controlId: string,
+  ) {
+    const risks = await this.complianceService.getRisksForControl(controlId);
+    return { risks };
   }
 
   @Get(':id/yaml')

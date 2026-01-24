@@ -10,6 +10,7 @@ import { ThreagileService } from './services/threagile.service';
 import { YamlGeneratorService } from './services/yaml-generator.service';
 import { RiskParserService } from './services/risk-parser.service';
 import { GapDetectionService } from './services/gap-detection.service';
+import { ThreatModelComplianceService } from './services/threat-model-compliance.service';
 import { AnalysisProcessor } from '../queue/processors';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
@@ -27,6 +28,7 @@ import { QueueModule } from '../queue/queue.module';
     YamlGeneratorService,
     RiskParserService,
     GapDetectionService,
+    ThreatModelComplianceService,
     AnalysisProcessor,
   ],
   exports: [
@@ -39,6 +41,7 @@ import { QueueModule } from '../queue/queue.module';
     YamlGeneratorService,
     RiskParserService,
     GapDetectionService,
+    ThreatModelComplianceService,
   ],
 })
 export class ThreatModelingModule {}
