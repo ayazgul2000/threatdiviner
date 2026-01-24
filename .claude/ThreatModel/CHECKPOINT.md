@@ -557,9 +557,20 @@ Tests:       26 passed, 26 total
 
 ---
 
-### Next: Checkpoint v2.7.0
-- [ ] Calculate risk scores from Threagile output
-- [ ] Priority ranking dashboard
+## ✅ PHASE 2 COMPLETE
+
+Phase 2 (Threagile Integration) completed at v2.6.0. Ready to proceed to Phase 3.
+
+---
+
+### Next: Phase 3 - Admin Console
+
+**Checkpoint v3.1.0: Admin Shell**
+Per 09_implementation_plan.md:
+- [ ] Admin layout with sidebar menu
+- [ ] Role check (redirect if not admin)
+- [ ] Navigation links to all admin sections
+- [ ] Dashboard with overview metrics (empty OK)
 
 ---
 
