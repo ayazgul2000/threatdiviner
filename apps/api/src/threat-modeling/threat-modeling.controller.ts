@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Delete,
+  Patch,
   Param,
   Body,
   Query,
@@ -12,6 +13,9 @@ import {
   Res,
   Header,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ThreatModelingService } from './threat-modeling.service';
@@ -20,6 +24,11 @@ import { StrideAnalyzer } from './analyzers/stride.analyzer';
 import { EnterpriseStrideAnalyzer } from './analyzers/enterprise-stride.analyzer';
 import { ThreatModelDiagramService } from './services/diagram.service';
 import { ThreatModelExportService } from './services/export.service';
+import { ThreagileService } from './services/threagile.service';
+import { YamlGeneratorService } from './services/yaml-generator.service';
+import { GapDetectionService } from './services/gap-detection.service';
+import { QueueService } from '../queue/services/queue.service';
+import { BatchUpdateAssetsDto, BatchUpdateLinksDto, BatchUpdateBoundariesDto } from './dto/batch-update.dto';
 
 interface AuthRequest {
   user: {
@@ -37,6 +46,10 @@ export class ThreatModelingController {
     private readonly enterpriseStrideAnalyzer: EnterpriseStrideAnalyzer,
     private readonly diagramService: ThreatModelDiagramService,
     private readonly exportService: ThreatModelExportService,
+    private readonly threagileService: ThreagileService,
+    private readonly yamlGeneratorService: YamlGeneratorService,
+    private readonly gapDetectionService: GapDetectionService,
+    private readonly queueService: QueueService,
   ) {}
 
   // ===== THREAT MODELS =====
@@ -426,5 +439,501 @@ export class ThreatModelingController {
   @Delete('mitigations/:mitigationId')
   async deleteMitigation(@Req() req: AuthRequest, @Param('mitigationId') mitigationId: string) {
     return this.service.deleteMitigation(req.user.tenantId, mitigationId);
+  }
+
+  // ===== THREAGILE ANALYSIS =====
+
+  @Get('threagile/health')
+  async getThreagileHealth() {
+    return this.threagileService.healthCheck();
+  }
+
+  @Post(':id/validate')
+  async validateModel(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.yamlGeneratorService.validateModel(id, req.user.tenantId);
+  }
+
+  // ===== GAP DETECTION (v2.5.0) =====
+
+  @Get(':id/gaps')
+  async detectGaps(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.gapDetectionService.detectGaps(req.user.tenantId, id);
+  }
+
+  @Patch(':id/assets/batch')
+  async batchUpdateAssets(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: BatchUpdateAssetsDto,
+  ) {
+    const result = await this.gapDetectionService.batchUpdateAssets(
+      req.user.tenantId,
+      id,
+      body.updates,
+    );
+
+    // Re-validate after updates
+    const gaps = await this.gapDetectionService.detectGaps(req.user.tenantId, id);
+
+    return {
+      ...result,
+      gaps: gaps.gaps,
+      valid: gaps.valid,
+    };
+  }
+
+  @Patch(':id/data-flows/batch')
+  async batchUpdateDataFlows(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: BatchUpdateLinksDto,
+  ) {
+    const result = await this.gapDetectionService.batchUpdateDataFlows(
+      req.user.tenantId,
+      id,
+      body.updates,
+    );
+
+    // Re-validate after updates
+    const gaps = await this.gapDetectionService.detectGaps(req.user.tenantId, id);
+
+    return {
+      ...result,
+      gaps: gaps.gaps,
+      valid: gaps.valid,
+    };
+  }
+
+  @Patch(':id/boundaries/batch')
+  async batchUpdateBoundaries(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: BatchUpdateBoundariesDto,
+  ) {
+    const result = await this.gapDetectionService.batchUpdateBoundaries(
+      req.user.tenantId,
+      id,
+      body.updates,
+    );
+
+    // Re-validate after updates
+    const gaps = await this.gapDetectionService.detectGaps(req.user.tenantId, id);
+
+    return {
+      ...result,
+      gaps: gaps.gaps,
+      valid: gaps.valid,
+    };
+  }
+
+  @Post(':id/gaps/fill')
+  async fillGaps(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: {
+      assetUpdates?: Array<{ id: string; fields: Record<string, any> }>;
+      linkUpdates?: Array<{ id: string; fields: Record<string, any> }>;
+      boundaryUpdates?: Array<{ id: string; fields: Record<string, any> }>;
+    },
+  ) {
+    return this.gapDetectionService.batchFillGaps(
+      req.user.tenantId,
+      id,
+      body.assetUpdates || [],
+      body.linkUpdates || [],
+      body.boundaryUpdates || [],
+    );
+  }
+
+  @Get(':id/yaml')
+  @Header('Content-Type', 'application/x-yaml')
+  async generateYaml(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const yaml = await this.yamlGeneratorService.generateYaml(id, req.user.tenantId);
+    res.setHeader('Content-Disposition', `attachment; filename=threat-model-${id}.yaml`);
+    res.send(yaml);
+  }
+
+  @Post(':id/analyze/threagile')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async runThreagileAnalysis(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: { async?: boolean; skipGapCheck?: boolean },
+  ) {
+    // v2.5.0: Check for gaps before running analysis
+    if (!body.skipGapCheck) {
+      const gapResult = await this.gapDetectionService.detectGaps(req.user.tenantId, id);
+      if (!gapResult.valid) {
+        throw new UnprocessableEntityException({
+          message: 'Model has gaps that must be filled before analysis',
+          gaps: gapResult.gaps,
+          summary: gapResult.summary,
+          hint: 'Use GET /threat-modeling/:id/gaps to view gaps, then POST /threat-modeling/:id/gaps/fill to fill them',
+        });
+      }
+    }
+
+    // First validate the model
+    const validation = await this.yamlGeneratorService.validateModel(id, req.user.tenantId);
+    if (!validation.valid) {
+      throw new BadRequestException({
+        message: 'Model validation failed',
+        errors: validation.errors,
+        warnings: validation.warnings,
+      });
+    }
+
+    // Generate YAML
+    const yaml = await this.yamlGeneratorService.generateYaml(id, req.user.tenantId);
+
+    // Check if async mode is requested (default to async)
+    const useAsync = body.async !== false;
+
+    if (useAsync) {
+      // Create AnalysisRun record
+      const analysisRun = await this.service.createAnalysisRun(
+        req.user.tenantId,
+        id,
+        req.user.userId,
+        yaml,
+      );
+
+      // Queue the analysis job
+      await this.queueService.enqueueAnalysis({
+        analysisRunId: analysisRun.id,
+        threatModelId: id,
+        tenantId: req.user.tenantId,
+        userId: req.user.userId,
+        yaml,
+      });
+
+      return {
+        success: true,
+        async: true,
+        analysisRunId: analysisRun.id,
+        status: 'queued',
+        message: 'Analysis queued. Poll GET /analysis-runs/:runId for progress.',
+        warnings: validation.warnings,
+      };
+    }
+
+    // Synchronous mode (for backward compatibility)
+    const result = await this.threagileService.analyze({
+      yaml,
+      threatModelId: id,
+      tenantId: req.user.tenantId,
+      userId: req.user.userId,
+    });
+
+    if (!result.success) {
+      throw new BadRequestException({
+        message: 'Threagile analysis failed',
+        error: result.error,
+      });
+    }
+
+    // Create Threat records from the risks
+    for (const risk of result.risks) {
+      await this.service.addThreat(req.user.tenantId, id, req.user.userId, {
+        title: risk.title,
+        description: risk.mitigation || risk.risk_assessment || 'Risk identified by Threagile',
+        category: risk.category,
+        strideCategory: this.mapThreagileCategory(risk.category),
+        likelihood: this.mapExploitationLikelihood(risk.exploitation_likelihood),
+        impact: this.mapExploitationImpact(risk.exploitation_impact),
+        cweIds: risk.cwe_id ? [String(risk.cwe_id)] : [],
+        attackTechniqueIds: [],
+      });
+    }
+
+    return {
+      success: true,
+      async: false,
+      analysisRunId: result.rawOutput?.analysis_run_id,
+      risksFound: result.risks.length,
+      duration_ms: result.duration_ms,
+      warnings: validation.warnings,
+    };
+  }
+
+  @Get(':id/analysis-runs')
+  async getAnalysisHistory(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.threagileService.getAnalysisHistory(
+      id,
+      req.user.tenantId,
+      limit ? parseInt(limit) : 10,
+    );
+  }
+
+  @Get(':id/analysis-runs/:runId')
+  async getAnalysisRun(
+    @Req() req: AuthRequest,
+    @Param('id') _id: string,
+    @Param('runId') runId: string,
+  ) {
+    const run = await this.threagileService.getAnalysisRun(runId, req.user.tenantId);
+    if (!run) {
+      throw new BadRequestException('Analysis run not found');
+    }
+    return run;
+  }
+
+  @Delete(':id/analysis-runs/:runId')
+  async cancelAnalysis(
+    @Req() req: AuthRequest,
+    @Param('id') _id: string,
+    @Param('runId') runId: string,
+  ) {
+    // First try to cancel the queue job
+    const queueCancelled = await this.queueService.cancelAnalysis(runId);
+
+    // Then update the analysis run status
+    const cancelled = await this.threagileService.cancelAnalysis(runId, req.user.tenantId);
+
+    if (!cancelled && !queueCancelled) {
+      throw new BadRequestException('Analysis run not found or not running');
+    }
+    return { success: true, message: 'Analysis cancelled' };
+  }
+
+  // ===== LOCKING =====
+
+  @Get(':id/lock')
+  async getLockStatus(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    const lock = await this.service.getLock(req.user.tenantId, id);
+    if (!lock) {
+      throw new BadRequestException('No lock found');
+    }
+    return lock;
+  }
+
+  @Post(':id/lock')
+  async acquireLock(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: {
+      lockedBy: string;
+      lockedByName?: string;
+      durationMinutes?: number;
+    },
+  ) {
+    // Check if lock already exists and is not expired
+    const existingLock = await this.service.getLock(req.user.tenantId, id);
+    if (existingLock && new Date(existingLock.expiresAt) > new Date()) {
+      if (existingLock.lockedBy !== body.lockedBy) {
+        throw new BadRequestException({
+          message: 'Lock already held by another user',
+          existingLock,
+        });
+      }
+      // Same user - extend the lock
+      return this.service.refreshLock(
+        req.user.tenantId,
+        id,
+        body.lockedBy,
+        body.durationMinutes || 5,
+      );
+    }
+
+    return this.service.acquireLock(
+      req.user.tenantId,
+      id,
+      body.lockedBy,
+      body.lockedByName,
+      body.durationMinutes || 5,
+    );
+  }
+
+  @Post(':id/lock/refresh')
+  async refreshLock(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: {
+      userId: string;
+      durationMinutes?: number;
+    },
+  ) {
+    const lock = await this.service.getLock(req.user.tenantId, id);
+    if (!lock || lock.lockedBy !== body.userId) {
+      throw new BadRequestException('Lock not found or not owned by user');
+    }
+
+    return this.service.refreshLock(
+      req.user.tenantId,
+      id,
+      body.userId,
+      body.durationMinutes || 5,
+    );
+  }
+
+  @Delete(':id/lock')
+  async releaseLock(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: { userId: string },
+  ) {
+    const lock = await this.service.getLock(req.user.tenantId, id);
+    if (!lock) {
+      return { success: true, message: 'No lock to release' };
+    }
+
+    if (lock.lockedBy !== body.userId) {
+      throw new BadRequestException('Cannot release lock owned by another user');
+    }
+
+    await this.service.releaseLock(req.user.tenantId, id);
+    return { success: true, message: 'Lock released' };
+  }
+
+  @Post(':id/lock/force')
+  async forceTakeLock(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: {
+      lockedBy: string;
+      lockedByName?: string;
+      durationMinutes?: number;
+    },
+  ) {
+    // Force take the lock (admin action)
+    // First release any existing lock
+    await this.service.releaseLock(req.user.tenantId, id);
+
+    // Then acquire new lock
+    return this.service.acquireLock(
+      req.user.tenantId,
+      id,
+      body.lockedBy,
+      body.lockedByName,
+      body.durationMinutes || 5,
+    );
+  }
+
+  // ===== VERSIONS =====
+
+  @Get(':id/versions')
+  async listVersions(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    const versions = await this.service.listVersions(
+      req.user.tenantId,
+      id,
+      limit ? parseInt(limit) : 20,
+    );
+    return { versions };
+  }
+
+  @Post(':id/versions')
+  async createVersion(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: {
+      xmlContent: string;
+      isAutoSave?: boolean;
+      versionName?: string;
+    },
+  ) {
+    return this.service.createVersion(
+      req.user.tenantId,
+      id,
+      req.user.userId,
+      body.xmlContent,
+      body.isAutoSave || false,
+      body.versionName,
+    );
+  }
+
+  @Get(':id/versions/:versionId')
+  async getVersion(
+    @Req() req: AuthRequest,
+    @Param('id') _id: string,
+    @Param('versionId') versionId: string,
+  ) {
+    const version = await this.service.getVersion(req.user.tenantId, versionId);
+    if (!version) {
+      throw new BadRequestException('Version not found');
+    }
+    return version;
+  }
+
+  // ===== HELPERS =====
+
+  private mapThreagileCategory(category: string): string {
+    const mapping: Record<string, string> = {
+      'unencrypted-asset': 'information_disclosure',
+      'unencrypted-communication': 'information_disclosure',
+      'missing-authentication': 'spoofing',
+      'missing-authentication-second-factor': 'spoofing',
+      'missing-authorization': 'elevation_of_privilege',
+      'sql-nosql-injection': 'tampering',
+      'code-backdoor': 'tampering',
+      'denial-of-service': 'denial_of_service',
+      'untrusted-deserialization': 'tampering',
+      'xml-external-entity': 'information_disclosure',
+      'cross-site-scripting': 'tampering',
+      'cross-site-request-forgery': 'spoofing',
+      'missing-build-infrastructure': 'repudiation',
+      'missing-cloud-hardening': 'elevation_of_privilege',
+      'missing-identity-provider-isolation': 'spoofing',
+      'missing-identity-propagation': 'spoofing',
+      'missing-network-segmentation': 'elevation_of_privilege',
+      'missing-vault': 'information_disclosure',
+      'missing-waf': 'tampering',
+      'path-traversal': 'information_disclosure',
+      'push-instead-of-pull-deployment': 'tampering',
+      'search-query-injection': 'tampering',
+      'server-side-request-forgery': 'tampering',
+      'service-registry-poisoning': 'spoofing',
+      'unguarded-access-from-internet': 'information_disclosure',
+      'unguarded-direct-datastore-access': 'information_disclosure',
+      'unnecessary-communication-link': 'information_disclosure',
+      'unnecessary-data-asset': 'information_disclosure',
+      'unnecessary-data-transfer': 'information_disclosure',
+      'unnecessary-technical-asset': 'elevation_of_privilege',
+      'wrong-communication-link-content': 'information_disclosure',
+      'wrong-trust-boundary-content': 'elevation_of_privilege',
+    };
+    return mapping[category?.toLowerCase()] || 'tampering';
+  }
+
+  private mapExploitationLikelihood(likelihood: string): string {
+    const mapping: Record<string, string> = {
+      'frequent': 'high',
+      'likely': 'high',
+      'occasional': 'medium',
+      'unlikely': 'low',
+      'rare': 'low',
+    };
+    return mapping[likelihood?.toLowerCase()] || 'medium';
+  }
+
+  private mapExploitationImpact(impact: string): string {
+    const mapping: Record<string, string> = {
+      'critical': 'high',
+      'high': 'high',
+      'medium': 'medium',
+      'low': 'low',
+      'negligible': 'low',
+    };
+    return mapping[impact?.toLowerCase()] || 'medium';
   }
 }
