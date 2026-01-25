@@ -1,6 +1,6 @@
 # ThreatDiviner Threat Modeling - Implementation Checkpoint
 
-## Current Checkpoint: v4.2.0
+## Current Checkpoint: v4.3.0
 **Status:** AWAITING APPROVAL
 **Date:** 2026-01-25
 **Phase:** 4 - Compliance Module (IN PROGRESS)
@@ -1899,6 +1899,96 @@ TypeScript Compilation:
   API: No errors
   Dashboard: New compliance components compile without errors
   (Pre-existing errors in other files not related to this checkpoint)
+```
+
+---
+
+**Status: COMPLETED** — Approved, proceeding to v4.3.0
+
+---
+
+# Checkpoint v4.3.0: Compliance Reports (PDF/Excel)
+
+## What Was Built
+
+Compliance report generation and export functionality with PDF and Excel formats, including customizable sections.
+
+### Deliverables (per 09_implementation_plan.md)
+- [x] 4.3.1: Report dialog - Select sections, format
+- [x] 4.3.2: PDF generation - Using pdfkit with professional formatting
+- [x] 4.3.3: Excel generation - Multi-sheet workbook with detailed control status
+- [x] 4.3.4: Executive summary - High-level metrics and compliance posture
+
+## Backend Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/reporting/generators/compliance-report.generator.ts` | PDF and Excel compliance report generator |
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/api/src/reporting/reporting.module.ts` | Added ComplianceReportGenerator |
+| `apps/api/src/reporting/index.ts` | Exported ComplianceReportGenerator |
+| `apps/api/src/threat-modeling/threat-modeling.module.ts` | Import ReportingModule |
+| `apps/api/src/threat-modeling/threat-modeling.controller.ts` | Added compliance export endpoint |
+| `apps/api/src/threat-modeling/threat-modeling.service.ts` | Added getTenant method |
+| `apps/dashboard/src/components/compliance/ComplianceTab.tsx` | Added export modal with format/section selection |
+
+## API Endpoint Implemented
+
+```
+GET /threat-modeling/:id/compliance/export
+    ?format=pdf|xlsx
+    ?frameworkIds=id1,id2
+    ?coverPage=true|false
+    ?executiveSummary=true|false
+    ?frameworkOverview=true|false
+    ?gapDetails=true|false
+    ?riskInventory=true|false
+    ?remediationRoadmap=true|false
+```
+
+## PDF Report Sections (per 02_functional_spec.md §15.1)
+
+1. **Cover Page** - ThreatDiviner branding, threat model name, tenant info, quick stats
+2. **Executive Summary** - Key findings, compliance posture assessment
+3. **Framework Overview** - Progress bars and stats per framework
+4. **Gap Details** - Control gaps by framework with related risks
+5. **Risk Inventory** - All unique risks with severity and affected controls
+6. **Remediation Roadmap** - Prioritized action items (P1-P4)
+
+## Excel Report Sheets (per 02_functional_spec.md §15.2)
+
+1. **Summary** - Metadata and framework compliance overview table
+2. **[Framework Name]** - Per-framework sheets with control details
+3. **All Controls** - Full control list across all frameworks with filters
+4. **Risks** - Risk inventory with severity, mitigation status, affected controls
+5. **Remediation** - Prioritized gap list with recommended actions
+
+## Frontend Components Updated
+
+### Export Modal (ComplianceTab.tsx)
+- Format selection (PDF/Excel) with visual buttons
+- Section checkboxes with descriptions
+- Selected frameworks display
+- Loading state during generation
+- Download triggered on success
+
+## UI Features (per 05_ui_screens.md §11)
+
+- ReportDialog with format selection
+- Section toggles for customization
+- Export button in ComplianceTab header
+- Download triggers automatically on generation complete
+- Error handling with toast notifications
+
+## TypeScript Compilation
+
+```
+API TypeScript: No errors
+Dashboard ComplianceTab: No errors
 ```
 
 ---

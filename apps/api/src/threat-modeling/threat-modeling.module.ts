@@ -14,9 +14,10 @@ import { ThreatModelComplianceService } from './services/threat-model-compliance
 import { AnalysisProcessor } from '../queue/processors';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
+import { ReportingModule } from '../reporting/reporting.module';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, QueueModule],
+  imports: [PrismaModule, ConfigModule, QueueModule, ReportingModule],
   controllers: [ThreatModelingController],
   providers: [
     ThreatModelingService,

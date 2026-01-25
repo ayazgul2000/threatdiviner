@@ -30,6 +30,7 @@ import { GapDetectionService } from './services/gap-detection.service';
 import { ThreatModelComplianceService } from './services/threat-model-compliance.service';
 import { QueueService } from '../queue/services/queue.service';
 import { BatchUpdateAssetsDto, BatchUpdateLinksDto, BatchUpdateBoundariesDto } from './dto/batch-update.dto';
+import { ComplianceReportGenerator } from '../reporting/generators/compliance-report.generator';
 
 interface AuthRequest {
   user: {
@@ -52,6 +53,7 @@ export class ThreatModelingController {
     private readonly gapDetectionService: GapDetectionService,
     private readonly complianceService: ThreatModelComplianceService,
     private readonly queueService: QueueService,
+    private readonly complianceReportGenerator: ComplianceReportGenerator,
   ) {}
 
   // ===== THREAT MODELS =====
@@ -606,6 +608,86 @@ export class ThreatModelingController {
 
     await this.complianceService.invalidateCache(id);
     return { success: true, message: 'Compliance cache invalidated' };
+  }
+
+  @Get(':id/compliance/export')
+  async exportComplianceReport(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Res() res: Response,
+    @Query('format') format?: string,
+    @Query('frameworkIds') frameworkIds?: string,
+    @Query('coverPage') coverPage?: string,
+    @Query('executiveSummary') executiveSummary?: string,
+    @Query('frameworkOverview') frameworkOverview?: string,
+    @Query('gapDetails') gapDetails?: string,
+    @Query('riskInventory') riskInventory?: string,
+    @Query('remediationRoadmap') remediationRoadmap?: string,
+  ) {
+    const reportFormat = format === 'xlsx' ? 'xlsx' : 'pdf';
+
+    // Get threat model with tenant info
+    const model = await this.service.getThreatModel(req.user.tenantId, id);
+
+    // Get tenant
+    const tenant = await this.service.getTenant(req.user.tenantId);
+
+    // Parse framework IDs
+    const frameworkIdList = frameworkIds
+      ? frameworkIds.split(',').map(f => f.trim())
+      : undefined;
+
+    // Get compliance data
+    const complianceData = await this.complianceService.calculateComplianceGaps(
+      id,
+      frameworkIdList,
+    );
+
+    // Get gap summary
+    const summary = await this.complianceService.getComplianceGapSummary(id);
+
+    // Prepare report data
+    const reportData = {
+      tenant: { name: tenant?.name || 'Unknown' },
+      threatModel: {
+        id: model.id,
+        name: model.name,
+        description: model.description || undefined,
+      },
+      generatedAt: new Date(),
+      totalThreats: complianceData.totalThreats,
+      threatsWithCanonicalRisk: complianceData.threatsWithCanonicalRisk,
+      frameworks: complianceData.frameworks,
+      summary,
+    };
+
+    // Parse section options
+    const sections = {
+      coverPage: coverPage !== 'false',
+      executiveSummary: executiveSummary !== 'false',
+      frameworkOverview: frameworkOverview !== 'false',
+      gapDetails: gapDetails !== 'false',
+      riskInventory: riskInventory !== 'false',
+      remediationRoadmap: remediationRoadmap !== 'false',
+    };
+
+    // Generate report
+    const buffer = await this.complianceReportGenerator.generate(reportData, {
+      format: reportFormat,
+      sections,
+      frameworkIds: frameworkIdList,
+    });
+
+    // Set response headers
+    const contentType = reportFormat === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/pdf';
+    const extension = reportFormat === 'xlsx' ? 'xlsx' : 'pdf';
+    const filename = `compliance-report-${id}-${Date.now()}.${extension}`;
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
   }
 
   @Get('compliance/controls-for-risk/:canonicalRiskId')

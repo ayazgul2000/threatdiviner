@@ -78,6 +78,14 @@ const RISK_SCORES: Record<string, number> = {
 export class ThreatModelingService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // ===== TENANT =====
+
+  async getTenant(tenantId: string) {
+    return this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+  }
+
   // ===== THREAT MODELS =====
 
   async listThreatModels(tenantId: string, options?: {
