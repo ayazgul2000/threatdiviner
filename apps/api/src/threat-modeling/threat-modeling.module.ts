@@ -10,6 +10,7 @@ import { ThreagileService } from './services/threagile.service';
 import { YamlGeneratorService } from './services/yaml-generator.service';
 import { RiskParserService } from './services/risk-parser.service';
 import { GapDetectionService } from './services/gap-detection.service';
+import { DiagramSyncService } from './services/diagram-sync.service';
 import { ThreatModelComplianceService } from './services/threat-model-compliance.service';
 import { AnalysisProcessor } from '../queue/processors';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -29,6 +30,7 @@ import { ReportingModule } from '../reporting/reporting.module';
     YamlGeneratorService,
     RiskParserService,
     GapDetectionService,
+    DiagramSyncService,
     ThreatModelComplianceService,
     AnalysisProcessor,
   ],
@@ -42,6 +44,7 @@ import { ReportingModule } from '../reporting/reporting.module';
     YamlGeneratorService,
     RiskParserService,
     GapDetectionService,
+    DiagramSyncService,
     ThreatModelComplianceService,
   ],
 })

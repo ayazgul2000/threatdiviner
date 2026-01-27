@@ -13,6 +13,7 @@ import {
   Res,
   Header,
   BadRequestException,
+  NotFoundException,
   HttpCode,
   HttpStatus,
   UnprocessableEntityException,
@@ -27,6 +28,7 @@ import { ThreatModelExportService } from './services/export.service';
 import { ThreagileService } from './services/threagile.service';
 import { YamlGeneratorService } from './services/yaml-generator.service';
 import { GapDetectionService } from './services/gap-detection.service';
+import { DiagramSyncService } from './services/diagram-sync.service';
 import { ThreatModelComplianceService } from './services/threat-model-compliance.service';
 import { QueueService } from '../queue/services/queue.service';
 import { BatchUpdateAssetsDto, BatchUpdateLinksDto, BatchUpdateBoundariesDto } from './dto/batch-update.dto';
@@ -51,6 +53,7 @@ export class ThreatModelingController {
     private readonly threagileService: ThreagileService,
     private readonly yamlGeneratorService: YamlGeneratorService,
     private readonly gapDetectionService: GapDetectionService,
+    private readonly diagramSyncService: DiagramSyncService,
     private readonly complianceService: ThreatModelComplianceService,
     private readonly queueService: QueueService,
     private readonly complianceReportGenerator: ComplianceReportGenerator,
@@ -136,6 +139,62 @@ export class ThreatModelingController {
 
   @Get(':id/diagram')
   async getDiagram(@Req() req: AuthRequest, @Param('id') id: string) {
+    // Return XML for the new mxGraph-based editor
+    const model = await this.service.getThreatModel(req.user.tenantId, id);
+    const lock = await this.service.getLock(req.user.tenantId, id);
+
+    // Get latest version number
+    const versions = await this.service.listVersions(req.user.tenantId, id, 1);
+    const latestVersion = versions[0]?.versionNumber || 0;
+
+    return {
+      xml: model.diagramXml || '',
+      version: latestVersion,
+      lockedBy: lock
+        ? {
+            id: lock.lockedBy,
+            name: lock.lockedByName,
+            expiresAt: lock.expiresAt,
+          }
+        : null,
+    };
+  }
+
+  @Put(':id/diagram')
+  async saveDiagram(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: { xml: string; versionName?: string },
+  ) {
+    // Check lock ownership
+    const lock = await this.service.getLock(req.user.tenantId, id);
+    if (!lock || lock.lockedBy !== req.user.userId) {
+      throw new BadRequestException('You must hold the lock to save');
+    }
+
+    // Create version and update model
+    const version = await this.service.createVersion(
+      req.user.tenantId,
+      id,
+      req.user.userId,
+      body.xml,
+      false, // not auto-save
+      body.versionName,
+    );
+
+    return { version };
+  }
+
+  @Post(':id/diagram/sync')
+  async syncDiagram(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.diagramSyncService.syncDiagramToDatabase(id, req.user.tenantId);
+  }
+
+  @Get(':id/diagram/mermaid')
+  async getMermaidDiagram(@Req() req: AuthRequest, @Param('id') id: string) {
     const mermaid = await this.diagramService.generateMermaidDiagram(id, req.user.tenantId);
     return { mermaid };
   }
@@ -725,6 +784,9 @@ export class ThreatModelingController {
     @Param('id') id: string,
     @Body() body: { async?: boolean; skipGapCheck?: boolean },
   ) {
+    // Sync diagram shapes to DB components/data flows before analysis
+    await this.diagramSyncService.syncDiagramToDatabase(id, req.user.tenantId);
+
     // v2.5.0: Check for gaps before running analysis
     if (!body.skipGapCheck) {
       const gapResult = await this.gapDetectionService.detectGaps(req.user.tenantId, id);
@@ -874,7 +936,8 @@ export class ThreatModelingController {
   ) {
     const lock = await this.service.getLock(req.user.tenantId, id);
     if (!lock) {
-      throw new BadRequestException('No lock found');
+      // Return 404 so frontend knows there's no lock (not an error)
+      throw new NotFoundException('No lock found');
     }
     return lock;
   }
