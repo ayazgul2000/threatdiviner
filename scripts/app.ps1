@@ -48,8 +48,57 @@ function Stop-ThreatDiviner {
     Write-Host "Stopped" -ForegroundColor Green
 }
 
+function Start-DockerServices {
+    Write-Host "Ensuring Docker services are running..." -ForegroundColor Yellow
+
+    # Check if Docker is available
+    try {
+        $null = docker info 2>&1
+    } catch {
+        Write-Host "Docker is not running. Please start Docker Desktop first." -ForegroundColor Red
+        return $false
+    }
+
+    # Start all containers (including threagile)
+    Push-Location $ProjectRoot
+    docker compose up -d 2>&1 | Out-Null
+    Pop-Location
+
+    # Wait for critical services
+    $services = @(
+        @{ Name = "PostgreSQL"; Url = $null; Container = "td-postgres" },
+        @{ Name = "Redis"; Url = $null; Container = "td-redis" },
+        @{ Name = "Threagile"; Url = "http://localhost:8080/direct/analyze"; Container = "td-threagile" }
+    )
+
+    foreach ($svc in $services) {
+        $ready = $false
+        for ($i = 0; $i -lt 30; $i++) {
+            $status = docker inspect --format='{{.State.Running}}' $svc.Container 2>$null
+            if ($status -eq "true") {
+                Write-Host "  $($svc.Name): Running" -ForegroundColor Green
+                $ready = $true
+                break
+            }
+            Start-Sleep -Seconds 1
+        }
+        if (-not $ready) {
+            Write-Host "  $($svc.Name): Failed to start" -ForegroundColor Red
+        }
+    }
+
+    return $true
+}
+
 function Start-ThreatDiviner {
     Write-Host "Starting ThreatDiviner..." -ForegroundColor Yellow
+
+    # Ensure Docker services (postgres, redis, threagile, etc.) are up first
+    $dockerOk = Start-DockerServices
+    if (-not $dockerOk) {
+        Write-Host "Cannot start without Docker services." -ForegroundColor Red
+        return
+    }
 
     Stop-ThreatDiviner 2>$null
 
@@ -115,6 +164,19 @@ function Get-ThreatDivinerStatus {
     Write-Host "ThreatDiviner Status:" -ForegroundColor Cyan
     Write-Host ""
 
+    # Docker services
+    Write-Host "Docker Services:" -ForegroundColor Cyan
+    foreach ($container in @("td-postgres", "td-redis", "td-threagile", "td-minio", "td-qdrant")) {
+        $status = docker inspect --format='{{.State.Status}}' $container 2>$null
+        if ($status -eq "running") {
+            Write-Host "  ${container}: Running" -ForegroundColor Green
+        } else {
+            Write-Host "  ${container}: $($status ?? 'Not found')" -ForegroundColor Red
+        }
+    }
+    Write-Host ""
+
+    Write-Host "App Services:" -ForegroundColor Cyan
     try {
         $null = Invoke-WebRequest -Uri "http://localhost:$ApiPort/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
         Write-Host "  API:       Running (port $ApiPort)" -ForegroundColor Green

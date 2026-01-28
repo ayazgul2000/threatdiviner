@@ -43,8 +43,37 @@ stop_app() {
   echo "Stopped"
 }
 
+start_docker_services() {
+  echo "Ensuring Docker services are running..."
+
+  # Check if Docker is available
+  if ! docker info > /dev/null 2>&1; then
+    echo "ERROR: Docker is not running. Please start Docker first."
+    return 1
+  fi
+
+  # Start all containers (including threagile)
+  cd "$PROJECT_ROOT"
+  docker compose up -d 2>&1
+
+  # Wait for critical containers
+  for container in td-postgres td-redis td-threagile; do
+    for i in {1..30}; do
+      status=$(docker inspect --format='{{.State.Running}}' "$container" 2>/dev/null || echo "false")
+      if [ "$status" = "true" ]; then
+        echo "  $container: Running"
+        break
+      fi
+      sleep 1
+    done
+  done
+}
+
 start_app() {
   echo "Starting ThreatDiviner..."
+
+  # Ensure Docker services (postgres, redis, threagile, etc.) are up first
+  start_docker_services || { echo "Cannot start without Docker services."; exit 1; }
 
   # Ensure stopped first
   stop_app 2>/dev/null || true
@@ -98,6 +127,19 @@ status_app() {
   echo "ThreatDiviner Status:"
   echo ""
 
+  # Docker services
+  echo "Docker Services:"
+  for container in td-postgres td-redis td-threagile td-minio td-qdrant; do
+    status=$(docker inspect --format='{{.State.Status}}' "$container" 2>/dev/null || echo "not found")
+    if [ "$status" = "running" ]; then
+      echo "  $container: Running"
+    else
+      echo "  $container: $status"
+    fi
+  done
+  echo ""
+
+  echo "App Services:"
   if curl -s http://localhost:$API_PORT/health > /dev/null 2>&1; then
     echo "  API:       Running (port $API_PORT)"
   else
