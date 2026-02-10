@@ -13,10 +13,13 @@ import { FeedsController } from './feeds/feeds.controller';
 import { FeedsService } from './feeds/feeds.service';
 import { SuggestionsController } from './suggestions/suggestions.controller';
 import { SuggestionsService } from './suggestions/suggestions.service';
+import { TemplatesController } from './templates/templates.controller';
+import { TemplatesService } from './templates/templates.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PlatformModule } from '../platform/platform.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PlatformModule],
   controllers: [
     ShapeMappingsController,
     CanonicalRisksController,
@@ -25,6 +28,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     WizardController,
     FeedsController,
     SuggestionsController,
+    TemplatesController,
   ],
   providers: [
     ShapeMappingsService,
@@ -34,6 +38,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     WizardService,
     FeedsService,
     SuggestionsService,
+    TemplatesService,
   ],
   exports: [
     ShapeMappingsService,
@@ -43,6 +48,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     WizardService,
     FeedsService,
     SuggestionsService,
+    TemplatesService,
   ],
 })
 export class AdminModule {}

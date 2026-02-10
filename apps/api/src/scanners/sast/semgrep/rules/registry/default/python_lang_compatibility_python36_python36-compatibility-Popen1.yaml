@@ -1,0 +1,26 @@
+rules:
+  - id: python.lang.compatibility.python36.python36-compatibility-Popen1
+    pattern: subprocess.Popen(errors=$X, ...)
+    message: the `errors` argument to Popen is only available on Python 3.6+
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python36.python36-compatibility-Popen1
+      shortlink: https://sg.run/weBP
+      semgrep.dev:
+        rule:
+          r_id: 9573
+          rv_id: 946263
+          rule_id: nJUz7A
+          version_id: WrTEo4r
+          url: >-
+            https://semgrep.dev/playground/r/WrTEo4r/python.lang.compatibility.python36.python36-compatibility-Popen1
+          origin: community

@@ -1,0 +1,59 @@
+rules:
+  - id: terraform.aws.security.wildcard-assume-role.wildcard-assume-role
+    patterns:
+      - pattern-inside: |
+          resource "aws_iam_role" $NAME {
+            ...
+          }
+      - pattern: assume_role_policy = "$STATEMENT"
+      - metavariable-pattern:
+          metavariable: $STATEMENT
+          language: json
+          patterns:
+            - pattern-inside: |
+                {..., "Effect": "Allow", ..., "Action": "sts:AssumeRole", ...}
+            - pattern: |
+                "Principal": {..., "AWS": "*", ...}
+    message: >-
+      Detected wildcard access granted to sts:AssumeRole. This means anyone with
+      your AWS account ID and the name of the role can assume the role. Instead,
+      limit to a specific identity in your account, like this:
+      `arn:aws:iam::<account_id>:root`.
+    metadata:
+      cwe:
+        - 'CWE-250: Execution with Unnecessary Privileges'
+      category: security
+      technology:
+        - aws
+      references:
+        - >-
+          https://rhinosecuritylabs.com/aws/assume-worst-aws-assume-role-enumeration/
+      owasp:
+        - A06:2017 - Security Misconfiguration
+        - A05:2021 - Security Misconfiguration
+        - A02:2025 - Security Misconfiguration
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Authorization
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.wildcard-assume-role.wildcard-assume-role
+      shortlink: https://sg.run/LXWr
+      semgrep.dev:
+        rule:
+          r_id: 15139
+          rv_id: 1263749
+          rule_id: 5rUL1P
+          version_id: LjTkg8D
+          url: >-
+            https://semgrep.dev/playground/r/LjTkg8D/terraform.aws.security.wildcard-assume-role.wildcard-assume-role
+          origin: community
+    languages:
+      - hcl
+    severity: ERROR

@@ -1,0 +1,67 @@
+rules:
+  - id: php.lang.security.md5-loose-equality.md5-loose-equality
+    mode: taint
+    pattern-sinks:
+      - pattern: |
+          $VAR1 == $VAR2
+      - pattern: |
+          $VAR1 != $VAR2
+    pattern-sources:
+      - pattern: $PHAR->getSignature()
+      - pattern: $RARENTRY->getCrc()
+      - pattern: base_convert(...)
+      - pattern: bin2hex(...)
+      - pattern: dechex(...)
+      - pattern: hash_file(...)
+      - pattern: hash_final(...)
+      - pattern: hash_hmac_file(...)
+      - pattern: hash_hmac(...)
+      - pattern: hash_pbkdf2(...)
+      - pattern: hash(...)
+      - pattern: md5_file(...)
+      - pattern: md5(...)
+      - pattern: openssl_x509_fingerprint(...)
+      - pattern: rnp_locate_key(...)
+      - pattern: sha1_file(...)
+      - pattern: sha1(...)
+      - pattern: sodium_bin2hex(...)
+    pattern-sanitizers:
+      - pattern: strlen(...)
+    message: >-
+      Make sure comparisons involving md5 values are strict (use `===` not `==`)
+      to avoid type juggling issues
+    metadata:
+      cwe:
+        - 'CWE-697: Incorrect Comparison'
+      references:
+        - https://www.php.net/manual/en/types.comparisons.php
+        - >-
+          https://web.archive.org/web/20210430183236/https://www.whitehatsec.com/blog/magic-hashes/
+      category: security
+      technology:
+        - php
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: LOW
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Other
+      source: >-
+        https://semgrep.dev/r/php.lang.security.md5-loose-equality.md5-loose-equality
+      shortlink: https://sg.run/Do4G
+      semgrep.dev:
+        rule:
+          r_id: 9396
+          rv_id: 1024161
+          rule_id: GdU7RO
+          version_id: 9lTWdQq
+          url: >-
+            https://semgrep.dev/playground/r/9lTWdQq/php.lang.security.md5-loose-equality.md5-loose-equality
+          origin: community
+    languages:
+      - php
+    severity: ERROR

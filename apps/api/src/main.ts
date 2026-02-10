@@ -47,8 +47,11 @@ async function bootstrap(): Promise<void> {
   app.useGlobalInterceptors(new TimeoutInterceptor(30000));
 
   // Enable CORS with credentials for cookies
+  const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+    : ['http://localhost:3000', 'http://localhost:3002'];
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: corsOrigins,
     credentials: true,
   });
 

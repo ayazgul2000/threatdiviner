@@ -1,0 +1,55 @@
+rules:
+  - id: >-
+      scala.slick.security.scala-slick-overridesql-literal.scala-slick-overrideSql-literal
+    patterns:
+      - pattern: $MODEL.overrideSql($QUERY,...)
+      - pattern-not: $MODEL.overrideSql("...",...)
+      - pattern-not-inside: |
+          $QUERY = "..."
+          ...
+    message: >-
+      Detected a formatted string in a SQL statement. This could lead to SQL
+      injection if variables in the SQL statement are not properly sanitized.
+      Avoid using non literal values in `overrideSql(...)`.
+    languages:
+      - scala
+    severity: ERROR
+    metadata:
+      category: security
+      cwe:
+        - >-
+          CWE-89: Improper Neutralization of Special Elements used in an SQL
+          Command ('SQL Injection')
+      owasp:
+        - A01:2017 - Injection
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      technology:
+        - scala
+        - slick
+      confidence: LOW
+      references:
+        - https://owasp.org/Top10/A03_2021-Injection
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: HIGH
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - SQL Injection
+      source: >-
+        https://semgrep.dev/r/scala.slick.security.scala-slick-overridesql-literal.scala-slick-overrideSql-literal
+      shortlink: https://sg.run/PYe0
+      semgrep.dev:
+        rule:
+          r_id: 17501
+          rv_id: 1263692
+          rule_id: wdUA97
+          version_id: LjTkgvQ
+          url: >-
+            https://semgrep.dev/playground/r/LjTkgvQ/scala.slick.security.scala-slick-overridesql-literal.scala-slick-overrideSql-literal
+          origin: community

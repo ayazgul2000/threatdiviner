@@ -893,6 +893,50 @@ model DataSyncStatus {
   @@map("data_sync_status")
 }
 
+// CWE Views (e.g., CWE-699 Software Development, CWE-1194 Hardware Design)
+model CweView {
+  id          String        @id // e.g., "CWE-699"
+  name        String
+  type        String        // "Graph", "Implicit", "Explicit"
+  status      String        // "Stable", "Draft", "Incomplete", "Deprecated"
+  description String?
+  categories  CweCategory[]
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@map("cwe_views")
+}
+
+// CWE Categories (e.g., CWE-1214 Data Integrity, CWE-310 Cryptographic)
+model CweCategory {
+  id          String              @id // e.g., "CWE-1214"
+  name        String
+  status      String              // "Stable", "Draft", "Incomplete", "Deprecated"
+  description String?
+  viewId      String              @map("view_id")
+  view        CweView             @relation(fields: [viewId], references: [id], onDelete: Cascade)
+  members     CweCategoryMember[]
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  @@index([viewId])
+  @@map("cwe_categories")
+}
+
+// CWE Category → Weakness memberships
+model CweCategoryMember {
+  id         String      @id @default(uuid())
+  categoryId String      @map("category_id")
+  cweId      String      @map("cwe_id") // e.g., "CWE-89"
+  category   CweCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@unique([categoryId, cweId])
+  @@index([categoryId])
+  @@index([cweId])
+  @@map("cwe_category_members")
+}
+
 model ThreatModel {
   id                String                 @id @default(uuid())
   tenantId          String                 @map("tenant_id")
@@ -1560,6 +1604,7 @@ model AnalysisRun {
   errorMessage  String?     @map("error_message")
   yamlInput     String?     @map("yaml_input") @db.Text
   rawOutput     Json?       @map("raw_output")
+  reportZip     Bytes?      @map("report_zip")
   createdAt     DateTime    @default(now()) @map("created_at")
   threatModel   ThreatModel @relation(fields: [threatModelId], references: [id], onDelete: Cascade)
   threats       Threat[]    // v2.4.0 - Threats detected in this analysis run
@@ -1845,4 +1890,31 @@ model ConfigAuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("config_audit_logs")
+}
+
+// ============================================
+// THREAT MODEL TEMPLATES
+// ============================================
+
+model ThreatModelTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  category        String   // aws, azure, gcp, web, mobile, iot, microservices
+  tags            String[] @default([])
+  previewImageUrl String?  @map("preview_image_url")
+  diagramXml      String   @map("diagram_xml") @db.Text
+  components      Json     @default("[]")
+  dataFlows       Json     @default("[]") @map("data_flows")
+  boundaries      Json     @default("[]")
+  isPublic        Boolean  @default(true) @map("is_public")
+  tenantId        String?  @map("tenant_id")
+  createdBy       String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([tenantId])
+  @@index([isPublic])
+  @@map("threat_model_templates")
 }

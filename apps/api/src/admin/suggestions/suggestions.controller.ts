@@ -9,7 +9,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../libs/auth/guards/jwt-auth.guard';
+import { PlatformAdminGuard } from '../../platform/guards/platform-admin.guard';
 import { SuggestionsService } from './suggestions.service';
 import {
   SuggestionListQuery,
@@ -29,11 +29,11 @@ import {
 } from './dto/suggestion.dto';
 
 interface RequestWithUser extends Request {
-  user: { id: string; name?: string };
+  platformAdmin: { id: string; name: string; email: string; isSuperAdmin: boolean };
 }
 
 @Controller('admin/suggestions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(PlatformAdminGuard)
 export class SuggestionsController {
   constructor(private readonly suggestionsService: SuggestionsService) {}
 
@@ -64,7 +64,7 @@ export class SuggestionsController {
     @Body() dto: ApproveSuggestionDto,
     @Request() req: RequestWithUser,
   ) {
-    const suggestion = await this.suggestionsService.approveSuggestion(id, dto, req.user.id);
+    const suggestion = await this.suggestionsService.approveSuggestion(id, dto, req.platformAdmin.id);
     return { suggestion };
   }
 
@@ -74,7 +74,7 @@ export class SuggestionsController {
     @Body() dto: RejectSuggestionDto,
     @Request() req: RequestWithUser,
   ) {
-    const suggestion = await this.suggestionsService.rejectSuggestion(id, dto, req.user.id);
+    const suggestion = await this.suggestionsService.rejectSuggestion(id, dto, req.platformAdmin.id);
     return { suggestion };
   }
 
@@ -84,7 +84,7 @@ export class SuggestionsController {
     @Body() dto: EditSuggestionDto,
     @Request() req: RequestWithUser,
   ) {
-    const suggestion = await this.suggestionsService.editSuggestion(id, dto, req.user.id);
+    const suggestion = await this.suggestionsService.editSuggestion(id, dto, req.platformAdmin.id);
     return { suggestion };
   }
 
@@ -93,7 +93,7 @@ export class SuggestionsController {
     @Body() dto: BulkActionDto,
     @Request() req: RequestWithUser,
   ) {
-    return this.suggestionsService.bulkAction(dto, req.user.id);
+    return this.suggestionsService.bulkAction(dto, req.platformAdmin.id);
   }
 
   // ============================================
@@ -122,7 +122,7 @@ export class SuggestionsController {
     @Body() dto: SubmitForReviewDto,
     @Request() req: RequestWithUser,
   ) {
-    const item = await this.suggestionsService.submitForReview(dto, req.user.id);
+    const item = await this.suggestionsService.submitForReview(dto, req.platformAdmin.id);
     return { item };
   }
 
@@ -132,7 +132,7 @@ export class SuggestionsController {
     @Body() dto: ReviewDecisionDto,
     @Request() req: RequestWithUser,
   ) {
-    const item = await this.suggestionsService.reviewDecision(id, dto, req.user.id);
+    const item = await this.suggestionsService.reviewDecision(id, dto, req.platformAdmin.id);
     return { item };
   }
 
@@ -141,7 +141,7 @@ export class SuggestionsController {
     @Body() dto: PromoteDto,
     @Request() req: RequestWithUser,
   ) {
-    return this.suggestionsService.promote(dto, req.user.id);
+    return this.suggestionsService.promote(dto, req.platformAdmin.id);
   }
 
   @Post('promotions/rollback')
@@ -149,7 +149,7 @@ export class SuggestionsController {
     @Body() dto: RollbackDto,
     @Request() req: RequestWithUser,
   ) {
-    const item = await this.suggestionsService.rollback(dto, req.user.id);
+    const item = await this.suggestionsService.rollback(dto, req.platformAdmin.id);
     return { item };
   }
 

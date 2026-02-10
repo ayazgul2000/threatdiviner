@@ -12,13 +12,22 @@ import { RiskParserService } from './services/risk-parser.service';
 import { GapDetectionService } from './services/gap-detection.service';
 import { DiagramSyncService } from './services/diagram-sync.service';
 import { ThreatModelComplianceService } from './services/threat-model-compliance.service';
+import { UserWizardService } from './services/user-wizard.service';
+import { ImportService } from './services/import.service';
+import { AiCreationService } from './services/ai-creation.service';
+import { TemplateService } from './services/template.service';
+import { OpenApiParser } from './parsers/openapi.parser';
+import { TerraformParser } from './parsers/terraform.parser';
+import { PackageJsonParser } from './parsers/package-json.parser';
 import { AnalysisProcessor } from '../queue/processors';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
 import { ReportingModule } from '../reporting/reporting.module';
+import { AiModule } from '../ai/ai.module';
+import { ScmModule } from '../scm/scm.module';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, QueueModule, ReportingModule],
+  imports: [PrismaModule, ConfigModule, QueueModule, ReportingModule, AiModule, ScmModule],
   controllers: [ThreatModelingController],
   providers: [
     ThreatModelingService,
@@ -32,6 +41,13 @@ import { ReportingModule } from '../reporting/reporting.module';
     GapDetectionService,
     DiagramSyncService,
     ThreatModelComplianceService,
+    UserWizardService,
+    ImportService,
+    AiCreationService,
+    TemplateService,
+    OpenApiParser,
+    TerraformParser,
+    PackageJsonParser,
     AnalysisProcessor,
   ],
   exports: [

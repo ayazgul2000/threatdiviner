@@ -20,10 +20,10 @@ import {
   ComplianceFrameworkListQuery,
   ComplianceControlListQuery,
 } from './dto/compliance-framework.dto';
-import { JwtAuthGuard } from '../../libs/auth/guards/jwt-auth.guard';
+import { PlatformAdminGuard } from '../../platform/guards/platform-admin.guard';
 
 @Controller('admin/compliance-frameworks')
-@UseGuards(JwtAuthGuard)
+@UseGuards(PlatformAdminGuard)
 export class ComplianceFrameworksController {
   constructor(private readonly service: ComplianceFrameworksService) {}
 

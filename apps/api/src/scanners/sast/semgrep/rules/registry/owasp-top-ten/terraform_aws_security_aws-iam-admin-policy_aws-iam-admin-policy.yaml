@@ -1,0 +1,66 @@
+rules:
+  - id: terraform.aws.security.aws-iam-admin-policy.aws-iam-admin-policy
+    patterns:
+      - pattern-inside: |
+          resource "aws_iam_policy" $ANYTHING {
+            ...
+          }
+      - pattern: policy = "$STATEMENT"
+      - metavariable-pattern:
+          metavariable: $STATEMENT
+          language: json
+          patterns:
+            - pattern-not-inside: |
+                {..., "Effect": "Deny", ...}
+            - pattern-either:
+                - pattern: >
+                    {..., "Action": [..., "*", ...], "Resource": [..., "*",
+                    ...], ...}
+                - pattern: |
+                    {..., "Action": "*", "Resource": "*", ...}
+                - pattern: |
+                    {..., "Action": "*", "Resource": [...], ...}
+                - pattern: |
+                    {..., "Action": [...], "Resource": "*", ...}
+    message: >-
+      Detected admin access granted in your policy. This means anyone with this
+      policy can perform administrative actions. Instead, limit actions and
+      resources to what you need according to least privilege.
+    metadata:
+      category: security
+      technology:
+        - aws
+        - terraform
+      owasp:
+        - A05:2021 - Security Misconfiguration
+        - A02:2025 - Security Misconfiguration
+      cwe:
+        - 'CWE-732: Incorrect Permission Assignment for Critical Resource'
+      references:
+        - https://cwe.mitre.org/data/definitions/732.html
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Authorization
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.aws-iam-admin-policy.aws-iam-admin-policy
+      shortlink: https://sg.run/1zbw
+      semgrep.dev:
+        rule:
+          r_id: 17366
+          rv_id: 1263725
+          rule_id: DbUx8l
+          version_id: 6xT29Pv
+          url: >-
+            https://semgrep.dev/playground/r/6xT29Pv/terraform.aws.security.aws-iam-admin-policy.aws-iam-admin-policy
+          origin: community
+    languages:
+      - hcl
+    severity: ERROR

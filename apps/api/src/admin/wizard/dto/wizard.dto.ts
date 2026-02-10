@@ -12,6 +12,116 @@ import {
 import { Type } from 'class-transformer';
 
 // ============================================
+// Condition DTO (used by Question DTOs)
+// ============================================
+
+export class ConditionDto {
+  @IsString()
+  property!: string;
+
+  @IsString()
+  @IsIn(['equals', 'not_equals', 'in', 'not_in', 'contains'])
+  operator!: string;
+
+  @IsString()
+  value!: string;
+}
+
+// ============================================
+// Trigger DTOs (must be defined before Option DTOs)
+// ============================================
+
+export class TriggerNodeDto {
+  @IsString()
+  name!: string;
+
+  @IsString()
+  ref!: string;
+
+  @IsString()
+  @IsOptional()
+  technology?: string;
+
+  @IsString()
+  @IsOptional()
+  machineType?: string;
+
+  @IsString()
+  @IsOptional()
+  placementBoundary?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  internetFacing?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  multiTenant?: boolean;
+
+  @IsString()
+  @IsOptional()
+  encryption?: string;
+
+  @IsString()
+  @IsOptional()
+  authentication?: string;
+}
+
+export class TriggerBoundaryDto {
+  @IsString()
+  name!: string;
+
+  @IsString()
+  ref!: string;
+
+  @IsString()
+  type!: string;
+}
+
+export class TriggerLinkDto {
+  @IsString()
+  sourceRef!: string;
+
+  @IsString()
+  targetRef!: string;
+
+  @IsString()
+  @IsOptional()
+  protocol?: string;
+
+  @IsString()
+  @IsOptional()
+  authentication?: string;
+
+  @IsString()
+  @IsOptional()
+  encryption?: string;
+}
+
+export class TriggerDto {
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => TriggerNodeDto)
+  addNodes?: TriggerNodeDto[];
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => TriggerBoundaryDto)
+  addBoundaries?: TriggerBoundaryDto[];
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => TriggerLinkDto)
+  addLinks?: TriggerLinkDto[];
+
+  @IsOptional()
+  setProperties?: Record<string, string>;
+}
+
+// ============================================
 // Question DTOs
 // ============================================
 
@@ -94,18 +204,6 @@ export class UpdateQuestionDto {
   status?: string;
 }
 
-export class ConditionDto {
-  @IsString()
-  property!: string;
-
-  @IsString()
-  @IsIn(['equals', 'not_equals', 'in', 'not_in', 'contains'])
-  operator!: string;
-
-  @IsString()
-  value!: string;
-}
-
 // ============================================
 // Option DTOs
 // ============================================
@@ -168,96 +266,6 @@ export class UpdateOptionDto {
   @ValidateNested()
   @Type(() => TriggerDto)
   triggers?: TriggerDto;
-}
-
-export class TriggerDto {
-  @IsArray()
-  @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => TriggerNodeDto)
-  addNodes?: TriggerNodeDto[];
-
-  @IsArray()
-  @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => TriggerBoundaryDto)
-  addBoundaries?: TriggerBoundaryDto[];
-
-  @IsArray()
-  @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => TriggerLinkDto)
-  addLinks?: TriggerLinkDto[];
-
-  @IsOptional()
-  setProperties?: Record<string, string>;
-}
-
-export class TriggerNodeDto {
-  @IsString()
-  name!: string;
-
-  @IsString()
-  ref!: string;
-
-  @IsString()
-  @IsOptional()
-  technology?: string;
-
-  @IsString()
-  @IsOptional()
-  machineType?: string;
-
-  @IsString()
-  @IsOptional()
-  placementBoundary?: string;
-
-  @IsBoolean()
-  @IsOptional()
-  internetFacing?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
-  multiTenant?: boolean;
-
-  @IsString()
-  @IsOptional()
-  encryption?: string;
-
-  @IsString()
-  @IsOptional()
-  authentication?: string;
-}
-
-export class TriggerBoundaryDto {
-  @IsString()
-  name!: string;
-
-  @IsString()
-  ref!: string;
-
-  @IsString()
-  type!: string;
-}
-
-export class TriggerLinkDto {
-  @IsString()
-  sourceRef!: string;
-
-  @IsString()
-  targetRef!: string;
-
-  @IsString()
-  @IsOptional()
-  protocol?: string;
-
-  @IsString()
-  @IsOptional()
-  authentication?: string;
-
-  @IsString()
-  @IsOptional()
-  encryption?: string;
 }
 
 // ============================================

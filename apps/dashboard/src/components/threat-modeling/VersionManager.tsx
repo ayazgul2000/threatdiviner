@@ -111,7 +111,9 @@ export default function VersionManager({
   const fetchVersions = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions`);
+      const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions`, {
+        credentials: 'include',
+      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch versions');
@@ -149,6 +151,7 @@ export default function VersionManager({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           xmlContent: currentXml,
           isAutoSave,
@@ -187,7 +190,9 @@ export default function VersionManager({
 
     try {
       setIsLoading(true);
-      const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions/${versionId}`);
+      const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions/${versionId}`, {
+        credentials: 'include',
+      });
 
       if (!response.ok) {
         throw new Error('Failed to load version');
@@ -358,7 +363,9 @@ export function useVersionManager(threatModelId: string, apiBaseUrl = '/api/thre
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions`);
+      const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions`, {
+        credentials: 'include',
+      });
 
       if (!response.ok) throw new Error('Failed to fetch versions');
 
@@ -381,6 +388,7 @@ export function useVersionManager(threatModelId: string, apiBaseUrl = '/api/thre
       const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ xmlContent, isAutoSave, versionName }),
       });
 
@@ -402,7 +410,9 @@ export function useVersionManager(threatModelId: string, apiBaseUrl = '/api/thre
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions/${versionId}`);
+      const response = await fetch(`${apiBaseUrl}/${threatModelId}/versions/${versionId}`, {
+        credentials: 'include',
+      });
 
       if (!response.ok) throw new Error('Failed to load version');
 

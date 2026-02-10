@@ -60,6 +60,39 @@ export interface OpenApiParseResult {
 export class OpenApiParser {
   private readonly logger = new Logger(OpenApiParser.name);
 
+  /**
+   * Check if content is a valid OpenAPI specification
+   */
+  isValidOpenApiSpec(content: string): boolean {
+    try {
+      let spec: any;
+      try {
+        spec = yaml.load(content);
+      } catch {
+        spec = JSON.parse(content);
+      }
+
+      // Must have openapi or swagger field to be valid
+      if (!spec.openapi && !spec.swagger) {
+        return false;
+      }
+
+      // Must have info.title
+      if (!spec.info?.title) {
+        return false;
+      }
+
+      // Must have paths
+      if (!spec.paths || Object.keys(spec.paths).length === 0) {
+        return false;
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async parse(content: string): Promise<OpenApiParseResult> {
     try {
       // Try to parse as YAML first, then JSON
@@ -70,8 +103,17 @@ export class OpenApiParser {
         spec = JSON.parse(content);
       }
 
+      // Validate this is actually an OpenAPI spec
+      if (!spec.openapi && !spec.swagger) {
+        throw new Error('Not an OpenAPI specification (missing openapi/swagger field)');
+      }
+
+      if (!spec.info?.title) {
+        throw new Error('OpenAPI spec missing info.title');
+      }
+
       const result: OpenApiParseResult = {
-        title: spec.info?.title || 'Unknown API',
+        title: spec.info.title,
         version: spec.info?.version || '1.0.0',
         description: spec.info?.description,
         servers: this.extractServers(spec),

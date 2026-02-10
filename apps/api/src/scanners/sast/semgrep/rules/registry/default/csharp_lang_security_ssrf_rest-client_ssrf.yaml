@@ -1,0 +1,62 @@
+rules:
+  - id: csharp.lang.security.ssrf.rest-client.ssrf
+    severity: ERROR
+    languages:
+      - csharp
+    metadata:
+      cwe:
+        - 'CWE-918: Server-Side Request Forgery (SSRF)'
+      owasp:
+        - A10:2021 - Server-Side Request Forgery (SSRF)
+        - A01:2025 - Broken Access Control
+      references:
+        - >-
+          https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+      category: security
+      technology:
+        - .net
+      confidence: LOW
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Server-Side Request Forgery (SSRF)
+      source: https://semgrep.dev/r/csharp.lang.security.ssrf.rest-client.ssrf
+      shortlink: https://sg.run/Pb9v
+      semgrep.dev:
+        rule:
+          r_id: 13701
+          rv_id: 1262650
+          rule_id: 9AURoq
+          version_id: BjTkZzn
+          url: >-
+            https://semgrep.dev/playground/r/BjTkZzn/csharp.lang.security.ssrf.rest-client.ssrf
+          origin: community
+    message: >-
+      SSRF is an attack vector that abuses an application to interact with the
+      internal/external network or the machine itself.
+    patterns:
+      - pattern-inside: |
+          using RestSharp;
+          ...
+      - pattern-either:
+          - pattern: |
+              $T $F(..., $X, ...)
+              {
+              ...
+              ... new RestClient(<... $X ...>);
+              }
+          - pattern: |
+              $T $F(..., $X, ...)
+              {
+              ...
+              $A $B = <... $X ...>;
+              ...
+              ... new RestClient($B);
+              }

@@ -1,0 +1,59 @@
+rules:
+  - id: >-
+      problem-based-packs.insecure-transport.js-node.telnet-request.telnet-request
+    message: >-
+      Checks for creation of telnet servers or attempts to connect through
+      telnet. This is insecure as the telnet protocol supports no encryption,
+      and data passes through unencrypted.
+    severity: WARNING
+    metadata:
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      category: security
+      cwe: 'CWE-319: Cleartext Transmission of Sensitive Information'
+      owasp: A03:2017 - Sensitive Data Exposure
+      references:
+        - https://www.npmjs.com/package/telnet
+        - https://www.npmjs.com/package/telnet-client
+      subcategory:
+        - vuln
+      technology:
+        - node.js
+      vulnerability: Insecure Transport
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Mishandled Sensitive Information
+      source: >-
+        https://semgrep.dev/r/problem-based-packs.insecure-transport.js-node.telnet-request.telnet-request
+      shortlink: https://sg.run/weoA
+      semgrep.dev:
+        rule:
+          r_id: 9429
+          rv_id: 946073
+          rule_id: EwU2GA
+          version_id: DkTNpJJ
+          url: >-
+            https://semgrep.dev/playground/r/DkTNpJJ/problem-based-packs.insecure-transport.js-node.telnet-request.telnet-request
+          origin: community
+    languages:
+      - javascript
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              $TEL = require('telnet-client');
+              ...
+              $SERVER = new $TEL();
+              ...
+          - pattern-inside: |
+              $SERVER = require('telnet');
+              ...
+      - pattern-either:
+          - pattern: |
+              $SERVER.on(...)
+          - pattern: |
+              $SERVER.connect(...)
+          - pattern: |
+              $SERVER.createServer(...)

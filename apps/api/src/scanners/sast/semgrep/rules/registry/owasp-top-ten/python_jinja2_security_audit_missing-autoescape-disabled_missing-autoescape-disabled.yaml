@@ -1,0 +1,54 @@
+rules:
+  - id: >-
+      python.jinja2.security.audit.missing-autoescape-disabled.missing-autoescape-disabled
+    patterns:
+      - pattern-not: jinja2.Environment(..., autoescape=$VAL, ...)
+      - pattern: jinja2.Environment(...)
+    fix-regex:
+      regex: (.*)\)
+      replacement: \1, autoescape=True)
+    message: >-
+      Detected a Jinja2 environment without autoescaping. Jinja2 does not
+      autoescape by default. This is dangerous if you are rendering to a browser
+      because this allows for cross-site scripting (XSS) attacks. If you are in
+      a web context, enable autoescaping by setting 'autoescape=True.' You may
+      also consider using 'jinja2.select_autoescape()' to only enable automatic
+      escaping for certain file extensions.
+    metadata:
+      source-rule-url: >-
+        https://bandit.readthedocs.io/en/latest/plugins/b701_jinja2_autoescape_false.html
+      cwe:
+        - 'CWE-116: Improper Encoding or Escaping of Output'
+      owasp:
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - https://jinja.palletsprojects.com/en/2.11.x/api/#basics
+      category: security
+      technology:
+        - jinja2
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Encoding
+      source: >-
+        https://semgrep.dev/r/python.jinja2.security.audit.missing-autoescape-disabled.missing-autoescape-disabled
+      shortlink: https://sg.run/8kY4
+      semgrep.dev:
+        rule:
+          r_id: 20040
+          rv_id: 1263449
+          rule_id: 3qULRx
+          version_id: QkTGqje
+          url: >-
+            https://semgrep.dev/playground/r/QkTGqje/python.jinja2.security.audit.missing-autoescape-disabled.missing-autoescape-disabled
+          origin: community
+    languages:
+      - python
+    severity: WARNING

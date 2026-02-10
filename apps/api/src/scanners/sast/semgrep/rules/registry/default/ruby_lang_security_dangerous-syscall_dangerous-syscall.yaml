@@ -1,0 +1,45 @@
+rules:
+  - id: ruby.lang.security.dangerous-syscall.dangerous-syscall
+    pattern: |
+      syscall
+    message: >-
+      'syscall' is essentially unsafe and unportable. The DL
+      (https://apidock.com/ruby/Fiddle) library is preferred for safer and a bit
+      more portable programming.
+    metadata:
+      cwe:
+        - 'CWE-94: Improper Control of Generation of Code (''Code Injection'')'
+      owasp:
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      category: security
+      technology:
+        - ruby
+      references:
+        - https://owasp.org/Top10/A03_2021-Injection
+      cwe2022-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: HIGH
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Code Injection
+      source: >-
+        https://semgrep.dev/r/ruby.lang.security.dangerous-syscall.dangerous-syscall
+      shortlink: https://sg.run/DJkv
+      semgrep.dev:
+        rule:
+          r_id: 9808
+          rv_id: 1263602
+          rule_id: qNUo50
+          version_id: A8TgdDN
+          url: >-
+            https://semgrep.dev/playground/r/A8TgdDN/ruby.lang.security.dangerous-syscall.dangerous-syscall
+          origin: community
+    severity: WARNING
+    languages:
+      - ruby

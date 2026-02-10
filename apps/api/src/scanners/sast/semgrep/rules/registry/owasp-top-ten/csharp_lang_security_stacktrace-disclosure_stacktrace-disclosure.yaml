@@ -1,0 +1,54 @@
+rules:
+  - id: csharp.lang.security.stacktrace-disclosure.stacktrace-disclosure
+    patterns:
+      - pattern: $APP.UseDeveloperExceptionPage(...);
+      - pattern-not-inside: |
+          if ($ENV.IsDevelopment(...)) {
+            ...
+          }
+      - pattern-not-inside: |
+          if ($ENV.EnvironmentName == "Development") {
+            ...
+          }
+    message: >-
+      Stacktrace information is displayed in a non-Development environment.
+      Accidentally disclosing sensitive stack trace information in a production
+      environment aids an attacker in reconnaissance and information gathering.
+    metadata:
+      category: security
+      technology:
+        - csharp
+      owasp:
+        - A06:2017 - Security Misconfiguration
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      cwe:
+        - 'CWE-209: Generation of Error Message Containing Sensitive Information'
+      references:
+        - https://cwe.mitre.org/data/definitions/209.html
+        - https://owasp.org/Top10/A04_2021-Insecure_Design/
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: LOW
+      confidence: HIGH
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Mishandled Sensitive Information
+      source: >-
+        https://semgrep.dev/r/csharp.lang.security.stacktrace-disclosure.stacktrace-disclosure
+      shortlink: https://sg.run/XvkA
+      semgrep.dev:
+        rule:
+          r_id: 26720
+          rv_id: 1262653
+          rule_id: lBU6Dv
+          version_id: 0bTKzrB
+          url: >-
+            https://semgrep.dev/playground/r/0bTKzrB/csharp.lang.security.stacktrace-disclosure.stacktrace-disclosure
+          origin: community
+    languages:
+      - csharp
+    severity: WARNING

@@ -11,7 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../libs/auth/guards/jwt-auth.guard';
+import { PlatformAdminGuard } from '../../platform/guards/platform-admin.guard';
 import { FeedsService } from './feeds.service';
 import {
   CreateFeedConfigDto,
@@ -23,7 +23,7 @@ import {
 } from './dto/feed.dto';
 
 @Controller('admin/feeds')
-@UseGuards(JwtAuthGuard)
+@UseGuards(PlatformAdminGuard)
 export class FeedsController {
   constructor(private readonly feedsService: FeedsService) {}
 

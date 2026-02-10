@@ -1,0 +1,55 @@
+rules:
+  - id: >-
+      python.flask.security.flask-api-method-string-format.flask-api-method-string-format
+    patterns:
+      - pattern-either:
+          - pattern: |
+              def $METHOD(...,$ARG,...):
+                ...
+                $STRING = "...".format(...,$ARG,...)
+                ...
+                ... = requests.$REQMETHOD($STRING,...)
+          - pattern: |
+              def $METHOD(...,$ARG,...):
+                ...
+                ... = requests.$REQMETHOD("...".format(...,$ARG,...),...)
+      - pattern-inside: |
+          class $CLASS(...):
+            method_decorators = ...
+            ...
+    message: >-
+      Method $METHOD in API controller $CLASS provides user arg $ARG to requests
+      method $REQMETHOD
+    severity: ERROR
+    languages:
+      - python
+    metadata:
+      cwe:
+        - 'CWE-134: Use of Externally-Controlled Format String'
+      category: security
+      technology:
+        - flask
+      references:
+        - https://cwe.mitre.org/data/definitions/134.html
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Validation
+      source: >-
+        https://semgrep.dev/r/python.flask.security.flask-api-method-string-format.flask-api-method-string-format
+      shortlink: https://sg.run/bDWr
+      semgrep.dev:
+        rule:
+          r_id: 10126
+          rv_id: 946219
+          rule_id: NbUAeY
+          version_id: WrTEo0r
+          url: >-
+            https://semgrep.dev/playground/r/WrTEo0r/python.flask.security.flask-api-method-string-format.flask-api-method-string-format
+          origin: community

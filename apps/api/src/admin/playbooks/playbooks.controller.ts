@@ -21,10 +21,10 @@ import {
   PlaybookListQuery,
   BulkImportPlaybooksDto,
 } from './dto/playbook.dto';
-import { JwtAuthGuard } from '../../libs/auth/guards/jwt-auth.guard';
+import { PlatformAdminGuard } from '../../platform/guards/platform-admin.guard';
 
 @Controller('admin/playbooks')
-@UseGuards(JwtAuthGuard)
+@UseGuards(PlatformAdminGuard)
 export class PlaybooksController {
   constructor(private readonly service: PlaybooksService) {}
 

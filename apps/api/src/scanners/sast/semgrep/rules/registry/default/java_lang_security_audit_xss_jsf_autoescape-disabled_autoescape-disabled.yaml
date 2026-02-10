@@ -1,0 +1,45 @@
+rules:
+  - id: java.lang.security.audit.xss.jsf.autoescape-disabled.autoescape-disabled
+    message: >-
+      Detected an element with disabled HTML escaping. If external data can
+      reach this, this is a cross-site scripting (XSS) vulnerability. Ensure no
+      external data can reach here, or remove 'escape=false' from this element.
+    metadata:
+      owasp: A07:2017 - Cross-Site Scripting (XSS)
+      cwe:
+        - 'CWE-150: Improper Neutralization of Escape, Meta, or Control Sequences'
+      references:
+        - https://stackoverflow.com/a/7442668
+      category: security
+      technology:
+        - jsf
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Validation
+      source: >-
+        https://semgrep.dev/r/java.lang.security.audit.xss.jsf.autoescape-disabled.autoescape-disabled
+      shortlink: https://sg.run/qxne
+      semgrep.dev:
+        rule:
+          r_id: 9212
+          rv_id: 945709
+          rule_id: 10UKqE
+          version_id: GxTP74Y
+          url: >-
+            https://semgrep.dev/playground/r/GxTP74Y/java.lang.security.audit.xss.jsf.autoescape-disabled.autoescape-disabled
+          origin: community
+    pattern-regex: .*escape.*?=.*?false.*
+    paths:
+      include:
+        - '*.html'
+        - '*.xhtml'
+    languages:
+      - regex
+    severity: WARNING

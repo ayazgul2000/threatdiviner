@@ -1,0 +1,80 @@
+rules:
+  - id: >-
+      terraform.gcp.security.gcp-sql-database-ssl-insecure-value-sqlserver.gcp-sql-database-ssl-insecure-value-sqlserver
+    patterns:
+      - pattern-inside: |
+          resource "google_sql_database_instance" "..." {
+              ...
+              database_version = "$DB"
+              ...
+          }
+      - pattern-inside: |
+          resource "google_sql_database_instance" "..." {
+              ...
+              ip_configuration {
+                  ...
+                  ssl_mode = $VALUE
+                  ...
+              }
+              ...
+          }
+      - pattern-not-inside: |
+          resource "google_sql_database_instance" "..." {
+              ...
+              ip_configuration {
+                  ...
+                  ssl_mode = "ENCRYPTED_ONLY"
+                  ...
+              }
+              ...
+          }
+      - metavariable-regex:
+          metavariable: $DB
+          regex: .*(SQLSERVER).*
+      - focus-metavariable: $VALUE
+    fix: |
+      "ENCRYPTED_ONLY"
+    message: >-
+      Ensure all Cloud SQL database instance require incoming connections to use
+      SSL. For SQL Server, `ssl_mode="ENCRYPTED_ONLY"` is the most secure value
+      that is supported.
+    metadata:
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A02:2021 - Cryptographic Failures
+        - A04:2025 - Cryptographic Failures
+      cwe:
+        - 'CWE-326: Inadequate Encryption Strength'
+      category: security
+      technology:
+        - terraform
+        - gcp
+      references:
+        - >-
+          https://cloud.google.com/sql/docs/postgres/admin-api/rest/v1/instances#ipconfiguration
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.gcp.security.gcp-sql-database-ssl-insecure-value-sqlserver.gcp-sql-database-ssl-insecure-value-sqlserver
+      shortlink: https://sg.run/0o92j
+      semgrep.dev:
+        rule:
+          r_id: 153510
+          rv_id: 1263875
+          rule_id: GdUvX6A
+          version_id: X0Tzyyl
+          url: >-
+            https://semgrep.dev/playground/r/X0Tzyyl/terraform.gcp.security.gcp-sql-database-ssl-insecure-value-sqlserver.gcp-sql-database-ssl-insecure-value-sqlserver
+          origin: community
+    languages:
+      - hcl
+    severity: WARNING

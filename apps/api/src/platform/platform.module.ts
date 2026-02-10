@@ -41,6 +41,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     PlatformTenantsService,
     PlatformConfigService,
     PlatformStatsService,
+    PlatformAdminGuard,
   ],
 })
 export class PlatformModule {}

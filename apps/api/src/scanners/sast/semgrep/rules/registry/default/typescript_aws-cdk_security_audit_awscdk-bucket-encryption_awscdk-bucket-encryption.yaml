@@ -1,0 +1,74 @@
+rules:
+  - id: >-
+      typescript.aws-cdk.security.audit.awscdk-bucket-encryption.awscdk-bucket-encryption
+    message: >-
+      Add "encryption: $Y.BucketEncryption.KMS_MANAGED" or "encryption:
+      $Y.BucketEncryption.S3_MANAGED" to the bucket props for Bucket construct
+      $X
+    metadata:
+      cwe:
+        - 'CWE-311: Missing Encryption of Sensitive Data'
+      category: security
+      technology:
+        - AWS-CDK
+      references:
+        - >-
+          https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: HIGH
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/typescript.aws-cdk.security.audit.awscdk-bucket-encryption.awscdk-bucket-encryption
+      shortlink: https://sg.run/eowX
+      semgrep.dev:
+        rule:
+          r_id: 15276
+          rv_id: 1263903
+          rule_id: bwU8qz
+          version_id: GxTkeRx
+          url: >-
+            https://semgrep.dev/playground/r/GxTkeRx/typescript.aws-cdk.security.audit.awscdk-bucket-encryption.awscdk-bucket-encryption
+          origin: community
+    languages:
+      - typescript
+    severity: ERROR
+    pattern-either:
+      - patterns:
+          - pattern-inside: |
+              import {Bucket} from '@aws-cdk/aws-s3'
+              ...
+          - pattern: const $X = new Bucket(...)
+          - pattern-not: >
+              const $X = new Bucket(..., {..., encryption:
+              BucketEncryption.KMS_MANAGED, ...})
+          - pattern-not: >
+              const $X = new Bucket(..., {..., encryption: BucketEncryption.KMS,
+              ...})
+          - pattern-not: >
+              const $X = new Bucket(..., {..., encryption:
+              BucketEncryption.S3_MANAGED, ...})
+      - patterns:
+          - pattern-inside: |
+              import * as $Y from '@aws-cdk/aws-s3'
+              ...
+          - pattern: const $X = new $Y.Bucket(...)
+          - pattern-not: >
+              const $X = new $Y.Bucket(..., {..., encryption:
+              $Y.BucketEncryption.KMS_MANAGED, ...})
+          - pattern-not: >
+              const $X = new $Y.Bucket(..., {..., encryption:
+              $Y.BucketEncryption.KMS, ...})
+          - pattern-not: >
+              const $X = new $Y.Bucket(..., {..., encryption:
+              $Y.BucketEncryption.S3_MANAGED, ...})

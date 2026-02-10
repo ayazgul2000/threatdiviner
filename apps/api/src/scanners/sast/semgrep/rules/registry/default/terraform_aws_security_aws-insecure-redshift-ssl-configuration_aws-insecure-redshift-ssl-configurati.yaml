@@ -1,0 +1,67 @@
+rules:
+  - id: >-
+      terraform.aws.security.aws-insecure-redshift-ssl-configuration.aws-insecure-redshift-ssl-configuration
+    patterns:
+      - pattern: |
+          resource "aws_redshift_parameter_group" $ANYTHING {
+            ...
+          }
+      - pattern-not-inside: |
+          resource "aws_redshift_parameter_group" $ANYTHING {
+            ...
+            parameter {
+              name  = "require_ssl"
+              value = "true"
+            }
+            ...
+          }
+      - pattern-not-inside: |
+          resource "aws_redshift_parameter_group" $ANYTHING {
+            ...
+            parameter {
+              name  = "require_ssl"
+              value = true
+            }
+            ...
+          }
+    message: >-
+      Detected an AWS Redshift configuration with a SSL disabled. To fix this,
+      set your `require_ssl` to `"true"`.
+    metadata:
+      category: security
+      technology:
+        - terraform
+        - aws
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A02:2021 - Cryptographic Failures
+        - A04:2025 - Cryptographic Failures
+      cwe:
+        - 'CWE-326: Inadequate Encryption Strength'
+      references:
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.aws-insecure-redshift-ssl-configuration.aws-insecure-redshift-ssl-configuration
+      shortlink: https://sg.run/yPYx
+      semgrep.dev:
+        rule:
+          r_id: 17368
+          rv_id: 1263727
+          rule_id: 0oUrOj
+          version_id: zyTb27A
+          url: >-
+            https://semgrep.dev/playground/r/zyTb27A/terraform.aws.security.aws-insecure-redshift-ssl-configuration.aws-insecure-redshift-ssl-configuration
+          origin: community
+    languages:
+      - hcl
+    severity: WARNING

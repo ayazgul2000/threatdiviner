@@ -14,18 +14,32 @@ async function fetchRepository(repositoryId: string): Promise<any> {
   return res.json();
 }
 
-async function fetchBranches(repositoryId: string): Promise<any[]> {
+async function fetchBranches(repositoryId: string): Promise<{ data: any[]; error?: string }> {
   const res = await fetch(`${API_BASE}/scm/repositories/${repositoryId}/branches`, { credentials: 'include' });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMsg = errorData.message || `Failed to fetch branches (${res.status})`;
+    if (res.status === 500 && errorMsg.includes('401')) {
+      return { data: [], error: 'SCM token expired or invalid. Please reconnect the repository.' };
+    }
+    return { data: [], error: errorMsg };
+  }
   const data = await res.json();
-  return data.branches || data || [];
+  return { data: data.branches || data || [] };
 }
 
-async function fetchPullRequests(repositoryId: string): Promise<any[]> {
+async function fetchPullRequests(repositoryId: string): Promise<{ data: any[]; error?: string }> {
   const res = await fetch(`${API_BASE}/scm/repositories/${repositoryId}/pulls?state=all&limit=100`, { credentials: 'include' });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMsg = errorData.message || `Failed to fetch pull requests (${res.status})`;
+    if (res.status === 500 && errorMsg.includes('401')) {
+      return { data: [], error: 'SCM token expired or invalid. Please reconnect the repository.' };
+    }
+    return { data: [], error: errorMsg };
+  }
   const data = await res.json();
-  return data.pulls || data || [];
+  return { data: data.pulls || data || [] };
 }
 
 async function fetchScans(projectId: string, repositoryId: string): Promise<any[]> {
@@ -693,7 +707,7 @@ function DeepAnalysisModal({
 }
 
 // ============ BRANCHES TAB ============
-function BranchesTab({ branches, onBranchClick, onSettingsClick }: { branches: Branch[]; onBranchClick: (id: string) => void; onSettingsClick: (branch: Branch) => void }) {
+function BranchesTab({ branches, onBranchClick, onSettingsClick, scmError }: { branches: Branch[]; onBranchClick: (id: string) => void; onSettingsClick: (branch: Branch) => void; scmError?: string | null }) {
   const getHealthColor = (score: number | null) => {
     if (score === null) return 'bg-gray-100 text-gray-500';
     if (score >= 80) return 'bg-emerald-100 text-emerald-700';
@@ -702,6 +716,15 @@ function BranchesTab({ branches, onBranchClick, onSettingsClick }: { branches: B
   };
 
   if (branches.length === 0) {
+    if (scmError) {
+      return (
+        <div className="text-center py-8">
+          <AlertOctagon className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-red-600 font-medium">Unable to load branches</p>
+          <p className="text-sm text-gray-500 mt-1">Check the SCM connection settings above</p>
+        </div>
+      );
+    }
     return <div className="text-center py-8 text-gray-500">No branches found</div>;
   }
 
@@ -913,6 +936,7 @@ export default function RepoDetailPage() {
   const [pulls, setPulls] = useState<any[]>([]);
   const [findings, setFindings] = useState({ critical: 0, high: 0, medium: 0, low: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  const [scmError, setScmError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'branches' | 'scans' | 'prs'>('branches');
   const [selectedBranchForSettings, setSelectedBranchForSettings] = useState<Branch | null>(null);
   const [showDeepAnalysisModal, setShowDeepAnalysisModal] = useState(false);
@@ -927,8 +951,9 @@ export default function RepoDetailPage() {
   const loadRepoData = async () => {
     if (!repoId || !currentProject?.id) return;
     setIsLoading(true);
+    setScmError(null);
     try {
-      const [repoData, branchData, pullData, scanData, findingData] = await Promise.all([
+      const [repoData, branchResult, pullResult, scanData, findingData] = await Promise.all([
         fetchRepository(repoId),
         fetchBranches(repoId),
         fetchPullRequests(repoId),
@@ -936,9 +961,15 @@ export default function RepoDetailPage() {
         fetchFindings(currentProject.id, repoId),
       ]);
       setRepo(repoData);
-      setBranches(transformBranches(branchData, scanData, pullData));
+
+      // Check for SCM errors
+      if (branchResult.error || pullResult.error) {
+        setScmError(branchResult.error || pullResult.error || 'Failed to fetch data from SCM provider');
+      }
+
+      setBranches(transformBranches(branchResult.data, scanData, pullResult.data));
       setScans(scanData);
-      setPulls(pullData);
+      setPulls(pullResult.data);
       setFindings(findingData);
     } catch (err) {
       console.error('Failed to load repo:', err);
@@ -1070,6 +1101,31 @@ export default function RepoDetailPage() {
         </div>
       </div>
 
+      {/* SCM Error Banner */}
+      {scmError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+          <AlertOctagon className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-medium text-red-900">Connection Error</h3>
+            <p className="text-sm text-red-700 mt-1">{scmError}</p>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => router.push('/dashboard/connections')}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Manage Connections
+              </button>
+              <button
+                onClick={loadRepoData}
+                className="px-3 py-1.5 text-sm bg-white border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tree View */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6" ref={containerRef}>
         <div className="grid grid-cols-[240px_60px_240px] gap-4 items-start relative">
@@ -1126,7 +1182,7 @@ export default function RepoDetailPage() {
         </div>
         
         <div>
-          {activeTab === 'branches' && <BranchesTab branches={branches} onBranchClick={handleBranchClick} onSettingsClick={handleBranchSettingsClick} />}
+          {activeTab === 'branches' && <BranchesTab branches={branches} onBranchClick={handleBranchClick} onSettingsClick={handleBranchSettingsClick} scmError={scmError} />}
           {activeTab === 'scans' && <ScanHistoryTab scans={scans} />}
           {activeTab === 'prs' && <PRActivityTab pulls={pulls} />}
         </div>

@@ -1,0 +1,45 @@
+rules:
+  - id: python.pymongo.security.mongodb.mongo-client-bad-auth
+    pattern: |
+      pymongo.MongoClient(..., authMechanism='MONGODB-CR')
+    message: >-
+      Warning MONGODB-CR was deprecated with the release of MongoDB 3.6 and is
+      no longer supported by MongoDB 4.0 (see
+      https://api.mongodb.com/python/current/examples/authentication.html for
+      details).
+    fix-regex:
+      regex: MONGODB-CR
+      replacement: SCRAM-SHA-256
+    severity: WARNING
+    languages:
+      - python
+    metadata:
+      cwe:
+        - 'CWE-477: Use of Obsolete Function'
+      category: security
+      technology:
+        - pymongo
+      references:
+        - https://cwe.mitre.org/data/definitions/477.html
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: LOW
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Dangerous Method or Function
+      source: >-
+        https://semgrep.dev/r/python.pymongo.security.mongodb.mongo-client-bad-auth
+      shortlink: https://sg.run/YXRd
+      semgrep.dev:
+        rule:
+          r_id: 12658
+          rv_id: 946422
+          rule_id: d8UlOX
+          version_id: 0bT15XY
+          url: >-
+            https://semgrep.dev/playground/r/0bT15XY/python.pymongo.security.mongodb.mongo-client-bad-auth
+          origin: community

@@ -1,0 +1,60 @@
+rules:
+  - id: >-
+      terraform.azure.security.storage.storage-default-action-deny.storage-default-action-deny
+    message: >-
+      Detected a Storage that was not configured to deny action by default. Add
+      `default_action = "Deny"` in your resource block.
+    patterns:
+      - pattern: resource
+      - pattern-not-inside: |
+          resource "azurerm_storage_account_network_rules" "..." {
+          ...
+            default_action = "Deny"
+          ...
+          }
+      - pattern-inside: |
+          resource "azurerm_storage_account_network_rules" "..." {
+          ...
+            default_action = "Allow"
+          ...
+          }
+    metadata:
+      cwe:
+        - 'CWE-16: CWE CATEGORY: Configuration'
+      category: security
+      technology:
+        - terraform
+        - azure
+      references:
+        - >-
+          https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account_network_rules#default_action
+        - https://docs.microsoft.com/en-us/azure/firewall/rule-processing
+      owasp:
+        - A06:2017 - Security Misconfiguration
+        - A05:2021 - Security Misconfiguration
+        - A02:2025 - Security Misconfiguration
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: LOW
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Other
+      source: >-
+        https://semgrep.dev/r/terraform.azure.security.storage.storage-default-action-deny.storage-default-action-deny
+      shortlink: https://sg.run/WpN4
+      semgrep.dev:
+        rule:
+          r_id: 15109
+          rv_id: 1263804
+          rule_id: zdUY3N
+          version_id: A8Tgd7d
+          url: >-
+            https://semgrep.dev/playground/r/A8Tgd7d/terraform.azure.security.storage.storage-default-action-deny.storage-default-action-deny
+          origin: community
+    languages:
+      - hcl
+    severity: ERROR

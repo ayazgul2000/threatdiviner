@@ -1,0 +1,68 @@
+rules:
+  - id: >-
+      javascript.express.security.audit.express-cookie-settings.express-cookie-session-default-name
+    message: >-
+      Don't use the default session cookie name Using the default session cookie
+      name can open your app to attacks. The security issue posed is similar to
+      X-Powered-By: a potential attacker can use it to fingerprint the server
+      and target attacks accordingly.
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      cwe:
+        - 'CWE-522: Insufficiently Protected Credentials'
+      owasp:
+        - A02:2017 - Broken Authentication
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      source-rule-url: https://expressjs.com/en/advanced/best-practice-security.html
+      category: security
+      technology:
+        - express
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: HIGH
+      impact: LOW
+      confidence: MEDIUM
+      references:
+        - https://owasp.org/Top10/A04_2021-Insecure_Design
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/javascript.express.security.audit.express-cookie-settings.express-cookie-session-default-name
+      shortlink: https://sg.run/1Z5x
+      semgrep.dev:
+        rule:
+          r_id: 9266
+          rv_id: 1263130
+          rule_id: eqU8k2
+          version_id: bZT536J
+          url: >-
+            https://semgrep.dev/playground/r/bZT536J/javascript.express.security.audit.express-cookie-settings.express-cookie-session-default-name
+          origin: community
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              $SESSION = require('cookie-session');
+              ...
+          - pattern-inside: |
+              $SESSION = require('express-session');
+              ...
+      - pattern: $SESSION(...)
+      - pattern-not-inside: $SESSION(<... {name:...} ...>,...)
+      - pattern-not-inside: |
+          $OPTS = <... {name:...} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $OPTS.name = ...;
+          ...
+          $SESSION($OPTS,...);

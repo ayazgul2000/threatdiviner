@@ -18,6 +18,7 @@ import {
   HttpStatus,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import AdmZip from 'adm-zip';
 import { Response } from 'express';
 import { ThreatModelingService } from './threat-modeling.service';
 import { JwtAuthGuard } from '../libs/auth/guards/jwt-auth.guard';
@@ -30,6 +31,10 @@ import { YamlGeneratorService } from './services/yaml-generator.service';
 import { GapDetectionService } from './services/gap-detection.service';
 import { DiagramSyncService } from './services/diagram-sync.service';
 import { ThreatModelComplianceService } from './services/threat-model-compliance.service';
+import { UserWizardService } from './services/user-wizard.service';
+import { ImportService, ImportFileType, ImportPreviewResult } from './services/import.service';
+import { AiCreationService, AiGenerationResult } from './services/ai-creation.service';
+import { TemplateService } from './services/template.service';
 import { QueueService } from '../queue/services/queue.service';
 import { BatchUpdateAssetsDto, BatchUpdateLinksDto, BatchUpdateBoundariesDto } from './dto/batch-update.dto';
 import { ComplianceReportGenerator } from '../reporting/generators/compliance-report.generator';
@@ -55,9 +60,291 @@ export class ThreatModelingController {
     private readonly gapDetectionService: GapDetectionService,
     private readonly diagramSyncService: DiagramSyncService,
     private readonly complianceService: ThreatModelComplianceService,
+    private readonly userWizardService: UserWizardService,
+    private readonly importService: ImportService,
+    private readonly aiCreationService: AiCreationService,
+    private readonly templateService: TemplateService,
     private readonly queueService: QueueService,
     private readonly complianceReportGenerator: ComplianceReportGenerator,
   ) {}
+
+  // ===== WIZARD (User-Facing) =====
+
+  @Get('wizard/info')
+  async getWizardInfo() {
+    return this.userWizardService.getWizardInfo();
+  }
+
+  @Get('wizard/start')
+  async getWizardStart() {
+    const question = await this.userWizardService.getEntryQuestion();
+    if (!question) {
+      throw new NotFoundException('No wizard questions available. Please contact administrator.');
+    }
+    return question;
+  }
+
+  @Get('wizard/questions/:questionId')
+  async getWizardQuestion(@Param('questionId') questionId: string) {
+    return this.userWizardService.getQuestion(questionId);
+  }
+
+  @Post('wizard/next')
+  async getWizardNextQuestion(
+    @Body() body: { currentQuestionId: string; selectedValue: string },
+  ) {
+    const nextQuestion = await this.userWizardService.getNextQuestion(
+      body.currentQuestionId,
+      body.selectedValue,
+    );
+    return { question: nextQuestion, isTerminal: !nextQuestion };
+  }
+
+  @Post('wizard/preview')
+  async previewWizardResult(
+    @Body() body: { answers: Array<{ questionId: string; selectedValue: string | string[] }> },
+  ) {
+    return this.userWizardService.previewWizardResult(body.answers);
+  }
+
+  @Post('wizard/create')
+  async createFromWizard(
+    @Req() req: AuthRequest,
+    @Body() body: {
+      projectId: string;
+      answers: Array<{ questionId: string; selectedValue: string | string[] }>;
+      name: string;
+      description?: string;
+      methodology?: string;
+    },
+  ) {
+    if (!body.projectId) {
+      throw new BadRequestException('projectId is required');
+    }
+    if (!body.answers || body.answers.length === 0) {
+      throw new BadRequestException('At least one answer is required');
+    }
+    if (!body.name) {
+      throw new BadRequestException('name is required');
+    }
+
+    return this.userWizardService.createFromWizard(
+      req.user.tenantId,
+      req.user.userId,
+      body.projectId,
+      body.answers,
+      body.name,
+      body.description,
+      body.methodology,
+    );
+  }
+
+  // ===== IMPORT =====
+
+  @Post('import/parse')
+  async parseImportFile(
+    @Body() body: {
+      filename: string;
+      content: string;
+      fileType?: ImportFileType;
+    },
+  ): Promise<ImportPreviewResult> {
+    if (!body.filename) {
+      throw new BadRequestException('filename is required');
+    }
+    if (!body.content) {
+      throw new BadRequestException('content is required');
+    }
+
+    return this.importService.parseFile(body.filename, body.content, body.fileType);
+  }
+
+  @Post('import/from-repository')
+  async parseFromRepository(
+    @Req() req: AuthRequest,
+    @Body() body: {
+      repositoryId: string;
+      filePaths?: string[];
+    },
+  ): Promise<ImportPreviewResult[]> {
+    if (!body.repositoryId) {
+      throw new BadRequestException('repositoryId is required');
+    }
+
+    return this.importService.parseRepository(
+      body.repositoryId,
+      req.user.tenantId,
+      body.filePaths,
+    );
+  }
+
+  @Post('import/create')
+  async createFromImport(
+    @Req() req: AuthRequest,
+    @Body() body: {
+      projectId: string;
+      importResult: ImportPreviewResult;
+      name: string;
+      description?: string;
+      methodology?: string;
+    },
+  ) {
+    if (!body.projectId) {
+      throw new BadRequestException('projectId is required');
+    }
+    if (!body.importResult) {
+      throw new BadRequestException('importResult is required');
+    }
+    if (!body.name) {
+      throw new BadRequestException('name is required');
+    }
+
+    return this.importService.createFromImport(
+      req.user.tenantId,
+      req.user.userId,
+      body.projectId,
+      body.importResult,
+      body.name,
+      body.description,
+      body.methodology,
+    );
+  }
+
+  // ===== AI GENERATION =====
+
+  @Get('ai/status')
+  async getAiStatus() {
+    const available = await this.aiCreationService.isAvailable();
+    return { available };
+  }
+
+  @Post('ai/generate')
+  async generateFromDescription(
+    @Body() body: {
+      description: string;
+      systemType?: string;
+      industry?: string;
+    },
+  ): Promise<AiGenerationResult> {
+    if (!body.description) {
+      throw new BadRequestException('description is required');
+    }
+
+    return this.aiCreationService.generateFromDescription(body.description, {
+      systemType: body.systemType,
+      industry: body.industry,
+    });
+  }
+
+  @Post('ai/refine')
+  async refineGeneration(
+    @Body() body: {
+      currentResult: AiGenerationResult;
+      refinementPrompt: string;
+    },
+  ): Promise<AiGenerationResult> {
+    if (!body.currentResult) {
+      throw new BadRequestException('currentResult is required');
+    }
+    if (!body.refinementPrompt) {
+      throw new BadRequestException('refinementPrompt is required');
+    }
+
+    return this.aiCreationService.refineGeneration(
+      body.currentResult,
+      body.refinementPrompt,
+    );
+  }
+
+  @Post('ai/create')
+  async createFromAi(
+    @Req() req: AuthRequest,
+    @Body() body: {
+      projectId: string;
+      generationResult: AiGenerationResult;
+      name: string;
+      description?: string;
+      methodology?: string;
+    },
+  ) {
+    if (!body.projectId) {
+      throw new BadRequestException('projectId is required');
+    }
+    if (!body.generationResult) {
+      throw new BadRequestException('generationResult is required');
+    }
+    if (!body.name) {
+      throw new BadRequestException('name is required');
+    }
+
+    return this.aiCreationService.createFromGeneration(
+      req.user.tenantId,
+      req.user.userId,
+      body.projectId,
+      body.generationResult,
+      body.name,
+      body.description,
+      body.methodology,
+    );
+  }
+
+  // ===== TEMPLATES =====
+
+  @Get('templates')
+  async listTemplates(
+    @Req() req: AuthRequest,
+    @Query('category') category?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.templateService.listTemplates(req.user.tenantId, {
+      category,
+      search,
+    });
+  }
+
+  @Get('templates/categories')
+  async getTemplateCategories() {
+    return this.templateService.getCategories();
+  }
+
+  @Get('templates/:templateId')
+  async getTemplate(
+    @Req() req: AuthRequest,
+    @Param('templateId') templateId: string,
+  ) {
+    return this.templateService.getTemplate(req.user.tenantId, templateId);
+  }
+
+  @Post('templates/:templateId/create')
+  async createFromTemplate(
+    @Req() req: AuthRequest,
+    @Param('templateId') templateId: string,
+    @Body() body: {
+      projectId: string;
+      name: string;
+      description?: string;
+      methodology?: string;
+    },
+  ) {
+    if (!body.projectId) {
+      throw new BadRequestException('projectId is required');
+    }
+    if (!body.name) {
+      throw new BadRequestException('name is required');
+    }
+
+    return this.templateService.createFromTemplate(
+      req.user.tenantId,
+      req.user.userId,
+      templateId,
+      {
+        projectId: body.projectId,
+        name: body.name,
+        description: body.description,
+        methodology: body.methodology,
+      },
+    );
+  }
 
   // ===== THREAT MODELS =====
 
@@ -889,11 +1176,13 @@ export class ThreatModelingController {
     @Param('id') id: string,
     @Query('limit') limit?: string,
   ) {
-    return this.threagileService.getAnalysisHistory(
+    const runs = await this.threagileService.getAnalysisHistory(
       id,
       req.user.tenantId,
       limit ? parseInt(limit) : 10,
     );
+    // Strip binary reportZip from list; indicate whether artifacts exist
+    return runs.map(({ reportZip, ...rest }) => ({ ...rest, hasReportZip: !!reportZip }));
   }
 
   @Get(':id/analysis-runs/:runId')
@@ -906,7 +1195,9 @@ export class ThreatModelingController {
     if (!run) {
       throw new BadRequestException('Analysis run not found');
     }
-    return run;
+    // Exclude binary reportZip from JSON response; indicate whether artifacts exist
+    const { reportZip, ...rest } = run;
+    return { ...rest, hasReportZip: !!reportZip };
   }
 
   @Delete(':id/analysis-runs/:runId')
@@ -925,6 +1216,82 @@ export class ThreatModelingController {
       throw new BadRequestException('Analysis run not found or not running');
     }
     return { success: true, message: 'Analysis cancelled' };
+  }
+
+  // ===== ANALYSIS ARTIFACTS =====
+
+  @Get(':id/analysis-runs/:runId/artifacts')
+  async listArtifacts(
+    @Req() req: AuthRequest,
+    @Param('id') _id: string,
+    @Param('runId') runId: string,
+  ) {
+    const run = await this.threagileService.getAnalysisRun(runId, req.user.tenantId);
+    if (!run) {
+      throw new NotFoundException('Analysis run not found');
+    }
+
+    if (!run.reportZip) {
+      return { artifacts: [] };
+    }
+
+    const zip = new AdmZip(Buffer.from(run.reportZip));
+    const entries = zip.getEntries();
+
+    const artifacts = entries
+      .filter(e => !e.isDirectory)
+      .map(e => ({
+        name: e.entryName,
+        size: e.header.size,
+        contentType: this.getArtifactContentType(e.entryName),
+      }));
+
+    return { artifacts };
+  }
+
+  @Get(':id/analysis-runs/:runId/artifacts/:filename')
+  async downloadArtifact(
+    @Req() req: AuthRequest,
+    @Param('id') _id: string,
+    @Param('runId') runId: string,
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ) {
+    const run = await this.threagileService.getAnalysisRun(runId, req.user.tenantId);
+    if (!run) {
+      throw new NotFoundException('Analysis run not found');
+    }
+
+    if (!run.reportZip) {
+      throw new NotFoundException('No report artifacts available for this analysis run');
+    }
+
+    const zip = new AdmZip(Buffer.from(run.reportZip));
+    const entry = zip.getEntry(filename);
+    if (!entry) {
+      throw new NotFoundException(`Artifact "${filename}" not found in report`);
+    }
+
+    const contentType = this.getArtifactContentType(filename);
+    const data = entry.getData();
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', data.length);
+    res.send(data);
+  }
+
+  private getArtifactContentType(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const contentTypes: Record<string, string> = {
+      json: 'application/json',
+      pdf: 'application/pdf',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      png: 'image/png',
+      yaml: 'application/x-yaml',
+      yml: 'application/x-yaml',
+    };
+    return contentTypes[ext || ''] || 'application/octet-stream';
   }
 
   // ===== LOCKING =====

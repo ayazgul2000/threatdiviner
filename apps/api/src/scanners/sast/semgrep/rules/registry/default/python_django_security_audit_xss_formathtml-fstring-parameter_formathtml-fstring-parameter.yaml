@@ -1,0 +1,56 @@
+rules:
+  - id: >-
+      python.django.security.audit.xss.formathtml-fstring-parameter.formathtml-fstring-parameter
+    message: >-
+      Passing a formatted string as first parameter to `format_html` disables
+      the proper encoding of variables. Any HTML in the first parameter is not
+      encoded. Using a formatted string as first parameter obscures which
+      parameters are encoded. Correct use of `format_html` is passing a static
+      format string as first parameter, and the variables to substitute as
+      subsequent parameters.
+    metadata:
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - >-
+          https://docs.djangoproject.com/en/3.2/ref/utils/#django.utils.html.format_html
+      category: security
+      technology:
+        - django
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/python.django.security.audit.xss.formathtml-fstring-parameter.formathtml-fstring-parameter
+      shortlink: https://sg.run/lxQo
+      semgrep.dev:
+        rule:
+          r_id: 12657
+          rv_id: 1263373
+          rule_id: v8UjKg
+          version_id: 9lT4bYd
+          url: >-
+            https://semgrep.dev/playground/r/9lT4bYd/python.django.security.audit.xss.formathtml-fstring-parameter.formathtml-fstring-parameter
+          origin: community
+    languages:
+      - python
+    severity: WARNING
+    pattern-either:
+      - pattern: format_html(<... f"..." ...>, ...)
+      - pattern: format_html("..." % ..., ...)
+      - pattern: format_html("...".format(...), ...)

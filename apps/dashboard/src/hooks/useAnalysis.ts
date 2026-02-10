@@ -79,7 +79,12 @@ export function useAnalysis(): UseAnalysisResult {
         // Handle other errors
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          const errorMessage = errorData.message || `Analysis failed with status ${response.status}`;
+          let errorMessage = errorData.message || `Analysis failed with status ${response.status}`;
+          // Include validation errors if present
+          if (errorData.errors && Array.isArray(errorData.errors)) {
+            const details = errorData.errors.map((e: { message?: string; field?: string }) => e.message || e.field).filter(Boolean).join('; ');
+            if (details) errorMessage += ': ' + details;
+          }
           setError(errorMessage);
           setIsStarting(false);
           return {

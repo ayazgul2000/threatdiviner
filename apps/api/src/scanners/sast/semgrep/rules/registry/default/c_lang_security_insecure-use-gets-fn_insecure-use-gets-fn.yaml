@@ -1,0 +1,40 @@
+rules:
+  - id: c.lang.security.insecure-use-gets-fn.insecure-use-gets-fn
+    pattern: gets(...)
+    message: >-
+      Avoid 'gets()'. This function does not consider buffer boundaries and can
+      lead to buffer overflows. Use 'fgets()' or 'gets_s()' instead.
+    metadata:
+      cwe:
+        - 'CWE-676: Use of Potentially Dangerous Function'
+      references:
+        - >-
+          https://us-cert.cisa.gov/bsi/articles/knowledge/coding-practices/fgets-and-gets_s
+      category: security
+      technology:
+        - c
+      confidence: MEDIUM
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: HIGH
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Dangerous Method or Function
+      source: >-
+        https://semgrep.dev/r/c.lang.security.insecure-use-gets-fn.insecure-use-gets-fn
+      shortlink: https://sg.run/dKqX
+      semgrep.dev:
+        rule:
+          r_id: 8834
+          rv_id: 945170
+          rule_id: GdU7OE
+          version_id: YDTvRlQ
+          url: >-
+            https://semgrep.dev/playground/r/YDTvRlQ/c.lang.security.insecure-use-gets-fn.insecure-use-gets-fn
+          origin: community
+    languages:
+      - c
+    severity: ERROR

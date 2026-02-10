@@ -1,0 +1,43 @@
+rules:
+  - id: python.lang.security.audit.telnetlib.telnetlib
+    pattern: telnetlib.$ANYTHING(...)
+    message: Telnet does not encrypt communications. Use SSH instead.
+    metadata:
+      source-rule-url: >-
+        https://github.com/PyCQA/bandit/blob/d5f8fa0d89d7b11442fc6ec80ca42953974354c8/bandit/blacklists/calls.py#L208
+      cwe:
+        - 'CWE-319: Cleartext Transmission of Sensitive Information'
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A02:2021 - Cryptographic Failures
+        - A04:2025 - Cryptographic Failures
+      bandit-code: B312
+      references:
+        - https://docs.python.org/3/library/telnetlib.html
+      category: security
+      technology:
+        - python
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: LOW
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Mishandled Sensitive Information
+      source: https://semgrep.dev/r/python.lang.security.audit.telnetlib.telnetlib
+      shortlink: https://sg.run/Gelp
+      semgrep.dev:
+        rule:
+          r_id: 9648
+          rv_id: 1263519
+          rule_id: 0oU5Wl
+          version_id: K3TKkZo
+          url: >-
+            https://semgrep.dev/playground/r/K3TKkZo/python.lang.security.audit.telnetlib.telnetlib
+          origin: community
+    severity: WARNING
+    languages:
+      - python

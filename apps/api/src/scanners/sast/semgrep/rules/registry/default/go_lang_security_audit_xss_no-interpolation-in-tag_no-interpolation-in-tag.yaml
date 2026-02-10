@@ -1,0 +1,58 @@
+rules:
+  - id: go.lang.security.audit.xss.no-interpolation-in-tag.no-interpolation-in-tag
+    message: >-
+      Detected template variable interpolation in an HTML tag. This is
+      potentially vulnerable to cross-site scripting (XSS) attacks because a
+      malicious actor has control over HTML but without the need to use escaped
+      characters. Use explicit tags instead.
+    metadata:
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - https://github.com/golang/go/issues/19669
+        - >-
+          https://blogtitle.github.io/robn-go-security-pearls-cross-site-scripting-xss/
+      category: security
+      technology:
+        - generic
+      confidence: LOW
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/go.lang.security.audit.xss.no-interpolation-in-tag.no-interpolation-in-tag
+      shortlink: https://sg.run/LwJJ
+      semgrep.dev:
+        rule:
+          r_id: 9139
+          rv_id: 1262959
+          rule_id: AbUzBB
+          version_id: l4TJRZK
+          url: >-
+            https://semgrep.dev/playground/r/l4TJRZK/go.lang.security.audit.xss.no-interpolation-in-tag.no-interpolation-in-tag
+          origin: community
+    languages:
+      - generic
+    severity: WARNING
+    paths:
+      include:
+        - '*.html'
+        - '*.thtml'
+        - '*.gohtml'
+        - '*.tmpl'
+        - '*.tpl'
+    pattern: <{{ ... }} ... >

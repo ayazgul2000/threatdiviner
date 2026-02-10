@@ -1,0 +1,64 @@
+rules:
+  - patterns:
+      - pattern-either:
+          - pattern: |
+              provisioner "remote-exec" {
+                  ...
+              }
+          - pattern: |
+              provisioner "local-exec" {
+                  ...
+              }
+      - pattern-inside: |
+          resource "aws_instance" "..." {
+              ...
+          }
+    id: terraform.aws.security.aws-provisioner-exec.aws-provisioner-exec
+    message: >-
+      Provisioners are a tool of last resort and should be avoided where
+      possible. Provisioner behavior cannot be mapped by Terraform as part of a
+      plan, and execute arbitrary shell commands by design.
+    languages:
+      - terraform
+    severity: WARNING
+    metadata:
+      category: security
+      owasp:
+        - A03:2021 - Injection
+        - A01:2017 - Injection
+        - A05:2025 - Injection
+      cwe:
+        - >-
+          CWE-77: Improper Neutralization of Special Elements used in a Command
+          ('Command Injection')
+        - 'CWE-94: Improper Control of Generation of Code (''Code Injection'')'
+      subcategory:
+        - audit
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      technology:
+        - terraform
+      references:
+        - >-
+          https://developer.hashicorp.com/terraform/language/resources/provisioners/remote-exec
+        - >-
+          https://developer.hashicorp.com/terraform/language/resources/provisioners/local-exec
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Code Injection
+        - Other
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.aws-provisioner-exec.aws-provisioner-exec
+      shortlink: https://sg.run/7EjQ
+      semgrep.dev:
+        rule:
+          r_id: 70982
+          rv_id: 1263736
+          rule_id: EwUxO1
+          version_id: bZT53j1
+          url: >-
+            https://semgrep.dev/playground/r/bZT53j1/terraform.aws.security.aws-provisioner-exec.aws-provisioner-exec
+          origin: community

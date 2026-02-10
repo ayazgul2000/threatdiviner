@@ -1,0 +1,29 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-httpsconn
+    pattern: http.client.HTTPSConnection(blocksize=$X,...)
+    message: >-
+      Found usage of the 'blocksize' argument in a HTTPSConnection call. This is
+      only available on Python 3.7+ and is therefore not backwards compatible.
+      Remove this in order for this code to work in Python 3.6 and below.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-httpsconn
+      shortlink: https://sg.run/dKwd
+      semgrep.dev:
+        rule:
+          r_id: 9578
+          rv_id: 946268
+          rule_id: gxU1qd
+          version_id: YDTvR0R
+          url: >-
+            https://semgrep.dev/playground/r/YDTvR0R/python.lang.compatibility.python37.python37-compatibility-httpsconn
+          origin: community

@@ -11,7 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../../libs/auth/guards/jwt-auth.guard';
+import { PlatformAdminGuard } from '../../platform/guards/platform-admin.guard';
 import { WizardService } from './wizard.service';
 import {
   CreateQuestionDto,
@@ -24,7 +24,7 @@ import {
 } from './dto/wizard.dto';
 
 @Controller('admin/wizard')
-@UseGuards(JwtAuthGuard)
+@UseGuards(PlatformAdminGuard)
 export class WizardController {
   constructor(private readonly wizardService: WizardService) {}
 

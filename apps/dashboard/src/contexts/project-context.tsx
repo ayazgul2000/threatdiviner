@@ -39,14 +39,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const fetchProjects = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch(`${API_URL}/projects`, {
-        headers: { Authorization: `Bearer ${token}` },
         credentials: 'include',
       });
 
@@ -91,12 +84,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createProject = useCallback(async (name: string, description?: string): Promise<Project> => {
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API_URL}/projects`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ name, description }),
       credentials: 'include',

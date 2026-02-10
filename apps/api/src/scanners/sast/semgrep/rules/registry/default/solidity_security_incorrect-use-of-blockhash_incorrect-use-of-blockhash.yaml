@@ -1,0 +1,44 @@
+rules:
+  - id: solidity.security.incorrect-use-of-blockhash.incorrect-use-of-blockhash
+    message: blockhash(block.number) and blockhash(block.number + N) always returns 0.
+    metadata:
+      category: security
+      technology:
+        - solidity
+      cwe: 'CWE-341: Predictable from Observable State'
+      confidence: HIGH
+      likelihood: LOW
+      impact: MEDIUM
+      subcategory:
+        - vuln
+      references:
+        - >-
+          https://blog.positive.com/predicting-random-numbers-in-ethereum-smart-contracts-e5358c6b8620
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Other
+      source: >-
+        https://semgrep.dev/r/solidity.security.incorrect-use-of-blockhash.incorrect-use-of-blockhash
+      shortlink: https://sg.run/qvPO
+      semgrep.dev:
+        rule:
+          r_id: 67656
+          rv_id: 946618
+          rule_id: 4bUPoB
+          version_id: GxTP7wj
+          url: >-
+            https://semgrep.dev/playground/r/GxTP7wj/solidity.security.incorrect-use-of-blockhash.incorrect-use-of-blockhash
+          origin: community
+    patterns:
+      - pattern-either:
+          - pattern: blockhash(block.number)
+          - pattern: blockhash(block.number + $N)
+          - pattern: blockhash(block.number * $N)
+          - pattern: block.blockhash(block.number)
+          - pattern: block.blockhash(block.number + $N)
+          - pattern: block.blockhash(block.number * $N)
+    severity: ERROR
+    languages:
+      - solidity

@@ -108,7 +108,9 @@ export default function LockManager({
       setIsChecking(true);
       setError(null);
 
-      const response = await fetch(`${apiBaseUrl}/${threatModelId}/lock`);
+      const response = await fetch(`${apiBaseUrl}/${threatModelId}/lock`, {
+        credentials: 'include',
+      });
 
       if (response.status === 404) {
         // No lock exists
@@ -142,6 +144,7 @@ export default function LockManager({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           lockedBy: currentUserId,
           lockedByName: currentUserName,
@@ -187,6 +190,7 @@ export default function LockManager({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ userId: currentUserId }),
       });
 
@@ -215,6 +219,7 @@ export default function LockManager({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           userId: currentUserId,
           durationMinutes: LOCK_DURATION_MINUTES,
@@ -246,6 +251,7 @@ export default function LockManager({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           lockedBy: currentUserId,
           lockedByName: currentUserName,
@@ -388,7 +394,9 @@ export function useLockManager(
 
   const checkLock = useCallback(async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/${threatModelId}/lock`);
+      const response = await fetch(`${apiBaseUrl}/${threatModelId}/lock`, {
+        credentials: 'include',
+      });
       if (response.status === 404) {
         setLockInfo(null);
         return null;
@@ -410,15 +418,27 @@ export function useLockManager(
       const response = await fetch(`${apiBaseUrl}/${threatModelId}/lock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ lockedBy: currentUserId, lockedByName, durationMinutes: 5 }),
       });
-      if (!response.ok) throw new Error('Failed to acquire lock');
+      if (!response.ok) {
+        // Handle conflict - lock held by another user
+        if (response.status === 409 || response.status === 400) {
+          const errorData = await response.json().catch(() => ({}));
+          if (errorData.existingLock) {
+            setLockInfo(errorData.existingLock);
+          }
+          // Silently handle - the lock status will be shown in UI
+          return null;
+        }
+        throw new Error('Failed to acquire lock');
+      }
       const data = await response.json();
       setLockInfo(data);
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
-      throw err;
+      return null;
     } finally {
       setIsLocking(false);
     }
@@ -430,11 +450,34 @@ export function useLockManager(
       await fetch(`${apiBaseUrl}/${threatModelId}/lock`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ userId: currentUserId }),
       });
       setLockInfo(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLocking(false);
+    }
+  }, [threatModelId, currentUserId, apiBaseUrl]);
+
+  const forceTakeLock = useCallback(async (lockedByName?: string) => {
+    try {
+      setIsLocking(true);
+      setError(null);
+      const response = await fetch(`${apiBaseUrl}/${threatModelId}/lock/force`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ lockedBy: currentUserId, lockedByName, durationMinutes: 5 }),
+      });
+      if (!response.ok) throw new Error('Failed to force acquire lock');
+      const data = await response.json();
+      setLockInfo(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      return null;
     } finally {
       setIsLocking(false);
     }
@@ -449,5 +492,6 @@ export function useLockManager(
     checkLock,
     acquireLock,
     releaseLock,
+    forceTakeLock,
   };
 }

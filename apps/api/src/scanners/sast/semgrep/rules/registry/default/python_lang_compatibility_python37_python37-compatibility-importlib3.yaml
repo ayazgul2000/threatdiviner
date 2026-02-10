@@ -1,0 +1,29 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-importlib3
+    pattern: import importlib.abc.ResourceReader
+    message: >-
+      Found usage of 'importlib.abc.ResourceReader'. This module is only
+      available on Python 3.7+ and is therefore not backwards compatible.
+      Instead, use another loader.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-importlib3
+      shortlink: https://sg.run/Zv2o
+      semgrep.dev:
+        rule:
+          r_id: 9579
+          rv_id: 946269
+          rule_id: QrUzJ9
+          version_id: JdTDyrP
+          url: >-
+            https://semgrep.dev/playground/r/JdTDyrP/python.lang.compatibility.python37.python37-compatibility-importlib3
+          origin: community

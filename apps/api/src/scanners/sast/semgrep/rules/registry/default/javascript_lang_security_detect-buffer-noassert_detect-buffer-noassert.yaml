@@ -1,0 +1,51 @@
+rules:
+  - id: javascript.lang.security.detect-buffer-noassert.detect-buffer-noassert
+    message: >-
+      Detected usage of noassert in Buffer API, which allows the offset the be
+      beyond the end of the buffer. This could result in writing or reading
+      beyond the end of the buffer.
+    metadata:
+      cwe:
+        - >-
+          CWE-119: Improper Restriction of Operations within the Bounds of a
+          Memory Buffer
+      source-rule-url: >-
+        https://github.com/nodesecurity/eslint-plugin-security/blob/master/rules/detect-buffer-noassert.js
+      category: security
+      technology:
+        - javascript
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: HIGH
+      confidence: LOW
+      references:
+        - https://cwe.mitre.org/data/definitions/119.html
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Memory Issues
+      source: >-
+        https://semgrep.dev/r/javascript.lang.security.detect-buffer-noassert.detect-buffer-noassert
+      shortlink: https://sg.run/qxpO
+      semgrep.dev:
+        rule:
+          r_id: 9312
+          rv_id: 945886
+          rule_id: j2Uvj8
+          version_id: 9lTy1Y6
+          url: >-
+            https://semgrep.dev/playground/r/9lTy1Y6/javascript.lang.security.detect-buffer-noassert.detect-buffer-noassert
+          origin: community
+    languages:
+      - javascript
+      - typescript
+    severity: WARNING
+    patterns:
+      - pattern: $OBJ.$API(..., true)
+      - metavariable-regex:
+          metavariable: $API
+          regex: (read|write)(U?Int8|(U?Int(16|32)|Float|Double)(LE|BE))

@@ -1,0 +1,61 @@
+rules:
+  - id: python.flask.security.xss.audit.direct-use-of-jinja2.direct-use-of-jinja2
+    message: >-
+      Detected direct use of jinja2. If not done properly, this may bypass HTML
+      escaping which opens up the application to cross-site scripting (XSS)
+      vulnerabilities. Prefer using the Flask method 'render_template()' and
+      templates with a '.html' extension in order to prevent XSS.
+    metadata:
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - https://jinja.palletsprojects.com/en/2.11.x/api/#basics
+      category: security
+      technology:
+        - flask
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/python.flask.security.xss.audit.direct-use-of-jinja2.direct-use-of-jinja2
+      shortlink: https://sg.run/RoKe
+      semgrep.dev:
+        rule:
+          r_id: 9549
+          rv_id: 1263443
+          rule_id: qNUjN2
+          version_id: nWT2L1b
+          url: >-
+            https://semgrep.dev/playground/r/nWT2L1b/python.flask.security.xss.audit.direct-use-of-jinja2.direct-use-of-jinja2
+          origin: community
+    languages:
+      - python
+    severity: WARNING
+    pattern-either:
+      - pattern: jinja2.Environment(...)
+      - pattern: jinja2.Template.render(...)
+      - patterns:
+          - pattern-inside: |
+              $TEMPLATE = $ENV.get_template(...)
+              ...
+          - pattern: $TEMPLATE.render(...)
+      - patterns:
+          - pattern-inside: |
+              $TEMPLATE = jinja2.Template(...)
+              ...
+          - pattern: $TEMPLATE.render(...)

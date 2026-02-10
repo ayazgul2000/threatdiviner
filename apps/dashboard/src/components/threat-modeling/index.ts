@@ -1,20 +1,6 @@
-export { default as DiagramCanvas } from './DiagramCanvas';
-export type {
-  DiagramCanvasProps,
-  DiagramComponent,
-  DiagramDataFlow,
-} from './DiagramCanvas';
-
-export { default as ShapePalette } from './ShapePalette';
-export type { ShapePaletteProps, ShapeItem } from './ShapePalette';
-
-export { default as PropertyPanel } from './PropertyPanel';
-export type {
-  PropertyPanelProps,
-  ComponentFormData,
-  DataFlowFormData,
-  TrustBoundaryFormData,
-} from './PropertyPanel';
+// Draw.io Embed (replaces mxGraph DiagramCanvas and ShapePalette)
+export { default as DrawioEmbed } from './DrawioEmbed';
+export type { DrawioEmbedProps, DrawioEmbedRef } from './DrawioEmbed';
 
 export { default as VersionManager, useVersionManager } from './VersionManager';
 export type { VersionManagerProps, DiagramVersion } from './VersionManager';
@@ -27,3 +13,17 @@ export type { Gap, GapDetectionResult } from './GapFillDialog';
 
 export { AnalysisProgressModal } from './AnalysisProgressModal';
 export type { AnalysisStage, AnalysisProgress } from './AnalysisProgressModal';
+
+export { MethodCard, Icons } from './MethodCard';
+
+// Wizard components
+export { WizardProgress, WizardStep, WizardPreview } from './wizard';
+
+// Import components
+export { FileUploader, ImportPreview } from './import';
+
+// AI components
+export { AiPreview, DescriptionInput } from './ai';
+
+// Template components
+export { TemplateCard, CategoryFilter, TemplatePreview } from './template';

@@ -18,18 +18,19 @@ import {
   ImportCanonicalRiskDto,
   CanonicalRiskListQuery,
 } from './dto/canonical-risk.dto';
-import { JwtAuthGuard } from '../../libs/auth/guards/jwt-auth.guard';
+import { PlatformAdminGuard } from '../../platform/guards/platform-admin.guard';
 
 interface AuthenticatedRequest {
-  user: {
+  platformAdmin: {
     id: string;
-    tenantId: string;
-    isSuperAdmin?: boolean;
+    email: string;
+    name: string;
+    isSuperAdmin: boolean;
   };
 }
 
 @Controller('admin/canonical-risks')
-@UseGuards(JwtAuthGuard)
+@UseGuards(PlatformAdminGuard)
 export class CanonicalRisksController {
   constructor(private readonly service: CanonicalRisksService) {}
 
@@ -62,7 +63,7 @@ export class CanonicalRisksController {
     @Body() dto: CreateCanonicalRiskDto,
     @Request() req: AuthenticatedRequest,
   ) {
-    const risk = await this.service.create(dto, req.user.tenantId);
+    const risk = await this.service.create(dto, req.platformAdmin.id);
     return { risk };
   }
 
@@ -108,7 +109,7 @@ export class CanonicalRisksController {
     @Param('id') id: string,
     @Request() req: AuthenticatedRequest,
   ) {
-    const risk = await this.service.approve(id, req.user.isSuperAdmin || false);
+    const risk = await this.service.approve(id, req.platformAdmin.isSuperAdmin || false);
     return { risk };
   }
 
@@ -117,6 +118,6 @@ export class CanonicalRisksController {
     @Body() body: { risks: ImportCanonicalRiskDto[] },
     @Request() req: AuthenticatedRequest,
   ) {
-    return this.service.bulkImport(body.risks, req.user.tenantId);
+    return this.service.bulkImport(body.risks, req.platformAdmin.id);
   }
 }

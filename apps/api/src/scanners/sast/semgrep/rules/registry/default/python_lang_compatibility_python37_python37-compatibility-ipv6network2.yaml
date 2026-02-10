@@ -1,0 +1,28 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-ipv6network2
+    pattern: ipaddress.IPv6Network.supernet_of($X)
+    message: >-
+      IPv6Network.supernet_of is only available on Python 3.7+ and is therefore
+      not backwards compatible. Instead, check if the supernet is in 'supernet'.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-ipv6network2
+      shortlink: https://sg.run/7orW
+      semgrep.dev:
+        rule:
+          r_id: 9582
+          rv_id: 946272
+          rule_id: PeUZYr
+          version_id: RGTAgGq
+          url: >-
+            https://semgrep.dev/playground/r/RGTAgGq/python.lang.compatibility.python37.python37-compatibility-ipv6network2
+          origin: community

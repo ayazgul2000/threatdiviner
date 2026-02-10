@@ -1,0 +1,12 @@
+{
+  "syncedAt": "2026-02-09T03:00:07.116Z",
+  "totalRules": 2100,
+  "packs": 5,
+  "rulePacks": [
+    "p/default",
+    "p/security-audit",
+    "p/owasp-top-ten",
+    "p/cwe-top-25",
+    "p/secrets"
+  ]
+}

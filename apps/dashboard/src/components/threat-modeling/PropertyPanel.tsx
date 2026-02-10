@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { z } from 'zod';
+import pako from 'pako';
 
 // Zod schemas for validation
 const componentSchema = z.object({
@@ -47,6 +48,13 @@ export type ComponentFormData = z.infer<typeof componentSchema>;
 export type DataFlowFormData = z.infer<typeof dataFlowSchema>;
 export type TrustBoundaryFormData = z.infer<typeof trustBoundarySchema>;
 
+export interface DiagramElement {
+  id: string;
+  name: string;
+  type: 'component' | 'dataflow' | 'trust_boundary';
+  style: string;
+}
+
 export interface PropertyPanelProps {
   selectedType: 'component' | 'dataflow' | 'trust_boundary' | null;
   selectedData: ComponentFormData | DataFlowFormData | TrustBoundaryFormData | null;
@@ -54,6 +62,8 @@ export interface PropertyPanelProps {
   onClose?: () => void;
   isLoading?: boolean;
   isSaving?: boolean;
+  diagramXml?: string;
+  onElementSelect?: (elementId: string, elementData: any) => void;
 }
 
 // Technology options for components
@@ -125,6 +135,98 @@ const PROTOCOL_OPTIONS = [
   { value: 'container-spawning', label: 'Container Spawning' },
 ];
 
+// Helper to decode mxfile format (base64 encoded + deflated)
+function decodeMxFileXml(xml: string): string {
+  if (!xml) return '';
+
+  // If it's already raw mxGraphModel (not wrapped in mxfile), return as-is
+  if (xml.includes('<mxGraphModel') && !xml.includes('<mxfile')) {
+    return xml;
+  }
+
+  // If not mxfile format, return as-is
+  if (!xml.includes('<mxfile')) {
+    return xml;
+  }
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    const diagramEl = doc.getElementsByTagName('diagram')[0];
+    if (!diagramEl) return xml;
+
+    const compressed = diagramEl.textContent || '';
+    if (!compressed) return xml;
+    if (compressed.includes('<mxGraphModel')) return compressed;
+
+    // Decode: base64 → inflate → URL decode
+    const decoded = atob(compressed);
+    const inflated = pako.inflateRaw(
+      Uint8Array.from(decoded, (c) => c.charCodeAt(0)),
+      { to: 'string' }
+    );
+    return decodeURIComponent(inflated);
+  } catch (e) {
+    console.warn('[PropertyPanel] Failed to decode mxfile:', e);
+    return xml;
+  }
+}
+
+// Helper to parse elements from diagram XML
+function parseElementsFromXml(xml: string): DiagramElement[] {
+  if (!xml) {
+    console.log('[PropertyPanel] parseElementsFromXml: empty XML');
+    return [];
+  }
+  try {
+    // Decode mxfile format if needed
+    console.log('[PropertyPanel] parseElementsFromXml: decoding XML, isMxFile:', xml.includes('<mxfile'));
+    const decodedXml = decodeMxFileXml(xml);
+    console.log('[PropertyPanel] Decoded XML length:', decodedXml.length);
+    console.log('[PropertyPanel] Decoded XML preview:', decodedXml.substring(0, 400));
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(decodedXml, 'text/xml');
+
+    // Check for parse errors
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+      console.error('[PropertyPanel] XML parse error:', parseError.textContent);
+      return [];
+    }
+
+    const elements: DiagramElement[] = [];
+
+    // Select both configured assets (object) AND raw shapes (mxCell[vertex="1"], mxCell[edge="1"])
+    doc.querySelectorAll('object, mxCell[vertex="1"], mxCell[edge="1"]').forEach((cell) => {
+      const id = cell.getAttribute('id');
+      const value = cell.getAttribute('value') || cell.getAttribute('label') || '';
+      const style = cell.getAttribute('style') || cell.querySelector('mxCell')?.getAttribute('style') || '';
+
+      // Skip root cells only (not unnamed shapes)
+      if (!id || id === '0' || id === '1') return;
+
+      // Determine type from style
+      let type: 'component' | 'dataflow' | 'trust_boundary' = 'component';
+      if (style.includes('edgeStyle') || style.includes('endArrow')) {
+        type = 'dataflow';
+      } else if (style.includes('swimlane') || style.includes('group') || style.includes('dashed=1')) {
+        type = 'trust_boundary';
+      }
+
+      // Only add if not already in list
+      if (!elements.find(e => e.id === id)) {
+        elements.push({ id, name: value || '(unnamed)', type, style });
+      }
+    });
+
+    return elements;
+  } catch (e) {
+    console.error('Failed to parse diagram XML:', e);
+    return [];
+  }
+}
+
 export default function PropertyPanel({
   selectedType,
   selectedData,
@@ -132,10 +234,23 @@ export default function PropertyPanel({
   onClose,
   isLoading = false,
   isSaving = false,
+  diagramXml = '',
+  onElementSelect,
 }: PropertyPanelProps) {
   const [formData, setFormData] = useState<any>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isDirty, setIsDirty] = useState(false);
+  const [diagramElements, setDiagramElements] = useState<DiagramElement[]>([]);
+
+  // Parse elements when XML changes
+  useEffect(() => {
+    console.log('[PropertyPanel] Raw XML received, length:', diagramXml?.length || 0);
+    console.log('[PropertyPanel] Raw XML preview:', diagramXml?.substring(0, 100));
+    const elements = parseElementsFromXml(diagramXml);
+    console.log('[PropertyPanel] Parsed elements count:', elements.length);
+    console.log('[PropertyPanel] Parsed elements:', elements);
+    setDiagramElements(elements);
+  }, [diagramXml]);
 
   // Reset form when selection changes
   useEffect(() => {
@@ -184,14 +299,16 @@ export default function PropertyPanel({
 
     const result = schema.safeParse(formData);
     if (result.success) {
-      onUpdate(result.data);
+      // Cast to the union type expected by onUpdate
+      onUpdate(result.data as ComponentFormData | DataFlowFormData | TrustBoundaryFormData);
       setIsDirty(false);
     } else {
       const newErrors: Record<string, string> = {};
-      result.error.errors.forEach((err) => {
+      // Use .issues (not .errors) for ZodError
+      for (const err of result.error.issues) {
         const path = err.path.join('.');
         newErrors[path] = err.message;
-      });
+      }
       setErrors(newErrors);
     }
   }, [formData, selectedType, onUpdate]);
@@ -266,8 +383,25 @@ export default function PropertyPanel({
       <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-4 pb-2 border-b border-gray-200 dark:border-gray-600">
         Basic Information
       </h4>
-      {renderField('Name', 'name', 'text')}
-      {renderField('Type', 'type', 'text')}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+        <input
+          type="text"
+          value={formData?.name || ''}
+          disabled
+          className="w-full px-3 py-2 text-sm border rounded-md bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 cursor-not-allowed"
+        />
+        <p className="mt-1 text-xs text-gray-400">Edit name in Draw.io directly</p>
+      </div>
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+        <input
+          type="text"
+          value={formData?.type || ''}
+          disabled
+          className="w-full px-3 py-2 text-sm border rounded-md bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 cursor-not-allowed"
+        />
+      </div>
       {renderField('Technology', 'technology', 'select', TECHNOLOGY_OPTIONS)}
       {renderField('Description', 'description', 'textarea')}
 
@@ -455,30 +589,100 @@ export default function PropertyPanel({
     </>
   );
 
-  // No selection state
+  // Handle element selection from dropdown - parse real properties from XML
+  const handleElementClick = (element: DiagramElement) => {
+    if (onElementSelect && diagramXml) {
+      // Parse actual properties from the diagram XML
+      const decodedXml = decodeMxFileXml(diagramXml);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(decodedXml, 'text/xml');
+
+      const customProperties: Record<string, any> = {};
+
+      // Check object element first (configured assets)
+      const objectEl = doc.querySelector(`object[id="${element.id}"]`);
+      if (objectEl) {
+        Array.from(objectEl.attributes).forEach(attr => {
+          if (!['id', 'label'].includes(attr.name)) {
+            customProperties[attr.name] = attr.value;
+          }
+        });
+      }
+
+      // Also check mxCell for data-* attributes
+      const cellEl = doc.querySelector(`mxCell[id="${element.id}"]`);
+      if (cellEl) {
+        Array.from(cellEl.attributes).forEach(attr => {
+          if (attr.name.startsWith('data-')) {
+            customProperties[attr.name.replace('data-', '')] = attr.value;
+          }
+        });
+      }
+
+      onElementSelect(element.id, {
+        id: element.id,
+        value: element.name,
+        style: element.style,
+        geometry: { x: 0, y: 0, width: 100, height: 60 },
+        customProperties,
+      });
+    }
+  };
+
+  // No selection state - show element list
   if (!selectedType || !selectedData) {
     return (
-      <div className="w-80 h-full border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col">
+      <div className="h-full flex flex-col">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-200">Properties</h3>
         </div>
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="text-center text-gray-500 dark:text-gray-400">
-            <svg
-              className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-            <p className="text-sm">Select an element to view its properties</p>
-          </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {diagramElements.length > 0 ? (
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Select an element to edit its properties:
+              </p>
+              <div className="space-y-2">
+                {diagramElements.map((element) => (
+                  <button
+                    key={element.id}
+                    onClick={() => handleElementClick(element)}
+                    className="w-full text-left px-3 py-2 rounded-md border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${
+                        element.type === 'component' ? 'bg-blue-500' :
+                        element.type === 'dataflow' ? 'bg-green-500' : 'bg-purple-500'
+                      }`} />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                        {element.name}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 capitalize">
+                      {element.type.replace('_', ' ')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
+              <svg
+                className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
+              <p className="text-sm">Add shapes to the diagram to edit their properties</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -500,23 +704,27 @@ export default function PropertyPanel({
 
   return (
     <div className="w-80 h-full border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-200">
-          {selectedType === 'component' && 'Component Properties'}
-          {selectedType === 'dataflow' && 'Data Flow Properties'}
-          {selectedType === 'trust_boundary' && 'Trust Boundary Properties'}
-        </h3>
-        {onClose && (
+      {/* Header with back button */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2 mb-1">
           <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            onClick={() => onElementSelect?.(null as any, null)}
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+            title="Back to element list"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-        )}
+          <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-200">
+            {selectedType === 'component' && 'Component Properties'}
+            {selectedType === 'dataflow' && 'Data Flow Properties'}
+            {selectedType === 'trust_boundary' && 'Trust Boundary Properties'}
+          </h3>
+        </div>
+        <div className="text-xs text-gray-500 dark:text-gray-400 ml-6">
+          {formData?.name || '(unnamed)'} {formData?.id && <span className="text-gray-400">({formData.id})</span>}
+        </div>
       </div>
 
       {/* Form */}

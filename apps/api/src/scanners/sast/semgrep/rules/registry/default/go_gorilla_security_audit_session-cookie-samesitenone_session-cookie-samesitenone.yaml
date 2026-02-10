@@ -1,0 +1,56 @@
+rules:
+  - id: >-
+      go.gorilla.security.audit.session-cookie-samesitenone.session-cookie-samesitenone
+    patterns:
+      - pattern-inside: |
+          &sessions.Options{
+            ...,
+            SameSite: http.SameSiteNoneMode,
+            ...,
+          }
+      - pattern: |
+          &sessions.Options{
+            ...,
+          }
+    message: >-
+      Found SameSiteNoneMode setting in Gorilla session options. Consider
+      setting SameSite to Lax, Strict or Default for enhanced security.
+    metadata:
+      cwe:
+        - 'CWE-1275: Sensitive Cookie with Improper SameSite Attribute'
+      owasp:
+        - A05:2021 - Security Misconfiguration
+        - A02:2025 - Security Misconfiguration
+      references:
+        - https://pkg.go.dev/github.com/gorilla/sessions#Options
+      category: security
+      technology:
+        - gorilla
+      confidence: MEDIUM
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cookie Security
+      source: >-
+        https://semgrep.dev/r/go.gorilla.security.audit.session-cookie-samesitenone.session-cookie-samesitenone
+      shortlink: https://sg.run/x8Nwj
+      semgrep.dev:
+        rule:
+          r_id: 133074
+          rv_id: 1262913
+          rule_id: YGUpGd4
+          version_id: K3TKkKB
+          url: >-
+            https://semgrep.dev/playground/r/K3TKkKB/go.gorilla.security.audit.session-cookie-samesitenone.session-cookie-samesitenone
+          origin: community
+    fix-regex:
+      regex: (SameSite\s*:\s+)http.SameSiteNoneMode
+      replacement: \1http.SameSiteDefaultMode
+    severity: WARNING
+    languages:
+      - go

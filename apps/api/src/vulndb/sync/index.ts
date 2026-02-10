@@ -5,3 +5,5 @@ export * from './kev-sync.service';
 export * from './owasp-sync.service';
 export * from './cwe-mapping-sync.service';
 export * from './attack-sync.service';
+export * from './capec-sync.service';
+export * from './cwe-view-sync.service';

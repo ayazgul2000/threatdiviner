@@ -1,0 +1,54 @@
+rules:
+  - id: python.django.security.django-no-csrf-token.django-no-csrf-token
+    patterns:
+      - pattern: <form...>...</form>
+      - pattern-either:
+          - pattern: |
+              <form ... method="$METHOD" ...>...</form>
+          - pattern: |
+              <form ... method='$METHOD' ...>...</form>
+          - pattern: |
+              <form ... method=$METHOD ...>...</form>
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: (?i)(post|put|delete|patch)
+      - pattern-not-inside: <form...>...{% csrf_token %}...</form>
+      - pattern-not-inside: <form...>...{{ $VAR.csrf_token }}...</form>
+    message: >-
+      Manually-created forms in django templates should specify a csrf_token to
+      prevent CSRF attacks.
+    languages:
+      - generic
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: 'CWE-352: Cross-Site Request Forgery (CSRF)'
+      references:
+        - https://docs.djangoproject.com/en/4.2/howto/csrf/
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      subcategory:
+        - audit
+      technology:
+        - django
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site Request Forgery (CSRF)
+      source: >-
+        https://semgrep.dev/r/python.django.security.django-no-csrf-token.django-no-csrf-token
+      shortlink: https://sg.run/N0Bp
+      semgrep.dev:
+        rule:
+          r_id: 73471
+          rv_id: 946160
+          rule_id: PeUyYG
+          version_id: BjT1NRl
+          url: >-
+            https://semgrep.dev/playground/r/BjT1NRl/python.django.security.django-no-csrf-token.django-no-csrf-token
+          origin: community
+    paths:
+      include:
+        - '*.html'

@@ -82,6 +82,7 @@ function getMenuConfig(hasProject: boolean, projectName?: string): MenuConfigIte
         { href: '/dashboard/scans', label: 'Scans', icon: Search },
         { href: '/dashboard/findings', label: 'Findings', icon: Bug },
         { href: '/dashboard/baselines', label: 'Baselines', icon: FileText },
+        { href: '/dashboard/deep-analysis', label: 'Deep Analysis', icon: Network },
       ],
       requiresProject: true,
     });

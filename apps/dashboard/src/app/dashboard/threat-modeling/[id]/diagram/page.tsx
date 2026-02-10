@@ -1,322 +1,407 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import mermaid from 'mermaid';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Button,
-  Badge,
-} from '@/components/ui';
-import { CardSkeleton } from '@/components/ui/skeletons';
+import { Button } from '@/components/ui';
+import { useToast } from '@/components/ui/toast';
+import DrawioEmbed, { DrawioEmbedRef } from '@/components/threat-modeling/DrawioEmbed';
+import LockManager, { useLockManager } from '@/components/threat-modeling/LockManager';
+import VersionManager, { useVersionManager } from '@/components/threat-modeling/VersionManager';
+import { GapFillDialog } from '@/components/threat-modeling/GapFillDialog';
+import { AnalysisProgressModal } from '@/components/threat-modeling/AnalysisProgressModal';
+import { useAnalysis } from '@/hooks/useAnalysis';
+import { useGapDetection } from '@/hooks/useGapDetection';
+import { useAuth } from '@/lib/auth-context';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-interface DiagramData {
-  mermaid: string;
-}
 
 interface ThreatModel {
   id: string;
   name: string;
+  description?: string;
   methodology: string;
   status: string;
+  diagramXml?: string;
 }
 
-export default function ThreatModelDiagramPage() {
+export default function DiagramEditorPage() {
   const params = useParams();
-  const [model, setModel] = useState<ThreatModel | null>(null);
-  const [diagram, setDiagram] = useState<DiagramData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [diagramType, setDiagramType] = useState<'flowchart' | 'sequence'>('flowchart');
-  const diagramRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const toast = useToast();
+  const { user } = useAuth();
+  const modelId = params.id as string;
 
+  // Refs
+  const drawioRef = useRef<DrawioEmbedRef>(null);
+
+  // State
+  const [model, setModel] = useState<ThreatModel | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [currentXml, setCurrentXml] = useState<string>('');
+  const [showGapDialog, setShowGapDialog] = useState(false);
+
+  // Hooks
+  const {
+    lockInfo,
+    isLocked,
+    isLockedByCurrentUser: isLockedByMe,
+    acquireLock,
+    releaseLock,
+    checkLock: refreshLock,
+    forceTakeLock,
+  } = useLockManager(modelId, user?.id || '', `${API_URL}/threat-modeling`);
+
+  const {
+    versions,
+    currentVersion,
+    loadVersion,
+    saveVersion: createVersion,
+    fetchVersions,
+  } = useVersionManager(modelId, `${API_URL}/threat-modeling`);
+
+  const { startAnalysis, analysisRunId, gaps, error: analysisError, clearAnalysis } = useAnalysis();
+  const { detectGaps: checkGaps, gaps: detectedGaps } = useGapDetection();
+
+  const [isStarting, setIsStarting] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+
+  // Load model data
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'neutral',
-      flowchart: {
-        useMaxWidth: true,
-        htmlLabels: true,
-        curve: 'basis',
-      },
-      securityLevel: 'strict',
-    });
+    const fetchModel = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_URL}/threat-modeling/${modelId}`, {
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to fetch model');
+        const data = await res.json();
+        setModel(data);
+        setCurrentXml(data.diagramXml || '');
+      } catch (err) {
+        toast.error('Failed to load threat model');
+        router.push('/dashboard/threat-modeling');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchModel();
+  }, [modelId, router, toast]);
+
+  // Acquire lock on mount
+  useEffect(() => {
+    const tryAcquireLock = async () => {
+      if (user?.id) {
+        const lock = await acquireLock(user.name || user.email || 'Unknown User');
+        if (!lock) {
+          await refreshLock();
+        }
+      }
+    };
+    tryAcquireLock();
+
+    return () => {
+      if (isLockedByMe) {
+        releaseLock();
+      }
+    };
+  }, [user?.id]);
+
+  // Auto-refresh lock
+  useEffect(() => {
+    if (!isLockedByMe || !user) return;
+    const interval = setInterval(() => {
+      acquireLock(user.name || user.email || 'Unknown User');
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isLockedByMe, user, acquireLock]);
+
+  // Fetch versions on mount
+  useEffect(() => {
+    fetchVersions();
+  }, [fetchVersions]);
+
+  // Handle XML changes from Draw.io
+  const handleXmlChange = useCallback((xml: string) => {
+    setCurrentXml(xml);
+    setHasUnsavedChanges(true);
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [params.id]);
+  // Handle save
+  const handleSave = useCallback(async (xml?: string) => {
+    const xmlToSave = xml || currentXml;
 
-  useEffect(() => {
-    if (diagram && diagramRef.current) {
-      renderDiagram();
+    if (!isLockedByMe) {
+      toast.error('You do not have the edit lock');
+      return;
     }
-  }, [diagram, diagramType]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      const [modelRes, diagramRes] = await Promise.all([
-        fetch(`${API_URL}/threat-modeling/${params.id}`, { credentials: 'include' }),
-        fetch(`${API_URL}/threat-modeling/${params.id}/diagram`, { credentials: 'include' }),
-      ]);
-
-      if (!modelRes.ok || !diagramRes.ok) {
-        throw new Error('Failed to fetch data');
-      }
-
-      const modelData = await modelRes.json();
-      const diagramData = await diagramRes.json();
-
-      setModel(modelData);
-      setDiagram(diagramData);
-    } catch (err) {
-      console.error('Failed to fetch:', err);
-      setError('Failed to load diagram');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderDiagram = async () => {
-    if (!diagramRef.current || !diagram) return;
 
     try {
-      diagramRef.current.innerHTML = '';
-      const id = `mermaid-${Date.now()}`;
-      const { svg } = await mermaid.render(id, diagram.mermaid);
-      diagramRef.current.innerHTML = svg;
+      await createVersion(xmlToSave, false, 'Manual save');
+      setHasUnsavedChanges(false);
+      toast.success('Diagram saved successfully');
     } catch (err) {
-      console.error('Failed to render diagram:', err);
-      diagramRef.current.innerHTML = `
-        <div class="text-center py-8 text-gray-500">
-          <p>Failed to render diagram</p>
-          <pre class="mt-4 text-left text-xs bg-gray-100 dark:bg-gray-800 p-4 rounded overflow-auto">${diagram.mermaid}</pre>
-        </div>
-      `;
+      toast.error('Could not save diagram');
     }
-  };
+  }, [currentXml, isLockedByMe, createVersion, toast]);
 
-  const handleExport = async (format: 'svg' | 'png') => {
-    if (!diagramRef.current) return;
+  // Handle run analysis
+  const handleRunAnalysis = useCallback(async () => {
+    if (!isLockedByMe) {
+      toast.error('You do not have the edit lock. Please refresh the page.');
+      return;
+    }
 
-    const svg = diagramRef.current.querySelector('svg');
-    if (!svg) return;
+    setIsChecking(true);
+    const gapResult = await checkGaps(modelId);
+    setIsChecking(false);
 
-    if (format === 'svg') {
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const blob = new Blob([svgData], { type: 'image/svg+xml' });
-      downloadBlob(blob, `threat-model-${params.id}.svg`);
-    } else {
-      // PNG export
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    if (gapResult && gapResult.gaps && gapResult.gaps.length > 0) {
+      setShowGapDialog(true);
+      return;
+    }
 
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const img = new Image();
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+    if (hasUnsavedChanges) {
+      await handleSave();
+    }
 
-      img.onload = () => {
-        canvas.width = img.width * 2;
-        canvas.height = img.height * 2;
-        ctx.scale(2, 2);
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
+    setIsStarting(true);
+    const result = await startAnalysis(modelId);
+    setIsStarting(false);
+
+    if (!result.success && result.error) {
+      toast.error(result.error);
+    }
+  }, [modelId, checkGaps, hasUnsavedChanges, handleSave, startAnalysis, isLockedByMe, toast]);
+
+  // Handle gap fill complete
+  const handleGapFillComplete = useCallback(async () => {
+    setShowGapDialog(false);
+    await handleSave();
+    setIsStarting(true);
+    await startAnalysis(modelId);
+    setIsStarting(false);
+  }, [modelId, handleSave, startAnalysis]);
+
+  // Handle version load
+  const handleLoadVersion = useCallback(async (versionId: string) => {
+    const xml = await loadVersion(versionId);
+    if (xml) {
+      drawioRef.current?.setXml(xml);
+      setCurrentXml(xml);
+      setHasUnsavedChanges(false);
+    }
+  }, [loadVersion]);
+
+  // Handle export
+  const handleExport = useCallback(async (format: 'png' | 'svg' | 'xml') => {
+    if (!drawioRef.current) return;
+
+    try {
+      if (format === 'png') {
+        const blob = await drawioRef.current.exportPng();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${model?.name || 'diagram'}.png`;
+        a.click();
         URL.revokeObjectURL(url);
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            downloadBlob(blob, `threat-model-${params.id}.png`);
-          }
-        }, 'image/png');
-      };
-
-      img.src = url;
+      } else if (format === 'svg') {
+        const svg = await drawioRef.current.exportSvg();
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${model?.name || 'diagram'}.svg`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const xml = await drawioRef.current.getXml();
+        const blob = new Blob([xml], { type: 'application/xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${model?.name || 'diagram'}.drawio`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      toast.success(`Diagram exported as ${format.toUpperCase()}`);
+    } catch (err) {
+      toast.error('Could not export diagram');
     }
-  };
+  }, [model?.name, toast]);
 
-  const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave]);
 
-  const handleCopyMermaid = () => {
-    if (diagram) {
-      navigator.clipboard.writeText(diagram.mermaid);
-    }
-  };
-
+  // Loading state
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-          <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        </div>
-        <CardSkeleton />
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  if (error || !model) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg">
-        {error || 'Threat model not found'}
-      </div>
-    );
-  }
+  const isViewOnly = isLocked && !isLockedByMe;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="h-screen flex flex-col bg-gray-100 dark:bg-gray-950">
+      {/* Toolbar */}
+      <div className="h-14 border-b flex items-center justify-between px-4 bg-white dark:bg-gray-900 shadow-sm">
         <div className="flex items-center gap-4">
-          <Link
-            href={`/dashboard/threat-modeling/${params.id}`}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+          <Link href={`/dashboard/threat-modeling/${modelId}`}>
+            <Button variant="ghost" size="sm">
+              ← Back
+            </Button>
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{model.name} - Diagram</h1>
-            <div className="flex items-center gap-3 mt-1">
-              <Badge variant="outline">{model.methodology.toUpperCase()}</Badge>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {model?.name}
+          </h1>
+          {hasUnsavedChanges && (
+            <span className="text-sm text-amber-600 dark:text-amber-400">
+              • Unsaved changes
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Export dropdown */}
+          <div className="relative group">
+            <Button variant="ghost" size="sm">
+              Export ▼
+            </Button>
+            <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-gray-800 rounded-md shadow-lg border hidden group-hover:block z-10">
+              <button
+                onClick={() => handleExport('png')}
+                className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                PNG
+              </button>
+              <button
+                onClick={() => handleExport('svg')}
+                className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                SVG
+              </button>
+              <button
+                onClick={() => handleExport('xml')}
+                className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Draw.io XML
+              </button>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={handleCopyMermaid}>
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            Copy Mermaid
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => handleSave()}
+            disabled={isViewOnly || !hasUnsavedChanges}
+          >
+            Save
           </Button>
-          <Button variant="secondary" onClick={() => handleExport('svg')}>
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export SVG
-          </Button>
-          <Button variant="secondary" onClick={() => handleExport('png')}>
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Export PNG
+
+          <Button
+            size="sm"
+            onClick={handleRunAnalysis}
+            disabled={isViewOnly || isStarting || isChecking}
+          >
+            {isStarting || isChecking ? 'Analyzing...' : '▶ Run Analysis'}
           </Button>
         </div>
       </div>
 
-      {/* Diagram Card */}
-      <Card variant="bordered">
-        <CardHeader>
-          <CardTitle>Data Flow Diagram</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!diagram?.mermaid || diagram.mermaid.includes('No components') ? (
-            <div className="text-center py-12 text-gray-500">
-              <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-              </svg>
-              <p className="text-lg font-medium">No diagram available</p>
-              <p className="mt-2">Add components and data flows to generate the diagram.</p>
-              <Link href={`/dashboard/threat-modeling/${params.id}`}>
-                <Button className="mt-4">Add Components</Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="overflow-auto bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <div ref={diagramRef} className="flex justify-center min-h-[400px]" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Mermaid Code */}
-      {diagram?.mermaid && !diagram.mermaid.includes('No components') && (
-        <Card variant="bordered">
-          <CardHeader>
-            <CardTitle>Mermaid Source</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-auto text-sm font-mono">
-              {diagram.mermaid}
-            </pre>
-          </CardContent>
-        </Card>
+      {/* Lock Banner */}
+      {isViewOnly && lockInfo && (
+        <div className="bg-amber-100 dark:bg-amber-900/30 px-4 py-2 text-amber-800 dark:text-amber-200 text-sm flex items-center justify-between">
+          <span>
+            <span className="font-medium">View-only mode:</span> This model is being edited by{' '}
+            {lockInfo.lockedByName || 'another user'}.
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => forceTakeLock(user?.name || user?.email || 'Unknown User')}
+          >
+            Take Over Lock
+          </Button>
+        </div>
       )}
 
-      {/* Legend */}
-      <Card variant="bordered">
-        <CardHeader>
-          <CardTitle>Legend</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-white">Process</div>
-                <div className="text-sm text-gray-500">Rounded rectangle</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-white">Data Store</div>
-                <div className="text-sm text-gray-500">Cylinder shape</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center">
-                <svg className="w-5 h-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-white">External Entity</div>
-                <div className="text-sm text-gray-500">Rectangle</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 border-2 border-dashed border-red-400 dark:border-red-600 flex items-center justify-center">
-                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-white">Trust Boundary</div>
-                <div className="text-sm text-gray-500">Dashed rectangle</div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Main Content - Full width Draw.io editor */}
+      <div className="flex-1 overflow-hidden">
+        <DrawioEmbed
+          ref={drawioRef}
+          initialXml={currentXml}
+          onXmlChange={handleXmlChange}
+          onSave={handleSave}
+          readOnly={isViewOnly}
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="h-10 border-t flex items-center justify-between px-4 bg-white dark:bg-gray-900 text-sm">
+        <LockManager
+          threatModelId={modelId}
+          currentUserId={user?.id || ''}
+          currentUserName={user?.name}
+          apiBaseUrl={`${API_URL}/threat-modeling`}
+        />
+        <VersionManager
+          threatModelId={modelId}
+          currentXml={currentXml}
+          onVersionLoad={(xml) => {
+            drawioRef.current?.setXml(xml);
+            setCurrentXml(xml);
+            setHasUnsavedChanges(false);
+          }}
+          autoSaveEnabled={isLockedByMe}
+          apiBaseUrl={`${API_URL}/threat-modeling`}
+        />
+      </div>
+
+      {/* Gap Fill Dialog */}
+      {showGapDialog && detectedGaps && (
+        <GapFillDialog
+          isOpen={showGapDialog}
+          onClose={() => setShowGapDialog(false)}
+          gaps={detectedGaps}
+          threatModelId={modelId}
+          onComplete={handleGapFillComplete}
+          onSkip={() => {
+            setShowGapDialog(false);
+          }}
+        />
+      )}
+
+      {/* Analysis Progress Modal */}
+      {analysisRunId && (
+        <AnalysisProgressModal
+          isOpen={!!analysisRunId}
+          onClose={() => clearAnalysis()}
+          threatModelId={modelId}
+          analysisRunId={analysisRunId}
+          onComplete={(riskCount) => {
+            clearAnalysis();
+            toast.success(`Analysis complete: ${riskCount} risks identified`);
+          }}
+          onError={(error) => {
+            clearAnalysis();
+            toast.error(`Analysis failed: ${error}`);
+          }}
+        />
+      )}
     </div>
   );
 }

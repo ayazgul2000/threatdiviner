@@ -1,0 +1,45 @@
+rules:
+  - id: python.flask.security.audit.render-template-string.render-template-string
+    pattern: flask.render_template_string(...)
+    metadata:
+      cwe:
+        - >-
+          CWE-96: Improper Neutralization of Directives in Statically Saved Code
+          ('Static Code Injection')
+      owasp:
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - >-
+          https://nvisium.com/blog/2016/03/09/exploring-ssti-in-flask-jinja2.html
+      category: security
+      technology:
+        - flask
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Code Injection
+      source: >-
+        https://semgrep.dev/r/python.flask.security.audit.render-template-string.render-template-string
+      shortlink: https://sg.run/8yjE
+      semgrep.dev:
+        rule:
+          r_id: 9540
+          rv_id: 1263423
+          rule_id: 5rUOv1
+          version_id: o5TbDp4
+          url: >-
+            https://semgrep.dev/playground/r/o5TbDp4/python.flask.security.audit.render-template-string.render-template-string
+          origin: community
+    message: >-
+      Found a template created with string formatting. This is susceptible to
+      server-side template injection and cross-site scripting attacks.
+    languages:
+      - python
+    severity: WARNING

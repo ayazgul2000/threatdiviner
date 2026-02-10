@@ -1,0 +1,70 @@
+rules:
+  - id: >-
+      java.spring.security.audit.spring-unvalidated-redirect.spring-unvalidated-redirect
+    message: >-
+      Application redirects a user to a destination URL specified by a user
+      supplied parameter that is not validated.
+    metadata:
+      cwe:
+        - 'CWE-601: URL Redirection to Untrusted Site (''Open Redirect'')'
+      owasp:
+        - A01:2021 - Broken Access Control
+        - A01:2025 - Broken Access Control
+      source-rule-url: https://find-sec-bugs.github.io/bugs.htm#UNVALIDATED_REDIRECT
+      category: security
+      technology:
+        - spring
+      references:
+        - https://owasp.org/Top10/A01_2021-Broken_Access_Control
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Open Redirect
+      source: >-
+        https://semgrep.dev/r/java.spring.security.audit.spring-unvalidated-redirect.spring-unvalidated-redirect
+      shortlink: https://sg.run/9oXz
+      semgrep.dev:
+        rule:
+          r_id: 9223
+          rv_id: 1263083
+          rule_id: v8Un7w
+          version_id: nWT2Lk0
+          url: >-
+            https://semgrep.dev/playground/r/nWT2Lk0/java.spring.security.audit.spring-unvalidated-redirect.spring-unvalidated-redirect
+          origin: community
+    severity: WARNING
+    languages:
+      - java
+    pattern-either:
+      - pattern: |
+          $X $METHOD(...,String $URL,...) {
+            return "redirect:" + $URL;
+          }
+      - pattern: |
+          $X $METHOD(...,String $URL,...) {
+            ...
+            String $REDIR = "redirect:" + $URL;
+            ...
+            return $REDIR;
+            ...
+          }
+      - pattern: |
+          $X $METHOD(...,String $URL,...) {
+            ...
+            new ModelAndView("redirect:" + $URL);
+            ...
+          }
+      - pattern: |-
+          $X $METHOD(...,String $URL,...) {
+            ...
+            String $REDIR = "redirect:" + $URL;
+            ...
+            new ModelAndView($REDIR);
+            ...
+          }

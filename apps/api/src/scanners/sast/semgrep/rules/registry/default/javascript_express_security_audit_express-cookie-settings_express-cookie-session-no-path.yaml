@@ -1,0 +1,85 @@
+rules:
+  - id: >-
+      javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-path
+    message: >-
+      Default session middleware settings: `path` not set. It indicates the path
+      of the cookie; use it to compare against the request path. If this and
+      domain match, then send the cookie in the request.
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      cwe:
+        - 'CWE-522: Insufficiently Protected Credentials'
+      owasp:
+        - A02:2017 - Broken Authentication
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      source-rule-url: https://expressjs.com/en/advanced/best-practice-security.html
+      category: security
+      technology:
+        - express
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: HIGH
+      impact: LOW
+      confidence: MEDIUM
+      references:
+        - https://owasp.org/Top10/A04_2021-Insecure_Design
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-path
+      shortlink: https://sg.run/b7pd
+      semgrep.dev:
+        rule:
+          r_id: 9270
+          rv_id: 1263134
+          rule_id: nJUz4X
+          version_id: xyTjzQD
+          url: >-
+            https://semgrep.dev/playground/r/xyTjzQD/javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-path
+          origin: community
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              $SESSION = require('cookie-session');
+              ...
+          - pattern-inside: |
+              $SESSION = require('express-session');
+              ...
+      - pattern: $SESSION(...)
+      - pattern-not-inside: $SESSION(<... {cookie:{path:...}} ...>,...)
+      - pattern-not-inside: |
+          $OPTS = <... {cookie:{path:...}} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $COOKIE = <... {path:...} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $OPTS.cookie = <... {path:...} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $COOKIE.path = ...;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $OPTS.cookie.path = ...;
+          ...
+          $SESSION($OPTS,...);

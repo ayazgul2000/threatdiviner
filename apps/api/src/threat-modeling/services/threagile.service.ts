@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import AdmZip from 'adm-zip';
 
 export interface ThreagileHealthResponse {
   status: 'healthy' | 'unhealthy';
@@ -67,7 +68,7 @@ export class ThreagileService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(`${this.threagileUrl}/health`, {
+      const response = await fetch(`${this.threagileUrl}/meta/ping`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -79,7 +80,7 @@ export class ThreagileService {
         return {
           status: 'healthy',
           version: data.version || 'unknown',
-          message: 'Threagile service is running',
+          message: data.message === 'pong' ? 'Threagile service is running' : 'Threagile service responded',
         };
       }
 
@@ -128,16 +129,20 @@ export class ThreagileService {
         },
       });
 
-      // Call Threagile API
+      // Call Threagile API with multipart form-data
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-      const response = await fetch(`${this.threagileUrl}/analyze`, {
+      const formData = new FormData();
+      formData.append(
+        'file',
+        new Blob([request.yaml], { type: 'application/x-yaml' }),
+        'threagile.yaml',
+      );
+
+      const response = await fetch(`${this.threagileUrl}/direct/analyze`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-yaml',
-        },
-        body: request.yaml,
+        body: formData,
         signal: controller.signal,
       });
 
@@ -150,10 +155,25 @@ export class ThreagileService {
         throw new Error(`Threagile analysis failed: ${errorText}`);
       }
 
-      const result = await response.json();
+      // Response is a ZIP file containing risks.json
+      const zipBuffer = Buffer.from(await response.arrayBuffer());
+      const zip = new AdmZip(zipBuffer);
+      const risksEntry = zip.getEntry('risks.json');
+      if (!risksEntry) {
+        throw new Error('Threagile response ZIP does not contain risks.json');
+      }
+      const risksJson = JSON.parse(risksEntry.getData().toString('utf-8'));
+
+      // Also extract stats.json for raw output
+      const statsEntry = zip.getEntry('stats.json');
+      const statsJson = statsEntry
+        ? JSON.parse(statsEntry.getData().toString('utf-8'))
+        : {};
+
+      const result = { risks: risksJson, stats: statsJson };
       const risks = this.parseRisks(result);
 
-      // Update analysis run with results
+      // Update analysis run with results and store full ZIP
       await this.prisma.analysisRun.update({
         where: { id: analysisRun.id },
         data: {
@@ -166,6 +186,7 @@ export class ThreagileService {
           mediumCount: risks.filter(r => r.severity === 'medium').length,
           lowCount: risks.filter(r => r.severity === 'low').length,
           rawOutput: result,
+          reportZip: zipBuffer,
         },
       });
 
@@ -237,15 +258,20 @@ export class ThreagileService {
   private parseRisks(result: any): ThreagileRisk[] {
     const risks: ThreagileRisk[] = [];
 
-    // Threagile outputs risks in different structures depending on version
+    // Threagile outputs risks in different structures depending on version/endpoint
     // Try multiple parsing approaches
-    if (result.risks_identified) {
-      // Array format
+    if (Array.isArray(result.risks)) {
+      // ZIP extraction format: { risks: [...], stats: {...} }
+      for (const risk of result.risks) {
+        risks.push(this.normalizeRisk(risk));
+      }
+    } else if (result.risks_identified) {
+      // Legacy: risks_identified array
       for (const risk of result.risks_identified) {
         risks.push(this.normalizeRisk(risk));
       }
     } else if (result.generated_risks) {
-      // Object format (keyed by risk ID)
+      // Legacy: object format (keyed by risk ID)
       for (const [id, risk] of Object.entries(result.generated_risks)) {
         risks.push(this.normalizeRisk({ id, ...(risk as any) }));
       }
@@ -321,10 +347,7 @@ export class ThreagileService {
    */
   async getAnalysisRun(runId: string, tenantId: string) {
     return this.prisma.analysisRun.findFirst({
-      where: {
-        id: runId,
-        tenantId,
-      },
+      where: { id: runId, tenantId },
     });
   }
 

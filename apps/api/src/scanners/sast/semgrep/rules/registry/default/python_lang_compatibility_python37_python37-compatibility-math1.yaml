@@ -1,0 +1,28 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-math1
+    pattern: math.remainder($X, $Y)
+    message: >-
+      math.remainder is only available on Python 3.7+ and is therefore not
+      backwards compatible. Instead, use math.fmod() or calculate $X - n* $Y.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-math1
+      shortlink: https://sg.run/Q50Q
+      semgrep.dev:
+        rule:
+          r_id: 9586
+          rv_id: 946276
+          rule_id: ReUgbz
+          version_id: WrTEopQ
+          url: >-
+            https://semgrep.dev/playground/r/WrTEopQ/python.lang.compatibility.python37.python37-compatibility-math1
+          origin: community

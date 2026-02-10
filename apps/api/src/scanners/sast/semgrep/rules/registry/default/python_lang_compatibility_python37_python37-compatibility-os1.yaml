@@ -1,0 +1,29 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-os1
+    pattern: os.preadv(...)
+    message: >-
+      os.preadv() is only available on Python 3.7+ and is therefore not
+      backwards compatible. Instead, use a combination of os.readv() and
+      os.pread().
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-os1
+      shortlink: https://sg.run/PJWW
+      semgrep.dev:
+        rule:
+          r_id: 9589
+          rv_id: 946279
+          rule_id: DbUpQQ
+          version_id: qkT4jnO
+          url: >-
+            https://semgrep.dev/playground/r/qkT4jnO/python.lang.compatibility.python37.python37-compatibility-os1
+          origin: community

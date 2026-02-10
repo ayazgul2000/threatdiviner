@@ -96,6 +96,8 @@ interface ThreatModel {
   status: string;
   createdAt: string;
   updatedAt: string;
+  analysisStatus?: string;
+  lastAnalysisRunId?: string;
   components: Component[];
   dataFlows: DataFlow[];
   threats: Threat[];
@@ -164,6 +166,24 @@ const threatStatusColors: Record<string, string> = {
   accepted: 'bg-yellow-100 text-yellow-700',
   transferred: 'bg-purple-100 text-purple-700',
 };
+
+function ArtifactButton({ modelId, runId, filename, label }: { modelId: string; runId: string; filename: string; label: string }) {
+  const downloadUrl = `${API_URL}/threat-modeling/${modelId}/analysis-runs/${runId}/artifacts/${filename}`;
+
+  return (
+    <a
+      href={downloadUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+    >
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+      {label}
+    </a>
+  );
+}
 
 export default function ThreatModelDetailPage() {
   const params = useParams();
@@ -687,6 +707,61 @@ export default function ThreatModelDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Analysis Artifacts */}
+          {model.analysisStatus === 'completed' && model.lastAnalysisRunId && (
+            <Card variant="bordered" className="mt-4">
+              <CardHeader>
+                <CardTitle>Analysis Artifacts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-500 mb-4">
+                  Download outputs from the latest Threagile analysis run.
+                </p>
+                <div className="space-y-4">
+                  {/* Report */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Report</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="report.pdf" label="PDF Report" />
+                    </div>
+                  </div>
+                  {/* Diagrams */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Diagrams</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="data-flow-diagram.png" label="Data Flow Diagram" />
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="data-asset-diagram.png" label="Data Asset Diagram" />
+                    </div>
+                  </div>
+                  {/* Data */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="risks.json" label="Risks (JSON)" />
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="stats.json" label="Stats (JSON)" />
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="technical-assets.json" label="Technical Assets (JSON)" />
+                    </div>
+                  </div>
+                  {/* Exports */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Exports</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="risks.xlsx" label="Risks (Excel)" />
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="tags.xlsx" label="Tags (Excel)" />
+                    </div>
+                  </div>
+                  {/* Input */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Input</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <ArtifactButton modelId={model.id} runId={model.lastAnalysisRunId} filename="threagile.yaml" label="Threagile YAML" />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Components Tab */}

@@ -1,0 +1,43 @@
+rules:
+  - id: >-
+      problem-based-packs.insecure-transport.go-stdlib.telnet-request.telnet-request
+    message: >-
+      Checks for attempts to connect to an insecure telnet server using the
+      package telnet. This is bad because it can lead to man in the middle
+      attacks.
+    severity: WARNING
+    metadata:
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      category: security
+      cwe: 'CWE-319: Cleartext Transmission of Sensitive Information'
+      owasp: A03:2017 - Sensitive Data Exposure
+      references:
+        - https://godoc.org/github.com/reiver/go-telnet
+      subcategory:
+        - vuln
+      technology:
+        - go-telnet
+      vulnerability: Insecure Transport
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Mishandled Sensitive Information
+      source: >-
+        https://semgrep.dev/r/problem-based-packs.insecure-transport.go-stdlib.telnet-request.telnet-request
+      shortlink: https://sg.run/Do4P
+      semgrep.dev:
+        rule:
+          r_id: 9408
+          rv_id: 946051
+          rule_id: oqUewD
+          version_id: 3ZTOPnj
+          url: >-
+            https://semgrep.dev/playground/r/3ZTOPnj/problem-based-packs.insecure-transport.go-stdlib.telnet-request.telnet-request
+          origin: community
+    languages:
+      - go
+    pattern: |
+      telnet.DialToAndCall(...)

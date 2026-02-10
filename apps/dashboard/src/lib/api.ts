@@ -245,8 +245,8 @@ export const connectionsApi = {
 
 // Repositories API
 export const repositoriesApi = {
-  list: () =>
-    fetchApi<Repository[]>('/scm/repositories'),
+  list: (projectId: string) =>
+    fetchApi<Repository[]>(`/scm/repositories?projectId=${projectId}`),
 
   get: async (id: string): Promise<Repository> => {
     const response = await fetchApi<{ repository: Repository }>(`/scm/repositories/${id}`);
@@ -513,6 +513,199 @@ export const slaApi = {
   mttr: () => fetchApi<any>('/vulndb/sla/mttr'),
 };
 
+// ==================== Wizard Types ====================
+export interface WizardQuestion {
+  id: string;
+  questionId: string;
+  text: string;
+  helpText: string | null;
+  type: string;
+  isEntryPoint: boolean;
+  isTerminal: boolean;
+  options: Array<{
+    id: string;
+    value: string;
+    label: string;
+    description: string | null;
+    iconUrl: string | null;
+    nextQuestionId: string | null;
+  }>;
+}
+
+export interface WizardAnswer {
+  questionId: string;
+  selectedValue: string | string[];
+}
+
+export interface WizardNode {
+  name: string;
+  ref: string;
+  type?: string;
+  technology?: string;
+  description?: string;
+}
+
+export interface WizardFlowResult {
+  globalProperties: Record<string, string>;
+  nodes: WizardNode[];
+  boundaries: Array<{ name: string; ref: string; type: string; description?: string }>;
+  links: Array<{
+    sourceRef: string;
+    targetRef: string;
+    protocol?: string;
+    dataType?: string;
+    encrypted?: boolean;
+    authenticated?: boolean;
+  }>;
+  path: Array<{ questionId: string; selectedValue: string | string[]; questionText: string }>;
+}
+
+export interface WizardInfo {
+  available: boolean;
+  totalQuestions: number;
+}
+
+export interface WizardCreateResult {
+  threatModel: { id: string; name: string };
+  componentsCreated: number;
+  dataFlowsCreated: number;
+}
+
+// ==================== Import Types ====================
+export type ImportFileType = 'openapi' | 'terraform' | 'drawio';
+
+export interface ParsedComponent {
+  name: string;
+  type: string;
+  description?: string;
+  technology?: string;
+  dataClassification?: string;
+  criticality?: string;
+}
+
+export interface ParsedDataFlow {
+  sourceName: string;
+  targetName: string;
+  protocol?: string;
+  dataType?: string;
+  authenticated?: boolean;
+  encrypted?: boolean;
+}
+
+export interface ImportPreviewResult {
+  fileType: ImportFileType;
+  title: string;
+  description?: string;
+  components: ParsedComponent[];
+  dataFlows: ParsedDataFlow[];
+  securityConcerns: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface ImportCreateResult {
+  threatModel: { id: string; name: string };
+  componentsCreated: number;
+  dataFlowsCreated: number;
+}
+
+// ==================== AI Generation Types ====================
+export interface AiGeneratedComponent {
+  name: string;
+  type: 'process' | 'data_store' | 'external_entity';
+  description: string;
+  technology?: string;
+  dataClassification?: 'public' | 'internal' | 'confidential' | 'restricted';
+  criticality?: 'critical' | 'high' | 'medium' | 'low';
+}
+
+export interface AiGeneratedDataFlow {
+  sourceName: string;
+  targetName: string;
+  description: string;
+  protocol?: string;
+  dataType?: string;
+  authenticated?: boolean;
+  encrypted?: boolean;
+}
+
+export interface AiGeneratedBoundary {
+  name: string;
+  type: string;
+  description: string;
+  componentNames: string[];
+}
+
+export interface AiGenerationResult {
+  title: string;
+  description: string;
+  components: AiGeneratedComponent[];
+  dataFlows: AiGeneratedDataFlow[];
+  boundaries: AiGeneratedBoundary[];
+  suggestedThreats: string[];
+}
+
+export interface AiCreateResult {
+  threatModel: { id: string; name: string };
+  componentsCreated: number;
+  dataFlowsCreated: number;
+}
+
+// ==================== Template Types ====================
+export interface TemplateComponent {
+  name: string;
+  type: string;
+  technology?: string;
+  description?: string;
+  criticality?: string;
+  dataClassification?: string;
+  positionX?: number;
+  positionY?: number;
+}
+
+export interface TemplateDataFlow {
+  sourceName: string;
+  targetName: string;
+  label?: string;
+  protocol?: string;
+  dataType?: string;
+  authentication?: boolean;
+  encryption?: boolean;
+}
+
+export interface TemplateBoundary {
+  name: string;
+  type: string;
+  description?: string;
+  componentNames: string[];
+}
+
+export interface TemplateListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  tags: string[];
+  previewImageUrl: string | null;
+  componentCount: number;
+  dataFlowCount: number;
+  isPublic: boolean;
+}
+
+export interface TemplateDetails extends TemplateListItem {
+  diagramXml: string;
+  components: TemplateComponent[];
+  dataFlows: TemplateDataFlow[];
+  boundaries: TemplateBoundary[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateCreateResult {
+  threatModel: { id: string; name: string };
+  componentsCreated: number;
+  dataFlowsCreated: number;
+}
+
 // ==================== Threat Modeling API ====================
 export const threatModelingApi = {
   list: (status?: string) => {
@@ -569,6 +762,112 @@ export const threatModelingApi = {
     fetchApi<any>(`/threat-modeling/${modelId}/mitigations/${mitigationId}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteMitigation: (modelId: string, mitigationId: string) =>
     fetchApi<void>(`/threat-modeling/${modelId}/mitigations/${mitigationId}`, { method: 'DELETE' }),
+
+  // Wizard endpoints
+  wizard: {
+    getInfo: () => fetchApi<WizardInfo>('/threat-modeling/wizard/info'),
+    start: () => fetchApi<WizardQuestion | null>('/threat-modeling/wizard/start'),
+    getQuestion: (questionId: string) =>
+      fetchApi<WizardQuestion>(`/threat-modeling/wizard/questions/${questionId}`),
+    getNextQuestion: (currentQuestionId: string, selectedValue: string) =>
+      fetchApi<WizardQuestion | null>('/threat-modeling/wizard/next', {
+        method: 'POST',
+        body: JSON.stringify({ currentQuestionId, selectedValue }),
+      }),
+    preview: (answers: WizardAnswer[]) =>
+      fetchApi<WizardFlowResult>('/threat-modeling/wizard/preview', {
+        method: 'POST',
+        body: JSON.stringify({ answers }),
+      }),
+    create: (data: {
+      projectId: string;
+      answers: WizardAnswer[];
+      name: string;
+      description?: string;
+      methodology?: string;
+    }) =>
+      fetchApi<WizardCreateResult>('/threat-modeling/wizard/create', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  // Import endpoints
+  import: {
+    parse: (filename: string, content: string, fileType?: ImportFileType) =>
+      fetchApi<ImportPreviewResult>('/threat-modeling/import/parse', {
+        method: 'POST',
+        body: JSON.stringify({ filename, content, fileType }),
+      }),
+    fromRepository: (repositoryId: string, filePaths?: string[]) =>
+      fetchApi<ImportPreviewResult[]>('/threat-modeling/import/from-repository', {
+        method: 'POST',
+        body: JSON.stringify({ repositoryId, filePaths }),
+      }),
+    create: (data: {
+      projectId: string;
+      importResult: ImportPreviewResult;
+      name: string;
+      description?: string;
+      methodology?: string;
+    }) =>
+      fetchApi<ImportCreateResult>('/threat-modeling/import/create', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  // AI generation endpoints
+  ai: {
+    getStatus: () => fetchApi<{ available: boolean }>('/threat-modeling/ai/status'),
+    generate: (description: string, options?: { systemType?: string; industry?: string }) =>
+      fetchApi<AiGenerationResult>('/threat-modeling/ai/generate', {
+        method: 'POST',
+        body: JSON.stringify({ description, ...options }),
+      }),
+    refine: (currentResult: AiGenerationResult, refinementPrompt: string) =>
+      fetchApi<AiGenerationResult>('/threat-modeling/ai/refine', {
+        method: 'POST',
+        body: JSON.stringify({ currentResult, refinementPrompt }),
+      }),
+    create: (data: {
+      projectId: string;
+      generationResult: AiGenerationResult;
+      name: string;
+      description?: string;
+      methodology?: string;
+    }) =>
+      fetchApi<AiCreateResult>('/threat-modeling/ai/create', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
+
+  // Template endpoints
+  templates: {
+    list: (options?: { category?: string; search?: string }) => {
+      const params = new URLSearchParams();
+      if (options?.category) params.append('category', options.category);
+      if (options?.search) params.append('search', options.search);
+      const queryString = params.toString();
+      return fetchApi<TemplateListItem[]>(`/threat-modeling/templates${queryString ? `?${queryString}` : ''}`);
+    },
+    getCategories: () => fetchApi<string[]>('/threat-modeling/templates/categories'),
+    get: (templateId: string) => fetchApi<TemplateDetails>(`/threat-modeling/templates/${templateId}`),
+    create: (
+      templateId: string,
+      data: {
+        projectId: string;
+        name: string;
+        description?: string;
+        methodology?: string;
+      },
+    ) =>
+      fetchApi<TemplateCreateResult>(`/threat-modeling/templates/${templateId}/create`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
 };
 
 // ==================== SBOM API ====================

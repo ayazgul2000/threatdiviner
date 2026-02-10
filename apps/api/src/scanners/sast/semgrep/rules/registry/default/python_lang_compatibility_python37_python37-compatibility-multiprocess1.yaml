@@ -1,0 +1,28 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-multiprocess1
+    pattern: multiprocessing.Process.close()
+    message: >-
+      multiprocessing.Process.close() is only available on Python 3.7+ and is
+      therefore not backwards compatible. Instead, use join().
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-multiprocess1
+      shortlink: https://sg.run/3xjp
+      semgrep.dev:
+        rule:
+          r_id: 9587
+          rv_id: 946277
+          rule_id: AbUzRA
+          version_id: 0bT15be
+          url: >-
+            https://semgrep.dev/playground/r/0bT15be/python.lang.compatibility.python37.python37-compatibility-multiprocess1
+          origin: community

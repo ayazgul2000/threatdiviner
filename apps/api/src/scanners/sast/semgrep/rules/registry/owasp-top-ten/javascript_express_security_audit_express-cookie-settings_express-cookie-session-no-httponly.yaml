@@ -1,0 +1,85 @@
+rules:
+  - id: >-
+      javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-httponly
+    message: >-
+      Default session middleware settings: `httpOnly` not set. It ensures the
+      cookie is sent only over HTTP(S), not client JavaScript, helping to
+      protect against cross-site scripting attacks.
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      cwe:
+        - 'CWE-522: Insufficiently Protected Credentials'
+      owasp:
+        - A02:2017 - Broken Authentication
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      source-rule-url: https://expressjs.com/en/advanced/best-practice-security.html
+      category: security
+      technology:
+        - express
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: HIGH
+      impact: LOW
+      confidence: MEDIUM
+      references:
+        - https://owasp.org/Top10/A04_2021-Insecure_Design
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-httponly
+      shortlink: https://sg.run/ydBO
+      semgrep.dev:
+        rule:
+          r_id: 9268
+          rv_id: 1263132
+          rule_id: d8UjGo
+          version_id: kbTzGev
+          url: >-
+            https://semgrep.dev/playground/r/kbTzGev/javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-httponly
+          origin: community
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              $SESSION = require('cookie-session');
+              ...
+          - pattern-inside: |
+              $SESSION = require('express-session');
+              ...
+      - pattern: $SESSION(...)
+      - pattern-not-inside: $SESSION(<... {cookie:{httpOnly:true}} ...>,...)
+      - pattern-not-inside: |
+          $OPTS = <... {cookie:{httpOnly:true}} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $COOKIE = <... {httpOnly:true} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $OPTS.cookie = <... {httpOnly:true} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $COOKIE.httpOnly = true;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $OPTS.cookie.httpOnly = true;
+          ...
+          $SESSION($OPTS,...);

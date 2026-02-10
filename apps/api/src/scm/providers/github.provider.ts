@@ -783,6 +783,38 @@ ${confidence < 0.8 ? '⚠️ *AI-generated fix – please review carefully.*' : 
   }
 
   /**
+   * Get repository tree (list all files)
+   */
+  async getRepositoryTree(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    ref: string,
+  ): Promise<{ path: string; type: 'blob' | 'tree'; size?: number }[]> {
+    try {
+      const response = await this.apiRequest(
+        accessToken,
+        `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
+      );
+
+      if (!response.tree) {
+        return [];
+      }
+
+      return response.tree
+        .filter((item: any) => item.type === 'blob')
+        .map((item: any) => ({
+          path: item.path,
+          type: item.type,
+          size: item.size,
+        }));
+    } catch (error) {
+      this.logger.warn(`Failed to get repository tree: ${error}`);
+      return [];
+    }
+  }
+
+  /**
    * Get file content from repository
    */
   async getFileContent(

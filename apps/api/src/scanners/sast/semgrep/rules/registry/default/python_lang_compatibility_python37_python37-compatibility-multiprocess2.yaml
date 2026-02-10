@@ -1,0 +1,28 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-multiprocess2
+    pattern: multiprocessing.Process.kill()
+    message: >-
+      multiprocessing.Process.kill() is only available on Python 3.7+ and is
+      therefore not backwards compatible. Instead, use terminate().
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-multiprocess2
+      shortlink: https://sg.run/4x1z
+      semgrep.dev:
+        rule:
+          r_id: 9588
+          rv_id: 946278
+          rule_id: BYUNE9
+          version_id: K3TJbqK
+          url: >-
+            https://semgrep.dev/playground/r/K3TJbqK/python.lang.compatibility.python37.python37-compatibility-multiprocess2
+          origin: community

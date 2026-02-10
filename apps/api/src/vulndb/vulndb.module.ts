@@ -14,8 +14,11 @@ import {
   OwaspSyncService,
   CweMappingSyncService,
   AttackSyncService,
+  CapecSyncService,
+  CweViewSyncService,
 } from './sync';
 import { VulnDbSchedulerService } from './vulndb-scheduler.service';
+import { CweBridgeResolutionService, CweBridgeController } from './bridge';
 
 @Module({
   imports: [
@@ -34,9 +37,12 @@ import { VulnDbSchedulerService } from './vulndb-scheduler.service';
     OwaspSyncService,
     CweMappingSyncService,
     AttackSyncService,
+    CapecSyncService,
+    CweViewSyncService,
     VulnDbSchedulerService,
+    CweBridgeResolutionService,
   ],
-  controllers: [VulnDbController],
+  controllers: [VulnDbController, CweBridgeController],
   exports: [VulnDbService, FindingEnrichmentService, SlaService],
 })
 export class VulnDbModule {}

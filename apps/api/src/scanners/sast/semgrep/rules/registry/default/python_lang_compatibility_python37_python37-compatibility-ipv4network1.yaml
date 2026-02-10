@@ -1,0 +1,28 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-ipv4network1
+    pattern: ipaddress.IPv4Network.subnet_of($X)
+    message: >-
+      IPv4Network.subnet_of is only available on Python 3.7+ and is therefore
+      not backwards compatible. Instead, check if the subnet is in 'subnets'.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-ipv4network1
+      shortlink: https://sg.run/LwRo
+      semgrep.dev:
+        rule:
+          r_id: 9583
+          rv_id: 946273
+          rule_id: JDUyqR
+          version_id: A8TJz73
+          url: >-
+            https://semgrep.dev/playground/r/A8TJz73/python.lang.compatibility.python37.python37-compatibility-ipv4network1
+          origin: community

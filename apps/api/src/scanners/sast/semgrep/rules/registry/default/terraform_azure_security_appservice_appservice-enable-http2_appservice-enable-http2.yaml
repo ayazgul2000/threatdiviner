@@ -1,0 +1,73 @@
+rules:
+  - id: >-
+      terraform.azure.security.appservice.appservice-enable-http2.appservice-enable-http2
+    message: >-
+      Use the latest version of HTTP to ensure you are benefiting from security
+      fixes. Add `http2_enabled = true` to your appservice resource block
+    patterns:
+      - pattern: resource
+      - pattern-not-inside: |
+          resource "azurerm_app_service" "..." {
+          ...
+            site_config {
+              ...
+              http2_enabled = true
+              ...
+            }
+          ...
+          }
+      - pattern-either:
+          - pattern-inside: |
+              resource "azurerm_app_service" "..." {
+              ...
+              }
+          - pattern-inside: |
+              resource "azurerm_app_service" "..." {
+              ...
+                site_config {
+                  ...
+                  http2_enabled = false
+                  ...
+                }
+              ...
+              }
+    metadata:
+      cwe:
+        - >-
+          CWE-444: Inconsistent Interpretation of HTTP Requests ('HTTP
+          Request/Response Smuggling')
+      category: security
+      technology:
+        - terraform
+        - azure
+      references:
+        - >-
+          https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/app_service#http2_enabled
+      owasp:
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Validation
+      source: >-
+        https://semgrep.dev/r/terraform.azure.security.appservice.appservice-enable-http2.appservice-enable-http2
+      shortlink: https://sg.run/5DkA
+      semgrep.dev:
+        rule:
+          r_id: 15103
+          rv_id: 1263756
+          rule_id: KxU7LJ
+          version_id: JdTzx98
+          url: >-
+            https://semgrep.dev/playground/r/JdTzx98/terraform.azure.security.appservice.appservice-enable-http2.appservice-enable-http2
+          origin: community
+    languages:
+      - hcl
+    severity: INFO

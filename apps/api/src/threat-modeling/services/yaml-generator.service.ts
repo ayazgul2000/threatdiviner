@@ -77,7 +77,7 @@ export interface ThreagileCommunicationLink {
   description: string;
   protocol: string;
   authentication: string;
-  authorization?: string;
+  authorization: string;
   tags?: string[];
   vpn?: boolean;
   ip_filtered?: boolean;
@@ -324,6 +324,16 @@ export class YamlGeneratorService {
     );
     const dataAssets = this.buildDataAssets(threatModel.dataFlows);
 
+    // Collect all tags used by technical assets for tags_available
+    const allTags = new Set<string>();
+    for (const asset of Object.values(technicalAssets)) {
+      if (asset.tags) {
+        for (const tag of asset.tags) {
+          allTags.add(tag);
+        }
+      }
+    }
+
     return {
       threagile_version: '1.0.0',
       title: threatModel.name,
@@ -340,6 +350,7 @@ export class YamlGeneratorService {
       technical_overview: {
         description: `Technical architecture with ${threatModel.components.length} components and ${threatModel.dataFlows.length} data flows`,
       },
+      tags_available: allTags.size > 0 ? Array.from(allTags) : undefined,
       data_assets: dataAssets,
       technical_assets: technicalAssets,
       trust_boundaries: trustBoundaries,
@@ -371,6 +382,7 @@ export class YamlGeneratorService {
           description: flow.label || `Connection from ${component.name} to ${flow.target.name}`,
           protocol: this.mapProtocol(flow.protocol),
           authentication: flow.authentication ? 'credentials' : 'none',
+          authorization: 'none',
           usage: 'business',
           vpn: false,
           ip_filtered: false,
@@ -389,9 +401,9 @@ export class YamlGeneratorService {
         technology: mapping?.threagileType || this.mapTechnology(component.technology),
         machine: mapping?.machineType || 'virtual',
         encryption: mapping?.defaultEncryption || 'none',
-        confidentiality: this.mapCriticality(component.criticality),
-        integrity: this.mapCriticality(component.criticality),
-        availability: this.mapCriticality(component.criticality),
+        confidentiality: this.mapConfidentiality(component.criticality),
+        integrity: this.mapIntegrityAvailability(component.criticality),
+        availability: this.mapIntegrityAvailability(component.criticality),
         multi_tenant: mapping?.defaultMultiTenant || false,
         redundant: false,
         custom_developed_parts: component.type === 'process',
@@ -449,11 +461,11 @@ export class YamlGeneratorService {
   private buildTrustBoundaries(components: any[]): Record<string, ThreagileTrustBoundary> {
     const boundaries: Record<string, ThreagileTrustBoundary> = {};
 
-    // Group components by their criticality level to create trust boundaries
-    const criticalComponents = components.filter((c: any) => c.criticality === 'critical');
-    const highComponents = components.filter((c: any) => c.criticality === 'high');
-    const mediumComponents = components.filter((c: any) => c.criticality === 'medium');
-    // Low criticality components are placed in external boundary or not in any boundary
+    // Group internal components by criticality (exclude external entities — they go in external boundary)
+    const internal = components.filter((c: any) => c.type !== 'external_entity');
+    const criticalComponents = internal.filter((c: any) => c.criticality === 'critical');
+    const highComponents = internal.filter((c: any) => c.criticality === 'high');
+    const mediumComponents = internal.filter((c: any) => c.criticality === 'medium');
 
     // Create internal network boundary for critical/high components
     if (criticalComponents.length > 0 || highComponents.length > 0) {
@@ -537,39 +549,74 @@ export class YamlGeneratorService {
   private mapTechnology(technology: string | null): string {
     if (!technology) return 'unknown-technology';
 
+    const tech = technology.toLowerCase();
+
+    // Exact match lookup
     const mapping: Record<string, string> = {
-      'ec2': 'amazon-ec2',
-      'rds': 'amazon-rds',
-      's3': 'amazon-s3',
-      'lambda': 'amazon-lambda',
-      'api-gateway': 'api-gateway',
-      'dynamodb': 'amazon-dynamodb',
-      'cloudfront': 'amazon-cloudfront',
-      'sqs': 'amazon-sqs',
-      'sns': 'amazon-sns',
-      'eks': 'amazon-eks',
-      'ecs': 'amazon-ecs',
-      'azure-vm': 'azure-vm',
-      'azure-sql': 'azure-sql',
-      'azure-storage': 'azure-storage',
-      'gcp-compute': 'gcp-compute',
-      'gcp-cloud-sql': 'gcp-cloud-sql',
-      'kubernetes': 'kubernetes',
-      'docker': 'container',
+      'ec2': 'web-server',
+      'rds': 'database',
+      's3': 'file-server',
+      'lambda': 'function',
+      'api-gateway': 'gateway',
+      'dynamodb': 'database',
+      'cloudfront': 'reverse-proxy',
+      'sqs': 'message-queue',
+      'sns': 'message-queue',
+      'eks': 'container-platform',
+      'ecs': 'container-platform',
+      'azure-vm': 'web-server',
+      'azure-sql': 'database',
+      'azure-storage': 'file-server',
+      'gcp-compute': 'web-server',
+      'gcp-cloud-sql': 'database',
+      'kubernetes': 'container-platform',
+      'docker': 'container-platform',
       'nginx': 'web-server',
       'apache': 'web-server',
-      'nodejs': 'node-js',
-      'python': 'python',
-      'java': 'java',
-      'postgresql': 'postgresql',
-      'mysql': 'mysql',
-      'mongodb': 'mongodb',
-      'redis': 'redis',
-      'kafka': 'kafka',
-      'rabbitmq': 'rabbitmq',
+      'nodejs': 'web-application',
+      'python': 'web-application',
+      'java': 'application-server',
+      'postgresql': 'database',
+      'mysql': 'database',
+      'mongodb': 'database',
+      'redis': 'database',
+      'kafka': 'message-queue',
+      'rabbitmq': 'message-queue',
+      'browser': 'browser',
+      'react': 'web-application',
+      'angular': 'web-application',
+      'vue': 'web-application',
+      'express': 'web-application',
+      'spring': 'application-server',
+      'django': 'web-application',
+      'flask': 'web-application',
+      'gateway': 'gateway',
+      'load-balancer': 'load-balancer',
+      'vault': 'vault',
+      'waf': 'waf',
     };
 
-    return mapping[technology.toLowerCase()] || technology.toLowerCase();
+    if (mapping[tech]) return mapping[tech];
+
+    // Keyword-based fallback for multi-word technology names
+    if (tech.includes('browser')) return 'browser';
+    if (tech.includes('react') || tech.includes('angular') || tech.includes('vue') || tech.includes('spa')) return 'web-application';
+    if (tech.includes('node') || tech.includes('express') || tech.includes('django') || tech.includes('flask')) return 'web-application';
+    if (tech.includes('spring') || tech.includes('java') || tech.includes('.net')) return 'application-server';
+    if (tech.includes('postgres') || tech.includes('mysql') || tech.includes('sql') || tech.includes('mongo') || tech.includes('database') || tech.includes('db')) return 'database';
+    if (tech.includes('redis') || tech.includes('cache') || tech.includes('memcache')) return 'database';
+    if (tech.includes('kafka') || tech.includes('rabbit') || tech.includes('queue') || tech.includes('sqs')) return 'message-queue';
+    if (tech.includes('nginx') || tech.includes('apache') || tech.includes('web server')) return 'web-server';
+    if (tech.includes('api') || tech.includes('rest') || tech.includes('graphql')) return 'web-service-rest';
+    if (tech.includes('gateway')) return 'gateway';
+    if (tech.includes('docker') || tech.includes('container') || tech.includes('k8s') || tech.includes('kubernetes')) return 'container-platform';
+    if (tech.includes('lambda') || tech.includes('function') || tech.includes('serverless')) return 'function';
+    if (tech.includes('s3') || tech.includes('storage') || tech.includes('blob')) return 'file-server';
+    if (tech.includes('stripe') || tech.includes('payment') || tech.includes('external')) return 'web-service-rest';
+    if (tech.includes('ldap') || tech.includes('active directory')) return 'ldap-server';
+    if (tech.includes('mail') || tech.includes('smtp') || tech.includes('email')) return 'mail-server';
+
+    return 'unknown-technology';
   }
 
   /**
@@ -581,13 +628,14 @@ export class YamlGeneratorService {
     const mapping: Record<string, string> = {
       'http': 'http',
       'https': 'https',
-      'tcp': 'tcp',
-      'udp': 'udp',
-      'grpc': 'grpc',
+      'tcp': 'binary',
+      'udp': 'binary',
+      'grpc': 'binary',
       'websocket': 'ws',
+      'ws': 'ws',
       'wss': 'wss',
       'mqtt': 'mqtt',
-      'amqp': 'amqp',
+      'amqp': 'binary',
       'jdbc': 'jdbc',
       'odbc': 'odbc',
       'ldap': 'ldap',
@@ -597,16 +645,21 @@ export class YamlGeneratorService {
       'ftp': 'ftp',
       'ftps': 'ftps',
       'smtp': 'smtp',
-      'smtps': 'smtps',
+      'smtps': 'smtp-encrypted',
+      'sql': 'sql-access-protocol',
+      'nosql': 'nosql-access-protocol',
+      'nfs': 'nfs',
+      'smb': 'smb',
     };
 
-    return mapping[protocol.toLowerCase()] || protocol.toLowerCase();
+    return mapping[protocol.toLowerCase()] || 'https';
   }
 
   /**
-   * Map criticality to Threagile confidentiality/integrity/availability
+   * Map criticality to Threagile confidentiality rating
+   * Valid: public, internal, restricted, confidential, strictly-confidential
    */
-  private mapCriticality(criticality: string | null): string {
+  private mapConfidentiality(criticality: string | null): string {
     const mapping: Record<string, string> = {
       'critical': 'strictly-confidential',
       'high': 'confidential',
@@ -614,6 +667,20 @@ export class YamlGeneratorService {
       'low': 'public',
     };
     return mapping[criticality?.toLowerCase() || ''] || 'internal';
+  }
+
+  /**
+   * Map criticality to Threagile integrity/availability rating
+   * Valid: archive, operational, important, critical, mission-critical
+   */
+  private mapIntegrityAvailability(criticality: string | null): string {
+    const mapping: Record<string, string> = {
+      'critical': 'mission-critical',
+      'high': 'critical',
+      'medium': 'important',
+      'low': 'operational',
+    };
+    return mapping[criticality?.toLowerCase() || ''] || 'important';
   }
 
   /**

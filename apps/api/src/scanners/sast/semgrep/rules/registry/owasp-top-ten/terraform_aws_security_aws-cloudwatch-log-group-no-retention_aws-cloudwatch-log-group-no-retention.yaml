@@ -1,0 +1,53 @@
+rules:
+  - id: >-
+      terraform.aws.security.aws-cloudwatch-log-group-no-retention.aws-cloudwatch-log-group-no-retention
+    patterns:
+      - pattern: |
+          resource "aws_cloudwatch_log_group" $ANYTHING {
+            ...
+          }
+      - pattern-not-inside: |
+          resource "aws_cloudwatch_log_group" $ANYTHING {
+            ...
+            retention_in_days = ...
+            ...
+          }
+    message: >-
+      The AWS CloudWatch Log Group has no retention. Missing retention in log
+      groups can cause losing important event information.
+    languages:
+      - hcl
+    severity: WARNING
+    metadata:
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+      cwe:
+        - 'CWE-320: CWE CATEGORY: Key Management Errors'
+      technology:
+        - aws
+        - terraform
+      category: security
+      references:
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.aws-cloudwatch-log-group-no-retention.aws-cloudwatch-log-group-no-retention
+      shortlink: https://sg.run/4lwl
+      semgrep.dev:
+        rule:
+          r_id: 17344
+          rv_id: 946665
+          rule_id: x8UGBG
+          version_id: BjT1N2B
+          url: >-
+            https://semgrep.dev/playground/r/BjT1N2B/terraform.aws.security.aws-cloudwatch-log-group-no-retention.aws-cloudwatch-log-group-no-retention
+          origin: community

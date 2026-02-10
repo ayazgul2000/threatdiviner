@@ -1,0 +1,29 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-pdb
+    pattern: pdb.set_trace(header=$X, ...)
+    message: >-
+      pdb.set_trace() with the header argument is only available on Python 3.7+
+      and is therefore not backwards compatible. Instead, use set_trace()
+      without the header argument.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-pdb
+      shortlink: https://sg.run/GeA2
+      semgrep.dev:
+        rule:
+          r_id: 9592
+          rv_id: 946281
+          rule_id: KxUby2
+          version_id: YDTvR0k
+          url: >-
+            https://semgrep.dev/playground/r/YDTvR0k/python.lang.compatibility.python37.python37-compatibility-pdb
+          origin: community

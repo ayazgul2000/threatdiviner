@@ -1,0 +1,68 @@
+rules:
+  - id: >-
+      go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
+    languages:
+      - go
+    message: >-
+      Detected directly writing or similar in 'http.ResponseWriter.write()'.
+      This bypasses HTML escaping that prevents cross-site scripting
+      vulnerabilities. Instead, use the 'html/template' package and render data
+      using 'template.Execute()'.
+    metadata:
+      category: security
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - >-
+          https://blogtitle.github.io/robn-go-security-pearls-cross-site-scripting-xss/
+      technology:
+        - go
+      confidence: LOW
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
+      shortlink: https://sg.run/EkbA
+      semgrep.dev:
+        rule:
+          r_id: 9137
+          rv_id: 1262957
+          rule_id: GdU71y
+          version_id: K3TKkoB
+          url: >-
+            https://semgrep.dev/playground/r/K3TKkoB/go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
+          origin: community
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              func $HANDLER(..., $WRITER http.ResponseWriter, ...) {
+                ...
+              }
+          - pattern-inside: |
+              func $HANDLER(..., $WRITER *http.ResponseWriter, ...) {
+                ...
+              }
+          - pattern-inside: |
+              func(..., $WRITER http.ResponseWriter, ...) {
+                ...
+              }
+      - pattern-either:
+          - pattern: $WRITER.Write(...)
+          - pattern: (*$WRITER).Write(...)
+      - pattern-not: $WRITER.Write([]byte("..."))
+    severity: WARNING

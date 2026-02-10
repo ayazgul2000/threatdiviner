@@ -1,0 +1,77 @@
+rules:
+  - id: php.lang.security.injection.echoed-request.echoed-request
+    mode: taint
+    message: >-
+      `Echo`ing user input risks cross-site scripting vulnerability. You should
+      use `htmlentities()` when showing data to users.
+    languages:
+      - php
+    severity: ERROR
+    pattern-sources:
+      - pattern: $_REQUEST
+      - pattern: $_GET
+      - pattern: $_POST
+    pattern-sinks:
+      - pattern: echo $...VARS;
+    pattern-sanitizers:
+      - pattern: htmlentities(...)
+      - pattern: htmlspecialchars(...)
+      - pattern: strip_tags(...)
+      - pattern: isset(...)
+      - pattern: empty(...)
+      - pattern: esc_html(...)
+      - pattern: esc_attr(...)
+      - pattern: wp_kses(...)
+      - pattern: e(...)
+      - pattern: twig_escape_filter(...)
+      - pattern: xss_clean(...)
+      - pattern: html_escape(...)
+      - pattern: Html::escape(...)
+      - pattern: Xss::filter(...)
+      - pattern: escapeHtml(...)
+      - pattern: escapeHtml(...)
+      - pattern: escapeHtmlAttr(...)
+    fix: echo htmlentities($...VARS);
+    metadata:
+      technology:
+        - php
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      category: security
+      references:
+        - https://www.php.net/manual/en/function.htmlentities.php
+        - https://www.php.net/manual/en/reserved.variables.request.php
+        - https://www.php.net/manual/en/reserved.variables.post.php
+        - https://www.php.net/manual/en/reserved.variables.get.php
+        - >-
+          https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/php.lang.security.injection.echoed-request.echoed-request
+      shortlink: https://sg.run/Bqqb
+      semgrep.dev:
+        rule:
+          r_id: 31707
+          rv_id: 1263283
+          rule_id: BYUyyg
+          version_id: d6TyxE9
+          url: >-
+            https://semgrep.dev/playground/r/d6TyxE9/php.lang.security.injection.echoed-request.echoed-request
+          origin: community

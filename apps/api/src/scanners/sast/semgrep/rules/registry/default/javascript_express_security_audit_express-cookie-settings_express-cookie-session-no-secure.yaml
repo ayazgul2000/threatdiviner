@@ -1,0 +1,84 @@
+rules:
+  - id: >-
+      javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-secure
+    message: >-
+      Default session middleware settings: `secure` not set. It ensures the
+      browser only sends the cookie over HTTPS.
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+    metadata:
+      cwe:
+        - 'CWE-522: Insufficiently Protected Credentials'
+      owasp:
+        - A02:2017 - Broken Authentication
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      source-rule-url: https://expressjs.com/en/advanced/best-practice-security.html
+      category: security
+      technology:
+        - express
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: HIGH
+      impact: LOW
+      confidence: MEDIUM
+      references:
+        - https://owasp.org/Top10/A04_2021-Insecure_Design
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-secure
+      shortlink: https://sg.run/9oKz
+      semgrep.dev:
+        rule:
+          r_id: 9267
+          rv_id: 1263131
+          rule_id: v8Unzw
+          version_id: NdTzyrv
+          url: >-
+            https://semgrep.dev/playground/r/NdTzyrv/javascript.express.security.audit.express-cookie-settings.express-cookie-session-no-secure
+          origin: community
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              $SESSION = require('cookie-session');
+              ...
+          - pattern-inside: |
+              $SESSION = require('express-session');
+              ...
+      - pattern: $SESSION(...)
+      - pattern-not-inside: $SESSION(<... {cookie:{secure:true}} ...>,...)
+      - pattern-not-inside: |
+          $OPTS = <... {cookie:{secure:true}} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $COOKIE = <... {secure:true} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $OPTS.cookie = <... {secure:true} ...>;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $COOKIE.secure = true;
+          ...
+          $SESSION($OPTS,...);
+      - pattern-not-inside: |
+          $OPTS = ...;
+          ...
+          $OPTS.cookie.secure = true;
+          ...
+          $SESSION($OPTS,...);

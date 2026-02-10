@@ -1,0 +1,26 @@
+rules:
+  - id: python.lang.compatibility.python36.python36-compatibility-ssl
+    pattern: ssl.get_ciphers()
+    message: this function is only available on Python 3.6+
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python36.python36-compatibility-ssl
+      shortlink: https://sg.run/kXn2
+      semgrep.dev:
+        rule:
+          r_id: 9572
+          rv_id: 946262
+          rule_id: ZqU5wR
+          version_id: DkTNpr8
+          url: >-
+            https://semgrep.dev/playground/r/DkTNpr8/python.lang.compatibility.python36.python36-compatibility-ssl
+          origin: community

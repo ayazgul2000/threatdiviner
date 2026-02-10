@@ -1,0 +1,66 @@
+rules:
+  - id: php.wordpress-plugins.security.audit.wp-ssrf-audit.wp-ssrf-audit
+    languages:
+      - php
+    severity: WARNING
+    message: >-
+      Detected usage of vulnerable functions with user input, which could lead
+      to SSRF vulnerabilities.
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $_GET[...]
+              - pattern: $_POST[...]
+              - pattern: $_REQUEST[...]
+              - pattern: get_option(...)
+              - pattern: get_user_meta(...)
+              - pattern: get_query_var(...)
+    pattern-sinks:
+      - patterns:
+          - focus-metavariable: $URL
+          - pattern-either:
+              - pattern: wp_remote_get($URL, ...)
+              - pattern: wp_safe_remote_get($URL, ...)
+              - pattern: wp_safe_remote_request($URL, ...)
+              - pattern: wp_safe_remote_head($URL, ...)
+              - pattern: wp_oembed_get($URL, ...)
+              - pattern: vip_safe_wp_remote_get($URL, ...)
+              - pattern: wp_safe_remote_post($URL, ...)
+    paths:
+      include:
+        - '**/wp-content/plugins/**/*.php'
+    metadata:
+      cwe: 'CWE-918: Server-Side Request Forgery (SSRF)'
+      owasp: A10:2021 - Server-Side Request Forgery (SSRF)
+      category: security
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      subcategory:
+        - audit
+      technology:
+        - Wordpress Plugins
+      references:
+        - >-
+          https://developer.wordpress.org/reference/functions/wp_safe_remote_get/
+        - https://developer.wordpress.org/reference/functions/wp_remote_get/
+        - >-
+          https://patchstack.com/articles/exploring-the-unpatched-wordpress-ssrf/
+      vulnerability_class:
+        - Server-Side Request Forgery (SSRF)
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/php.wordpress-plugins.security.audit.wp-ssrf-audit.wp-ssrf-audit
+      shortlink: https://sg.run/K3y06
+      semgrep.dev:
+        rule:
+          r_id: 191611
+          rv_id: 1039233
+          rule_id: 6JUZyKX
+          version_id: JdTp6rq
+          url: >-
+            https://semgrep.dev/playground/r/JdTp6rq/php.wordpress-plugins.security.audit.wp-ssrf-audit.wp-ssrf-audit
+          origin: community

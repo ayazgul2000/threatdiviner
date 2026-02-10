@@ -1,0 +1,32 @@
+rules:
+  - id: ocaml.lang.portability.crlf-support.prefer-read-in-binary-mode
+    pattern: open_in
+    fix: open_in_bin
+    message: >-
+      'open_in' behaves differently on Windows and on Unix-like systems with
+      respect to line endings. To get the same behavior everywhere, use
+      'open_in_bin' or 'open_in_gen [Open_binary]'. If you really want
+      CRLF-to-LF translations to take place when running on Windows, use
+      'open_in_gen [Open_text]'.
+    languages:
+      - ocaml
+    severity: WARNING
+    metadata:
+      category: portability
+      technology:
+        - ocaml
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/ocaml.lang.portability.crlf-support.prefer-read-in-binary-mode
+      shortlink: https://sg.run/d0YE
+      semgrep.dev:
+        rule:
+          r_id: 12778
+          rv_id: 945972
+          rule_id: WAUPAJ
+          version_id: DkTNpPw
+          url: >-
+            https://semgrep.dev/playground/r/DkTNpPw/ocaml.lang.portability.crlf-support.prefer-read-in-binary-mode
+          origin: community

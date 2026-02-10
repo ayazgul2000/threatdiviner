@@ -6,6 +6,7 @@ import { RiskParserService } from '../../threat-modeling/services/risk-parser.se
 import { QUEUE_NAMES } from '../queue.constants';
 import { AnalysisJobData, AnalysisStage } from '../jobs';
 import { BULL_CONNECTION } from '../custom-bull.module';
+import AdmZip from 'adm-zip';
 
 export interface AnalysisProgressEvent {
   analysisRunId: string;
@@ -119,10 +120,16 @@ export class AnalysisProcessor implements OnModuleInit, OnModuleDestroy {
 
       let response: Response;
       try {
-        response = await fetch(`${threagileUrl}/analyze`, {
+        const formData = new FormData();
+        formData.append(
+          'file',
+          new Blob([yaml], { type: 'application/x-yaml' }),
+          'threagile.yaml',
+        );
+
+        response = await fetch(`${threagileUrl}/direct/analyze`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-yaml' },
-          body: yaml,
+          body: formData,
           signal: controller.signal,
         });
       } finally {
@@ -136,13 +143,22 @@ export class AnalysisProcessor implements OnModuleInit, OnModuleDestroy {
         throw new Error(`Threagile analysis failed: ${errorText}`);
       }
 
-      const result = await response.json();
+      // Response is a ZIP file containing risks.json
+      const zipBuffer = Buffer.from(await response.arrayBuffer());
+      const zip = new AdmZip(zipBuffer);
+      const risksEntry = zip.getEntry('risks.json');
+      if (!risksEntry) {
+        throw new Error('Threagile response ZIP does not contain risks.json');
+      }
+      const risksJson = JSON.parse(risksEntry.getData().toString('utf-8'));
+      const result = { risks: risksJson };
 
       // Stage: Processing results
       await this.updateStage(job, analysisRunId, threatModelId, 'processing', 80, 'Processing analysis results...');
 
       // Parse risks using RiskParserService (v2.4.0 - with deduplication)
-      const parsedRisks = this.riskParserService.parseThreagileOutput(result);
+      // risks.json is already a direct array, wrap in object for parser
+      const parsedRisks = this.riskParserService.parseThreagileOutput(risksJson);
       const duration = Date.now() - startTime;
 
       // Count by severity
@@ -151,7 +167,7 @@ export class AnalysisProcessor implements OnModuleInit, OnModuleDestroy {
       const mediumCount = parsedRisks.filter(r => r.severity === 'medium').length;
       const lowCount = parsedRisks.filter(r => r.severity === 'low').length;
 
-      // Update AnalysisRun with results
+      // Update AnalysisRun with results and store full ZIP
       await this.prisma.analysisRun.update({
         where: { id: analysisRunId },
         data: {
@@ -162,6 +178,7 @@ export class AnalysisProcessor implements OnModuleInit, OnModuleDestroy {
           mediumCount,
           lowCount,
           rawOutput: result,
+          reportZip: zipBuffer,
         },
       });
 

@@ -1,0 +1,52 @@
+rules:
+  - id: terraform.lang.security.s3-unencrypted-bucket.s3-unencrypted-bucket
+    patterns:
+      - pattern: a
+      - pattern: b
+    languages:
+      - hcl
+    severity: INFO
+    message: >-
+      This rule has been deprecated, as all s3 buckets are encrypted by default
+      with no way to disable it. See
+      https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_server_side_encryption_configuration
+      for more info.
+    metadata:
+      references:
+        - >-
+          https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket#server_side_encryption_configuration
+        - >-
+          https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html
+      cwe:
+        - 'CWE-311: Missing Encryption of Sensitive Data'
+      category: security
+      technology:
+        - terraform
+        - aws
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      deprecated: true
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.lang.security.s3-unencrypted-bucket.s3-unencrypted-bucket
+      shortlink: https://sg.run/Jezw
+      semgrep.dev:
+        rule:
+          r_id: 16202
+          rv_id: 1263901
+          rule_id: 3qU62L
+          version_id: JdTzxjN
+          url: >-
+            https://semgrep.dev/playground/r/JdTzxjN/terraform.lang.security.s3-unencrypted-bucket.s3-unencrypted-bucket
+          origin: community

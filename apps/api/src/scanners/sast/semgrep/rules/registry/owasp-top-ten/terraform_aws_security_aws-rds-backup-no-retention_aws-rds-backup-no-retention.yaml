@@ -1,0 +1,56 @@
+rules:
+  - id: >-
+      terraform.aws.security.aws-rds-backup-no-retention.aws-rds-backup-no-retention
+    patterns:
+      - pattern-either:
+          - pattern: |
+              resource "aws_rds_cluster" $ANYTHING {
+                ...
+                backup_retention_period = 0
+                ...
+              }
+          - pattern: |
+              resource "aws_db_instance" $ANYTHING {
+                ...
+                backup_retention_period = 0
+                ...
+              }
+    message: >-
+      The AWS RDS has no retention. Missing retention can cause losing important
+      event information. To fix this, set a `backup_retention_period`.
+    languages:
+      - hcl
+    severity: WARNING
+    metadata:
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+      cwe:
+        - 'CWE-320: CWE CATEGORY: Key Management Errors'
+      technology:
+        - aws
+        - terraform
+      category: security
+      references:
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.aws-rds-backup-no-retention.aws-rds-backup-no-retention
+      shortlink: https://sg.run/OyYB
+      semgrep.dev:
+        rule:
+          r_id: 17375
+          rv_id: 946719
+          rule_id: GdUzwQ
+          version_id: GxTP0Lq
+          url: >-
+            https://semgrep.dev/playground/r/GxTP0Lq/terraform.aws.security.aws-rds-backup-no-retention.aws-rds-backup-no-retention
+          origin: community
