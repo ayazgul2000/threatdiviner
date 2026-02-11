@@ -75,7 +75,27 @@
       "sql-vm",
       "table",
       "virtual-clusters",
-      "web-app-database"
+      "web-app-database",
+      "clickhouse",
+      "duckdb",
+      "sql-datawarehouse"
+    ],
+    "excludeCwes": [
+      "CWE-90",
+      "CWE-472",
+      "CWE-565",
+      "CWE-601",
+      "CWE-1073"
+    ]
+  },
+  "database-analytics": {
+    "category": "database",
+    "icons": [
+      "bigdata-service",
+      "bigdata-service-white",
+      "science",
+      "science-white",
+      "virtual-datacenter"
     ],
     "excludeCwes": [
       "CWE-90",
@@ -1525,6 +1545,99 @@
       "CWE-1284"
     ]
   },
+  "container-service": {
+    "category": "compute",
+    "icons": [
+      "container",
+      "container-apps",
+      "container-optimized-os",
+      "container-service",
+      "container-services-deprecated",
+      "container-white",
+      "containers",
+      "elastic-container-instance",
+      "elastic-container-service",
+      "elastic-container-service-container",
+      "elastic-container-service-service",
+      "elastic-container-service-service-connect",
+      "elastic-container-service-task",
+      "fargate",
+      "mesh-applications",
+      "zun"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-619",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-1284"
+    ]
+  },
+  "container-registry": {
+    "category": "compute",
+    "icons": [
+      "ec2-container-registry",
+      "ec2-container-registry-image",
+      "ec2-container-registry-registry",
+      "ocir",
+      "ocir-white"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-470",
+      "CWE-502",
+      "CWE-619",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-1284"
+    ]
+  },
+  "k8s-cluster": {
+    "category": "compute",
+    "icons": [
+      "elastic-kubernetes-service",
+      "gke-on-prem",
+      "k8s-cluster",
+      "k8s-node",
+      "k8s-node-pool",
+      "kubernetes-engine",
+      "oke",
+      "oke-white"
+    ],
+    "excludeCwes": [
+      "CWE-619"
+    ]
+  },
+  "k8s-workload": {
+    "category": "compute",
+    "icons": [
+      "cronjob",
+      "ds",
+      "job",
+      "pod",
+      "rs",
+      "sts"
+    ],
+    "excludeCwes": [
+      "CWE-619"
+    ]
+  },
   "_comment_security": "--- SECURITY (50 CWE pool from CWE-1211, CWE-1212, CWE-255, CWE-310, CWE-320) ---",
   "_comment_security_groups": "Cred(12): passwords/defaults | Auth(15): authn bypass/mechanisms | Authz(9): access control | Crypto(11): hash/PRNG/signatures | Key(3): key exchange/reuse/expiry",
   "iam-identity": {
@@ -2423,7 +2536,8 @@
       "trusted-advisor-checklist-fault-tolerant",
       "trusted-advisor-checklist-performance",
       "trusted-advisor-checklist-security",
-      "well-architected-tool"
+      "well-architected-tool",
+      "ns"
     ],
     "excludeCwes": [
       "CWE-243",
@@ -5696,6 +5810,7 @@
     "icons": [
       "cloud",
       "elastic",
+      "firebase",
       "marketplace"
     ],
     "excludeCwes": []
@@ -7202,7 +7317,6 @@
       "smash"
     ],
     "excludeCwes": [
-      "CWE-384",
       "CWE-613",
       "CWE-804"
     ]

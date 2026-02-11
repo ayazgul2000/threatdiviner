@@ -88,10 +88,10 @@ export class CapecSyncService {
       typeof p === 'string' ? p.trim() : this.extractText([p])
     ).filter(Boolean) || [];
 
-    const skillsRequired = capec.Skills_Required?.[0]?.Skill?.map(s => ({
-      level: s.$?.Level || 'Unknown',
-      description: typeof s === 'string' ? s.trim() : (s._ ? s._.trim() : ''),
-    })).filter(s => s.description) || [];
+    const skillsRequired = capec.Skills_Required?.[0]?.Skill?.map((s: Record<string, unknown>) => ({
+      level: (s.$ as Record<string, string>)?.Level || 'Unknown',
+      description: typeof s === 'string' ? (s as string).trim() : ((s._ as string) ? (s._ as string).trim() : ''),
+    })).filter((s: { description: string }) => s.description) || [];
 
     const resourcesRequired = capec.Resources_Required?.[0]?.Resource?.map(r =>
       typeof r === 'string' ? r.trim() : this.extractText([r])

@@ -303,6 +303,52 @@
   "retrieve-rank": "ml",
   "scalable": "skip",
 
+  "_comment_flowchart": "--- Flowchart/BPMN shapes (no security relevance) ---",
+
+  "action": "skip",
+  "blank": "skip",
+  "collate": "skip",
+  "decision": "skip",
+  "delay": "skip",
+  "display": "skip",
+  "document": "skip",
+  "inspection": "skip",
+  "internal-storage": "skip",
+  "loop-limit": "skip",
+  "manual-input": "skip",
+  "manual-loop": "skip",
+  "merge": "skip",
+  "multiple-documents": "skip",
+  "off-page-connector-left": "skip",
+  "off-page-connector-right": "skip",
+  "or": "skip",
+  "predefined-process": "skip",
+  "preparation": "skip",
+  "sort": "skip",
+  "start-end": "skip",
+  "stored-data": "skip",
+  "summing-junction": "skip",
+
+  "_comment_gis": "--- GIS data format/tooling icons (no infrastructure CWEs) ---",
+
+  "geopackage": "skip",
+  "geopandas": "skip",
+  "geoparquet": "skip",
+  "geotools": "skip",
+  "ogc": "skip",
+  "pysal": "skip",
+  "wfs": "skip",
+  "wms": "skip",
+
+  "_comment_misc_skip": "--- Misc non-technical icons ---",
+
+  "keys": "skip",
+
+  "_comment_misc_remap": "--- Misc icons remapped to proper types ---",
+
+  "firebase": "saas",
+  "ns": "management",
+
   "_comment_excluded": "--- Excluded (non-functional variants / wrong type) ---",
 
   "autonomous-white": "skip",
