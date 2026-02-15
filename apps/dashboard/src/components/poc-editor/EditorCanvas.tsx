@@ -234,6 +234,7 @@ export function EditorCanvas() {
         fitView
         snapToGrid={showGrid}
         snapGrid={[15, 15]}
+        elevateNodesOnSelect={false}
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
         selectionOnDrag
