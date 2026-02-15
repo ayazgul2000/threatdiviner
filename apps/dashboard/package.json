@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@xyflow/react": "^12.10.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
     "mermaid": "^11.12.2",
@@ -23,7 +24,8 @@
     "react-hook-form": "^7.69.0",
     "recharts": "^3.6.0",
     "tailwind-merge": "^3.4.0",
-    "zod": "^4.2.1"
+    "zod": "^4.2.1",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

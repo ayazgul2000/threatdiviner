@@ -106,7 +106,7 @@ All under `/vulndb/bridge/`, JWT-authenticated:
 - `icon-type-overrides.json` reassigns these to proper types (e.g., `"generic-database"` → `"database"`, `"ftp"` → `"network"`)
 - `"skip"` value marks non-technical icons (UI chrome, logos, status indicators) — these get NO CWEs
 - **Every script/query that counts icons per type MUST apply these overrides**
-- After overrides: **59 skipped**, **34 unmapped** (flowchart symbols, GIS formats — excluded, no CWEs)
+- After overrides: **91 skipped** (flowchart shapes, GIS tooling, UI elements), **0 unmapped**
 
 ---
 
@@ -134,11 +134,11 @@ All under `/vulndb/bridge/`, JWT-authenticated:
 
 ## Layer 2 Progress — COMPLETE
 
-**All 132 categories covered. 484 total subtypes. File: 7,210 lines.**
+**All 132 categories covered. 294 total subtypes. 100% icon coverage (2,128 icons).**
 
 ### Breakdown
 
-- **29 categories with multiple subtypes** (granular CWE exclusion patterns)
+- **31 categories with multiple subtypes** (granular CWE exclusion patterns)
 - **103 categories with single `-all` subtypes** (all CWEs in pool apply uniformly to all icons)
 
 ### Categories with multiple subtypes (by subtype count):
@@ -146,9 +146,9 @@ All under `/vulndb/bridge/`, JWT-authenticated:
 | Category | Subtypes | Category | Subtypes |
 |----------|----------|----------|----------|
 | network | 12 | analytics | 7 |
-| database | 7 | general | 7 |
+| database | 8 | general | 7 |
 | security | 7 | aimachinelearning | 6 |
-| blockchain | 6 | compute | 6 |
+| blockchain | 6 | compute | 10 |
 | identity | 6 | language | 6 |
 | storage | 6 | web | 6 |
 | devops | 5 | devtools | 5 |
@@ -176,17 +176,18 @@ Each was reviewed against its CWE pool and icon list. The pattern is consistent:
 
 **Pool**: 42 CWEs from CWE-699 subs `[CWE-1214, CWE-19]` + Tech keyword `["Database Server"]`
 
-**7 subtypes, 134 icons, 0 unassigned:**
+**8 subtypes, 142 icons, 0 unassigned:**
 
 | Subtype | Icons | Excluded CWEs | Effective CWEs | Exclusion Groups |
 |---------|-------|---------------|----------------|-----------------|
-| sql-database | 71 | 5 (90,472,565,601,1073) | 37 | LDAP, Web, Non-SQL |
+| sql-database | 74 | 5 (90,472,565,601,1073) | 37 | LDAP, Web, Non-SQL |
 | kv-store | 18 | 10 (89,90,472,564,565,566,601,611,619,776) | 32 | SQL, LDAP, Web, XML |
 | data-warehouse | 13 | 4 (90,472,565,601) | 38 | LDAP, Web |
 | nosql-document | 11 | 8 (89,90,472,564,565,566,601,619) | 34 | SQL, LDAP, Web |
 | wide-column | 9 | 10 (89,90,472,564,565,566,601,611,619,776) | 32 | SQL, LDAP, Web, XML |
 | graph-database | 5 | 10 (89,90,472,564,565,566,601,611,619,776) | 32 | SQL, LDAP, Web, XML |
 | time-series | 5 | 10 (89,90,472,564,565,566,601,611,619,776) | 32 | SQL, LDAP, Web, XML |
+| database-analytics | 5 | 5 (90,472,565,601,1073) | 37 | LDAP, Web, Non-SQL |
 | search-engine | 2 | 8 (89,90,472,564,565,566,601,619) | 34 | SQL, LDAP, Web |
 
 ---
@@ -254,7 +255,7 @@ Uses the CWE database's own language-specific mappings — the CWE project itsel
 
 6. **Windows environment**: Scripts run on Windows with bash via Git Bash. Use `cd "C:\path"` with quotes. Use `rm -f` not `del`.
 
-7. **The 134 vs 114 discrepancy**: The type count script shows `database: 114` because it counts icons whose registry type is `database`. But `database` + `databases` + overridden icons = 134 total database icons in Layer 2. The Layer 2 file is authoritative.
+7. **The 142 vs 114 discrepancy**: The type count script shows `database: 114` because it counts icons whose registry type is `database`. But `database` + `databases` + overridden icons = 142 total database icons in Layer 2 (across 8 subtypes). The Layer 2 file is authoritative.
 
 8. **general and other are regular types**: They exist in Layer 1 with broad CWE mappings. Most of their icons have been reassigned via overrides. The remaining ones are legitimately technology-agnostic. Do NOT refer to them as "catch-alls" or treat them as special.
 
@@ -360,10 +361,125 @@ Never present the raw registry count alone as "number of database icons."
 
 ---
 
+## Verification Results (2026-02-11)
+
+All verification tasks completed. Full pass across all tests.
+
+### CWE ID Verification — PASS
+All **111 unique CWE IDs** referenced in Layer 3 confirmed to exist in the database, including all high-risk newer IDs:
+CWE-1235, CWE-1321, CWE-1335, CWE-1336, CWE-1341, CWE-1392, CWE-269, CWE-943.
+
+### API Endpoint Testing — 10/10 PASS
+Resolution tested for: java (107 CWEs), nodejs (34), neo4j (33), redis (36), rabbitmq (25), mongodb (35), docker (62), postgresql (38), php (48), python (31). All Layer 3 additions and exclusions applied correctly.
+
+### Global Icon Coverage — 100% PASS
+- **2,128** total icons in registry
+- **2,037** assigned to Layer 2/3 subtypes
+- **91** skipped (flowchart shapes, GIS tooling, UI elements)
+- **0** unassigned
+
+Coverage achieved by assigning 77 previously unassigned icons:
+- 35 container/K8s compute icons → 4 new subtypes (container-service, container-registry, k8s-cluster, k8s-workload)
+- 8 database icons → sql-database (3) + new database-analytics subtype (5)
+- 32 flowchart/GIS/misc → marked skip
+- 2 remapped (firebase → saas, ns → management)
+
+### Integration Testing — 7/7 PASS
+| Test | Result |
+|------|--------|
+| All 132 L1 categories resolve to non-empty CWE pools | PASS |
+| All 294 L2 subcategories reference valid L1 categories | PASS |
+| All L2 exclusion CWEs exist in parent L1 pools | PASS |
+| All 18 L3 overrides reference valid L2 subcategories | PASS |
+| All 111 L3 CWE IDs exist in database | PASS |
+| Global icon coverage (0 unassigned) | PASS |
+| No duplicate icon assignments within categories | PASS |
+
+---
+
+## Final Stats
+
+| Metric | Count |
+|--------|-------|
+| Total icons in registry | 2,128 |
+| Assigned to L2/L3 subtypes | 2,037 |
+| Skipped (non-technical) | 91 |
+| Unassigned | 0 |
+| Layer 1 categories | 132 |
+| Layer 2 subcategories | 294 |
+| Layer 3 icon overrides | 18 |
+| Unique CWE IDs in L3 addCwes | 111 |
+| CWE-699 subcategories used | 24 of 75 |
+
+---
+
 ## What's Next
 
 1. ~~**Fix Layer 3 mongodb subcategory**~~ — DONE (changed `nosql-database` → `nosql-document`)
 2. ~~**Expand Layer 3 overrides**~~ — DONE (18 icons across 3 phases: 4 language, 9 database, 5 infrastructure)
-3. **Global completeness verification**: Confirm every icon in registry is either assigned to a Layer 2 subtype, skipped, or marked excluded
-4. **Integration testing**: Ensure the resolution service correctly handles all 132 categories and 484 subtypes end-to-end
-5. **CWE ID verification**: Validate that all CWE IDs referenced in Layer 3 addCwes exist in the database (especially CWE-1235, CWE-1335, CWE-1336, CWE-1341, CWE-1321, CWE-1392, CWE-269)
+3. ~~**Global completeness verification**~~ — DONE (100% coverage, 0 unassigned)
+4. ~~**Integration testing**~~ — DONE (7/7 tests pass across all 132 categories and 294 subtypes)
+5. ~~**CWE ID verification**~~ — DONE (all 111 CWE IDs confirmed in database)
+
+All verification tasks complete. The CWE Bridge system is fully operational.
+
+---
+
+## POC System Design Editor (2026-02-15)
+
+A standalone visual canvas for designing system architectures, built as a React Flow + Zustand POC isolated from the existing Draw.io/Threagile threat modeling code. This is the future replacement for the XML-based diagram editor.
+
+### Route & Layout
+
+- **Route**: `/poc/editor` — full-screen, no sidebar (outside `/dashboard` layout)
+- **Auth**: Protected by `useAuth()` in `apps/dashboard/src/app/poc/layout.tsx`
+- **Entry point**: Also discoverable via "Design Editor (Beta)" button on `/dashboard/threat-modeling`
+
+### Tech Stack
+
+| Dependency | Version | Purpose |
+|-----------|---------|---------|
+| `@xyflow/react` | 12.10.0 | Canvas rendering, node/edge management, drag-and-drop |
+| `zustand` | 5.0.11 | Centralized editor state (nodes, edges, selection, palette) |
+
+### File Structure
+
+All files under `apps/dashboard/src/components/poc-editor/`:
+
+| File/Folder | Purpose |
+|------------|---------|
+| `types.ts` | Type definitions: node data, edge data, palette items, categories |
+| `constants.ts` | Palette categories, zone/actor/control presets, protocol options |
+| `store/editor-store.ts` | Zustand store: nodes, edges, selection, add/update/delete, export/import |
+| `nodes/ComponentNode.tsx` | Custom node for technology components (icon + label + handles) |
+| `nodes/ZoneNode.tsx` | Custom node for trust boundary zones (colored containers) |
+| `nodes/ActorNode.tsx` | Custom node for actors (users, external systems, admins) |
+| `edges/ProtocolEdge.tsx` | Custom edge with protocol label + auth/encryption badges |
+| `panels/Palette.tsx` | Left sidebar: searchable, categorized component palette with drag-to-canvas |
+| `panels/PropertyPanel.tsx` | Right panel: edit properties of selected node or edge |
+| `EditorCanvas.tsx` | Main React Flow canvas with drop handling, minimap, grid |
+| `EditorLayout.tsx` | Full-screen layout assembling Palette + Canvas + PropertyPanel + StatusBar |
+| `StatusBar.tsx` | Bottom bar: element counts, completeness, export/import/reset actions |
+| `index.ts` | Barrel exports |
+
+Route files:
+- `apps/dashboard/src/app/poc/layout.tsx` — minimal auth-only layout
+- `apps/dashboard/src/app/poc/editor/page.tsx` — wraps EditorLayout in ReactFlowProvider
+
+### Canvas Element Types
+
+| Element | Node Type | Key Properties |
+|---------|----------|---------------|
+| Component | `component` | label, description, technology, category, icon mapping |
+| Zone | `zone` | label, description, zoneType (trust-boundary, network, cloud, etc.) |
+| Actor | `actor` | label, description, actorType (end-user, admin, external-system, etc.) |
+| Inline Control | `inline-control` | label, description, controlType (firewall, waf, api-gateway, etc.) |
+| Connection | edge (`protocol`) | label, protocol, authentication, encryption, completeness badges |
+
+### Key Design Decisions
+
+1. **Isolated from existing code** — zero imports from Draw.io, Threagile, or existing threat-modeling components
+2. **Functional categories** — palette groups by function (Compute, Database, Network, etc.) not vendor
+3. **Completeness tracking** — edges show missing-property badges; status bar shows overall completeness %
+4. **Export/Import** — JSON format via `DesignExport` type; no backend persistence yet (client-side only)
+5. **Future CWE Bridge integration** — component `technology` field will map to CWE Bridge icon names for automatic vulnerability resolution
