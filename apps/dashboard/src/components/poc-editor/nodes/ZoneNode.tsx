@@ -11,9 +11,13 @@ function ZoneNodeInner({ id, data, selected }: NodeProps) {
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const colors = ZONE_COLORS[nodeData.zoneType] || ZONE_COLORS.custom;
 
-  const handleDoubleClick = useCallback(() => {
-    setSelectedElement({ type: 'node', id });
-  }, [id, setSelectedElement]);
+  const handleLabelClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setSelectedElement({ type: 'node', id });
+    },
+    [id, setSelectedElement],
+  );
 
   return (
     <div
@@ -26,8 +30,8 @@ function ZoneNodeInner({ id, data, selected }: NodeProps) {
         border: `2px ${selected ? 'solid' : 'dashed'} ${colors.border}`,
         minWidth: 200,
         minHeight: 150,
+        pointerEvents: 'none',
       }}
-      onDoubleClick={handleDoubleClick}
     >
       <NodeResizer
         isVisible={selected}
@@ -36,13 +40,16 @@ function ZoneNodeInner({ id, data, selected }: NodeProps) {
         lineStyle={{ borderColor: colors.border }}
         handleStyle={{ backgroundColor: colors.border, width: 8, height: 8 }}
       />
-      {/* Zone Label (top-left) */}
+      {/* Zone Label (top-left) — clickable to select the zone */}
       <div
-        className="absolute top-0 left-3 -translate-y-1/2 px-2 py-0.5 rounded text-xs font-semibold"
+        className="absolute top-0 left-3 -translate-y-1/2 px-2 py-0.5 rounded text-xs font-semibold cursor-pointer hover:opacity-90"
         style={{
           backgroundColor: colors.border,
           color: 'white',
+          pointerEvents: 'auto',
         }}
+        onClick={handleLabelClick}
+        onDoubleClick={handleLabelClick}
       >
         {nodeData.label}
         <span className="ml-1.5 opacity-75">
@@ -51,7 +58,7 @@ function ZoneNodeInner({ id, data, selected }: NodeProps) {
       </div>
 
       {/* Trust level indicator (top-right) */}
-      <div className="absolute top-2 right-2 flex gap-0.5">
+      <div className="absolute top-2 right-2 flex gap-0.5" style={{ pointerEvents: 'auto' }}>
         {[1, 2, 3, 4, 5].map((level) => (
           <div
             key={level}

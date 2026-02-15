@@ -8,6 +8,7 @@ import type {
   ComponentNodeData,
   ZoneNodeData,
   ActorNodeData,
+  InlineControlNodeData,
   ConnectionData,
   ProtocolType,
   AuthMethod,
@@ -85,8 +86,10 @@ export function PropertyPanel() {
         {selectedNode && (
           <NodeProperties
             nodeId={selectedNode.id}
+            parentId={selectedNode.parentId}
             data={selectedNode.data as CanvasNodeData}
             updateNodeData={updateNodeData}
+            nodes={nodes}
           />
         )}
         {selectedEdge && (
@@ -105,16 +108,33 @@ export function PropertyPanel() {
 
 function NodeProperties({
   nodeId,
+  parentId,
   data,
   updateNodeData,
+  nodes,
 }: {
   nodeId: string;
+  parentId?: string;
   data: CanvasNodeData;
   updateNodeData: (id: string, data: Partial<CanvasNodeData>) => void;
+  nodes: { id: string; parentId?: string; data: Record<string, unknown> }[];
 }) {
-  if (data.kind === 'component') return <ComponentProperties nodeId={nodeId} data={data} updateNodeData={updateNodeData} />;
-  if (data.kind === 'zone') return <ZoneProperties nodeId={nodeId} data={data} updateNodeData={updateNodeData} />;
-  if (data.kind === 'actor') return <ActorProperties nodeId={nodeId} data={data} updateNodeData={updateNodeData} />;
+  // Find parent zone name
+  const parentZone = parentId ? nodes.find((n) => n.id === parentId) : null;
+  const parentZoneLabel = parentZone ? (parentZone.data as CanvasNodeData).label : null;
+
+  const zoneBadge = parentZoneLabel ? (
+    <div className="mb-3 px-2 py-1.5 rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+        Zone: {parentZoneLabel}
+      </span>
+    </div>
+  ) : null;
+
+  if (data.kind === 'component') return <>{zoneBadge}<ComponentProperties nodeId={nodeId} data={data} updateNodeData={updateNodeData} /></>;
+  if (data.kind === 'zone') return <>{zoneBadge}<ZoneProperties nodeId={nodeId} data={data} updateNodeData={updateNodeData} nodes={nodes} /></>;
+  if (data.kind === 'actor') return <>{zoneBadge}<ActorProperties nodeId={nodeId} data={data} updateNodeData={updateNodeData} /></>;
+  if (data.kind === 'inline-control') return <>{zoneBadge}<InlineControlProperties nodeId={nodeId} data={data} updateNodeData={updateNodeData} /></>;
   return <div className="text-xs text-gray-400">Unknown node type</div>;
 }
 
@@ -190,11 +210,15 @@ function ZoneProperties({
   nodeId,
   data,
   updateNodeData,
+  nodes,
 }: {
   nodeId: string;
   data: ZoneNodeData;
   updateNodeData: (id: string, data: Partial<CanvasNodeData>) => void;
+  nodes: { id: string; parentId?: string; data: Record<string, unknown> }[];
 }) {
+  const children = nodes.filter((n) => n.parentId === nodeId);
+
   return (
     <>
       <FieldGroup label="Label">
@@ -230,6 +254,55 @@ function ZoneProperties({
             {data.trustLevel}
           </span>
         </div>
+      </FieldGroup>
+      {children.length > 0 && (
+        <FieldGroup label={`Contents (${children.length})`}>
+          <div className="space-y-1">
+            {children.map((child) => {
+              const cd = child.data as CanvasNodeData;
+              return (
+                <div key={child.id} className="text-[10px] text-gray-500 dark:text-gray-400 px-1.5 py-1 bg-gray-50 dark:bg-gray-800 rounded">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">{cd.label}</span>
+                  <span className="ml-1 opacity-60">({cd.kind})</span>
+                </div>
+              );
+            })}
+          </div>
+        </FieldGroup>
+      )}
+    </>
+  );
+}
+
+function InlineControlProperties({
+  nodeId,
+  data,
+  updateNodeData,
+}: {
+  nodeId: string;
+  data: InlineControlNodeData;
+  updateNodeData: (id: string, data: Partial<CanvasNodeData>) => void;
+}) {
+  return (
+    <>
+      <FieldGroup label="Label">
+        <input
+          type="text"
+          value={data.label}
+          onChange={(e) => updateNodeData(nodeId, { label: e.target.value })}
+          className="field-input"
+        />
+      </FieldGroup>
+      <FieldGroup label="Description">
+        <textarea
+          value={data.description}
+          onChange={(e) => updateNodeData(nodeId, { description: e.target.value })}
+          rows={2}
+          className="field-input resize-none"
+        />
+      </FieldGroup>
+      <FieldGroup label="Control Type">
+        <input type="text" value={data.controlType} readOnly className="field-input opacity-60" />
       </FieldGroup>
     </>
   );

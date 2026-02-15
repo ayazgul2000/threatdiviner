@@ -5,6 +5,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
+  MarkerType,
   type EdgeProps,
 } from '@xyflow/react';
 import type { ConnectionData } from '../types';
@@ -51,6 +52,7 @@ function ProtocolEdgeInner({
     <>
       <BaseEdge
         path={edgePath}
+        markerEnd={edgeData?.bidirectional ? undefined : MarkerType.ArrowClosed}
         style={{
           stroke: selected ? '#3b82f6' : isIncomplete ? '#ef4444' : '#94a3b8',
           strokeWidth: selected ? 2.5 : 1.5,
