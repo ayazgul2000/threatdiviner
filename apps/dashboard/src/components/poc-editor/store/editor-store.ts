@@ -70,9 +70,15 @@ interface EditorState {
     label: string,
     position: XYPosition,
     size?: { width: number; height: number },
+    parentId?: string,
   ) => string;
   addActorNode: (
     actorType: string,
+    label: string,
+    position: XYPosition,
+  ) => string;
+  addInlineControlNode: (
+    controlType: string,
     label: string,
     position: XYPosition,
   ) => string;
@@ -187,7 +193,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return id;
   },
 
-  addZoneNode: (zoneType, label, position, size) => {
+  addZoneNode: (zoneType, label, position, size, parentId) => {
     const id = nextNodeId();
     const preset = ZONE_PRESETS.find((z) => z.type === zoneType);
     const colors = ZONE_COLORS[zoneType as keyof typeof ZONE_COLORS] || ZONE_COLORS.custom;
@@ -210,6 +216,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         width: size?.width || 400,
         height: size?.height || 300,
       },
+      ...(parentId ? { parentId, extent: 'parent' as const } : {}),
     };
 
     set({ nodes: [node, ...get().nodes] }); // Zones go first so they render behind
@@ -228,6 +235,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const node: Node<CanvasNodeData> = {
       id,
       type: 'actor',
+      position,
+      data,
+    };
+
+    set({ nodes: [...get().nodes, node] });
+    return id;
+  },
+
+  addInlineControlNode: (controlType, label, position) => {
+    const id = nextNodeId();
+    const data: InlineControlNodeData = {
+      kind: 'inline-control',
+      label,
+      description: '',
+      controlType: controlType as InlineControlNodeData['controlType'],
+      attachedEdgeId: '',
+    };
+
+    const node: Node<CanvasNodeData> = {
+      id,
+      type: 'inline-control',
       position,
       data,
     };

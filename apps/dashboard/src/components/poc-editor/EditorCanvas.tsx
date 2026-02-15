@@ -16,6 +16,7 @@ import { useEditorStore } from './store/editor-store';
 import { ComponentNode } from './nodes/ComponentNode';
 import { ZoneNode } from './nodes/ZoneNode';
 import { ActorNode } from './nodes/ActorNode';
+import { InlineControlNode } from './nodes/InlineControlNode';
 import { ProtocolEdge } from './edges/ProtocolEdge';
 import type { PaletteItem, CanvasNodeData, ConnectionData } from './types';
 
@@ -23,6 +24,7 @@ const nodeTypes: NodeTypes = {
   component: ComponentNode,
   zone: ZoneNode,
   actor: ActorNode,
+  'inline-control': InlineControlNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -41,6 +43,7 @@ export function EditorCanvas() {
   const addComponentNode = useEditorStore((s) => s.addComponentNode);
   const addZoneNode = useEditorStore((s) => s.addZoneNode);
   const addActorNode = useEditorStore((s) => s.addActorNode);
+  const addInlineControlNode = useEditorStore((s) => s.addInlineControlNode);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const showMinimap = useEditorStore((s) => s.showMinimap);
@@ -126,15 +129,30 @@ export function EditorCanvas() {
             position,
           );
         } else if (type === 'zone') {
+          // Check if dropped inside another zone for nesting
+          const parentZoneId = findZoneAtPosition(position.x, position.y);
+          if (parentZoneId) {
+            const parentNode = nodes.find((n) => n.id === parentZoneId);
+            if (parentNode) {
+              const relativePosition = {
+                x: position.x - parentNode.position.x,
+                y: position.y - parentNode.position.y,
+              };
+              addZoneNode(payload.type, payload.label, relativePosition, undefined, parentZoneId);
+              return;
+            }
+          }
           addZoneNode(payload.type, payload.label, position);
         } else if (type === 'actor') {
           addActorNode(payload.type, payload.label, position);
+        } else if (type === 'inline-control') {
+          addInlineControlNode(payload.type, payload.label, position);
         }
       } catch {
         // Ignore parse errors from malformed drag data
       }
     },
-    [addComponentNode, addZoneNode, addActorNode, nodes],
+    [addComponentNode, addZoneNode, addActorNode, addInlineControlNode, nodes],
   );
 
   /** Find the topmost zone node at a given position */

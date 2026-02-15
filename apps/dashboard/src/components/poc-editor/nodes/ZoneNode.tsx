@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { type NodeProps, NodeResizer } from '@xyflow/react';
 import type { ZoneNodeData } from '../types';
 import { useEditorStore } from '../store/editor-store';
 import { ZONE_COLORS } from '../constants';
@@ -29,6 +29,13 @@ function ZoneNodeInner({ id, data, selected }: NodeProps) {
       }}
       onDoubleClick={handleDoubleClick}
     >
+      <NodeResizer
+        isVisible={selected}
+        minWidth={200}
+        minHeight={150}
+        lineStyle={{ borderColor: colors.border }}
+        handleStyle={{ backgroundColor: colors.border, width: 8, height: 8 }}
+      />
       {/* Zone Label (top-left) */}
       <div
         className="absolute top-0 left-3 -translate-y-1/2 px-2 py-0.5 rounded text-xs font-semibold"
