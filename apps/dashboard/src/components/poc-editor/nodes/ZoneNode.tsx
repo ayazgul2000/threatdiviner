@@ -37,8 +37,8 @@ function ZoneNodeInner({ id, data, selected }: NodeProps) {
         isVisible={selected}
         minWidth={200}
         minHeight={150}
-        lineStyle={{ borderColor: colors.border }}
-        handleStyle={{ backgroundColor: colors.border, width: 8, height: 8 }}
+        lineStyle={{ borderColor: colors.border, pointerEvents: 'auto' }}
+        handleStyle={{ backgroundColor: colors.border, width: 8, height: 8, pointerEvents: 'auto' }}
       />
       {/* Zone Label (top-left) — clickable to select the zone */}
       <div

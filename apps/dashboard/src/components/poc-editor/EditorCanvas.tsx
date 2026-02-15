@@ -73,6 +73,54 @@ export function EditorCanvas() {
     clearSelection();
   }, [clearSelection]);
 
+  // ── Zone position helpers ─────────────────────────────────────────────────
+
+  /** Compute absolute position of a node (walks up parent chain) */
+  const getAbsolutePosition = useCallback(
+    (node: { position: { x: number; y: number }; parentId?: string }) => {
+      let ax = node.position.x;
+      let ay = node.position.y;
+      let pid = node.parentId;
+      while (pid) {
+        const parent = nodes.find((n) => n.id === pid);
+        if (!parent) break;
+        ax += parent.position.x;
+        ay += parent.position.y;
+        pid = parent.parentId;
+      }
+      return { x: ax, y: ay };
+    },
+    [nodes],
+  );
+
+  /** Find the innermost zone node at a given absolute position */
+  const findZoneAtPosition = useCallback(
+    (x: number, y: number): string | null => {
+      let bestId: string | null = null;
+      let bestArea = Infinity;
+
+      for (const node of nodes) {
+        const data = node.data as CanvasNodeData;
+        if (data.kind !== 'zone') continue;
+
+        const w = (node.style?.width as number) || 400;
+        const h = (node.style?.height as number) || 300;
+        const abs = getAbsolutePosition(node);
+
+        if (x >= abs.x && x <= abs.x + w && y >= abs.y && y <= abs.y + h) {
+          // Prefer the smallest (innermost) zone
+          const area = w * h;
+          if (area < bestArea) {
+            bestArea = area;
+            bestId = node.id;
+          }
+        }
+      }
+      return bestId;
+    },
+    [nodes, getAbsolutePosition],
+  );
+
   // ── Drop handler ──────────────────────────────────────────────────────────
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -103,12 +151,13 @@ export function EditorCanvas() {
           // Check if dropped inside a zone
           const zoneId = findZoneAtPosition(position.x, position.y);
           if (zoneId) {
-            // Offset position relative to zone
+            // Offset position relative to zone's absolute position
             const zoneNode = nodes.find((n) => n.id === zoneId);
             if (zoneNode) {
+              const absPos = getAbsolutePosition(zoneNode);
               const relativePosition = {
-                x: position.x - zoneNode.position.x,
-                y: position.y - zoneNode.position.y,
+                x: position.x - absPos.x,
+                y: position.y - absPos.y,
               };
               addComponentNode(
                 item.iconKey,
@@ -134,9 +183,10 @@ export function EditorCanvas() {
           if (parentZoneId) {
             const parentNode = nodes.find((n) => n.id === parentZoneId);
             if (parentNode) {
+              const absPos = getAbsolutePosition(parentNode);
               const relativePosition = {
-                x: position.x - parentNode.position.x,
-                y: position.y - parentNode.position.y,
+                x: position.x - absPos.x,
+                y: position.y - absPos.y,
               };
               addZoneNode(payload.type, payload.label, relativePosition, undefined, parentZoneId);
               return;
@@ -152,30 +202,7 @@ export function EditorCanvas() {
         // Ignore parse errors from malformed drag data
       }
     },
-    [addComponentNode, addZoneNode, addActorNode, addInlineControlNode, nodes],
-  );
-
-  /** Find the topmost zone node at a given position */
-  const findZoneAtPosition = useCallback(
-    (x: number, y: number): string | null => {
-      // Iterate in reverse (topmost rendered last)
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        const node = nodes[i];
-        const data = node.data as CanvasNodeData;
-        if (data.kind !== 'zone') continue;
-
-        const w = (node.style?.width as number) || 400;
-        const h = (node.style?.height as number) || 300;
-        const nx = node.position.x;
-        const ny = node.position.y;
-
-        if (x >= nx && x <= nx + w && y >= ny && y <= ny + h) {
-          return node.id;
-        }
-      }
-      return null;
-    },
-    [nodes],
+    [addComponentNode, addZoneNode, addActorNode, addInlineControlNode, nodes, findZoneAtPosition, getAbsolutePosition],
   );
 
   // Default edge options

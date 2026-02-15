@@ -219,7 +219,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ...(parentId ? { parentId, extent: 'parent' as const } : {}),
     };
 
-    set({ nodes: [node, ...get().nodes] }); // Zones go first so they render behind
+    if (parentId) {
+      // Child zones go after their parent so they render on top and are clickable
+      const currentNodes = get().nodes;
+      const parentIndex = currentNodes.findIndex((n) => n.id === parentId);
+      const insertAt = parentIndex >= 0 ? parentIndex + 1 : currentNodes.length;
+      const updated = [...currentNodes];
+      updated.splice(insertAt, 0, node);
+      set({ nodes: updated });
+    } else {
+      // Top-level zones go first so they render behind components
+      set({ nodes: [node, ...get().nodes] });
+    }
     return id;
   },
 
