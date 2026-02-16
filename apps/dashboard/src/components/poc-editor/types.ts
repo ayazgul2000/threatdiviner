@@ -131,6 +131,10 @@ export interface ComponentNodeData extends Record<string, unknown> {
   technologyType: string;
   /** Whether the component is internet-facing */
   internetFacing: boolean;
+  /** Whether the component is in an internet-type zone (auto-computed) */
+  zoneInternetExposed: boolean;
+  /** Whether the component is shared/multi-tenant (for isolation CWEs) */
+  isShared: boolean;
   /** Data classification of data handled */
   dataClassification: DataClassification;
   /** Custom tags */

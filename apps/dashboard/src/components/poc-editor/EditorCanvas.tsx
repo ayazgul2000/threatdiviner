@@ -18,7 +18,21 @@ import { ZoneNode } from './nodes/ZoneNode';
 import { ActorNode } from './nodes/ActorNode';
 import { InlineControlNode } from './nodes/InlineControlNode';
 import { ProtocolEdge } from './edges/ProtocolEdge';
-import type { PaletteItem, CanvasNodeData, ConnectionData } from './types';
+import type { PaletteItem, CanvasNodeData } from './types';
+
+/** Distance from point (px,py) to line segment (x1,y1)→(x2,y2) */
+function pointToSegmentDistance(
+  px: number, py: number,
+  x1: number, y1: number,
+  x2: number, y2: number,
+): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
 
 const nodeTypes: NodeTypes = {
   component: ComponentNode,
@@ -44,6 +58,7 @@ export function EditorCanvas() {
   const addZoneNode = useEditorStore((s) => s.addZoneNode);
   const addActorNode = useEditorStore((s) => s.addActorNode);
   const addInlineControlNode = useEditorStore((s) => s.addInlineControlNode);
+  const splitEdgeWithControl = useEditorStore((s) => s.splitEdgeWithControl);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const clearSelection = useEditorStore((s) => s.clearSelection);
   const showMinimap = useEditorStore((s) => s.showMinimap);
@@ -121,6 +136,32 @@ export function EditorCanvas() {
     [nodes, getAbsolutePosition],
   );
 
+  /** Find the nearest edge within threshold of a given flow position */
+  const findEdgeAtPosition = useCallback(
+    (x: number, y: number, threshold: number = 40) => {
+      let bestEdge: (typeof edges)[number] | null = null;
+      let bestDist = threshold;
+
+      for (const edge of edges) {
+        const sourceNode = nodes.find((n) => n.id === edge.source);
+        const targetNode = nodes.find((n) => n.id === edge.target);
+        if (!sourceNode || !targetNode) continue;
+
+        const sPos = getAbsolutePosition(sourceNode);
+        const tPos = getAbsolutePosition(targetNode);
+
+        const dist = pointToSegmentDistance(x, y, sPos.x, sPos.y, tPos.x, tPos.y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestEdge = edge;
+        }
+      }
+
+      return bestEdge;
+    },
+    [edges, nodes, getAbsolutePosition],
+  );
+
   // ── Drop handler ──────────────────────────────────────────────────────────
 
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -196,13 +237,19 @@ export function EditorCanvas() {
         } else if (type === 'actor') {
           addActorNode(payload.type, payload.label, position);
         } else if (type === 'inline-control') {
-          addInlineControlNode(payload.type, payload.label, position);
+          // Check if dropped on an edge → split it
+          const nearestEdge = findEdgeAtPosition(position.x, position.y);
+          if (nearestEdge) {
+            splitEdgeWithControl(nearestEdge.id, payload.type, payload.label, position);
+          } else {
+            addInlineControlNode(payload.type, payload.label, position);
+          }
         }
       } catch {
         // Ignore parse errors from malformed drag data
       }
     },
-    [addComponentNode, addZoneNode, addActorNode, addInlineControlNode, nodes, findZoneAtPosition, getAbsolutePosition],
+    [addComponentNode, addZoneNode, addActorNode, addInlineControlNode, splitEdgeWithControl, nodes, findZoneAtPosition, findEdgeAtPosition, getAbsolutePosition],
   );
 
   // Default edge options

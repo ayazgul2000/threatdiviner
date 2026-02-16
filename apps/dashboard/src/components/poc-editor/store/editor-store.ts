@@ -82,6 +82,12 @@ interface EditorState {
     label: string,
     position: XYPosition,
   ) => string;
+  splitEdgeWithControl: (
+    edgeId: string,
+    controlType: string,
+    label: string,
+    position: XYPosition,
+  ) => string;
   removeNode: (nodeId: string) => void;
   updateNodeData: (nodeId: string, data: Partial<CanvasNodeData>) => void;
 
@@ -102,6 +108,10 @@ interface EditorState {
   setPropertyPanelOpen: (open: boolean) => void;
   toggleMinimap: () => void;
   toggleGrid: () => void;
+
+  // Actions — Analysis helpers
+  getNodeZoneId: (nodeId: string) => string | null;
+  isBoundaryCrossing: (edgeId: string) => boolean;
 
   // Actions — Serialization
   exportDesign: () => DesignExport;
@@ -130,6 +140,100 @@ function nextEdgeId(): string {
   return `edge-${++edgeIdCounter}-${Date.now()}`;
 }
 
+// ─── Zone Membership Reconciliation ──────────────────────────────────────────
+
+/** Get absolute position of a node by walking its parent chain */
+function getAbsPos(node: Node<CanvasNodeData>, nodes: Node<CanvasNodeData>[]): { x: number; y: number } {
+  let ax = node.position.x;
+  let ay = node.position.y;
+  let pid = node.parentId;
+  while (pid) {
+    const parent = nodes.find((n) => n.id === pid);
+    if (!parent) break;
+    ax += parent.position.x;
+    ay += parent.position.y;
+    pid = parent.parentId;
+  }
+  return { x: ax, y: ay };
+}
+
+/**
+ * After any position/dimension change, check each non-zone node:
+ * - If it's inside a zone but not parented → adopt it (set parentId, convert to relative pos)
+ * - If it's parented but moved outside its parent zone → unparent it (convert to absolute pos)
+ * Also updates zoneInternetExposed for component nodes.
+ */
+function reconcileZoneMembership(nodes: Node<CanvasNodeData>[]): Node<CanvasNodeData>[] {
+  const zones = nodes.filter((n) => (n.data as CanvasNodeData).kind === 'zone');
+  let changed = false;
+  const result = nodes.map((node) => {
+    const data = node.data as CanvasNodeData;
+    // Only reconcile components, actors, inline-controls (not zones themselves)
+    if (data.kind === 'zone') return node;
+
+    const absPos = getAbsPos(node, nodes);
+
+    // Find the innermost zone containing this node's absolute center
+    let bestZone: Node<CanvasNodeData> | null = null;
+    let bestArea = Infinity;
+    for (const zone of zones) {
+      // Don't parent a node to itself or to its own children
+      if (zone.id === node.id) continue;
+      const zAbs = getAbsPos(zone, nodes);
+      const zw = (zone.style?.width as number) || 400;
+      const zh = (zone.style?.height as number) || 300;
+      if (absPos.x >= zAbs.x && absPos.x <= zAbs.x + zw &&
+          absPos.y >= zAbs.y && absPos.y <= zAbs.y + zh) {
+        const area = zw * zh;
+        if (area < bestArea) {
+          bestArea = area;
+          bestZone = zone;
+        }
+      }
+    }
+
+    const newParentId = bestZone?.id || undefined;
+
+    // No change needed
+    if (node.parentId === newParentId) {
+      // Still update zoneInternetExposed if component
+      if (data.kind === 'component') {
+        const zoneData = bestZone?.data as ZoneNodeData | undefined;
+        const exposed = zoneData?.zoneType === 'internet';
+        if ((data as ComponentNodeData).zoneInternetExposed !== exposed) {
+          changed = true;
+          return { ...node, data: { ...data, zoneInternetExposed: exposed } as CanvasNodeData };
+        }
+      }
+      return node;
+    }
+
+    changed = true;
+
+    if (newParentId && bestZone) {
+      // Adopt into zone: convert absolute → relative position
+      const zAbs = getAbsPos(bestZone, nodes);
+      const relPos = { x: absPos.x - zAbs.x, y: absPos.y - zAbs.y };
+      const zoneData = bestZone.data as ZoneNodeData;
+      const exposed = zoneData.zoneType === 'internet';
+      const updatedData = data.kind === 'component'
+        ? { ...data, zoneInternetExposed: exposed }
+        : data;
+      return { ...node, position: relPos, parentId: newParentId, data: updatedData as CanvasNodeData };
+    } else {
+      // Unparent: position is already absolute after React Flow applies changes
+      // but if it had a parentId, we need to convert relative → absolute
+      const updatedData = data.kind === 'component'
+        ? { ...data, zoneInternetExposed: false }
+        : data;
+      const { parentId: _removed, extent: _ext, ...rest } = node;
+      return { ...rest, position: absPos, data: updatedData as CanvasNodeData } as Node<CanvasNodeData>;
+    }
+  });
+
+  return changed ? result : nodes;
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -147,7 +251,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // ── React Flow Handlers ───────────────────────────────────────────────────
 
   onNodesChange: (changes) => {
-    set({ nodes: applyNodeChanges(changes, get().nodes) as Node<CanvasNodeData>[] });
+    let nodes = applyNodeChanges(changes, get().nodes) as Node<CanvasNodeData>[];
+
+    // After position/dimension changes, re-evaluate zone membership
+    const hasPositionOrResize = changes.some(
+      (c) => c.type === 'position' || c.type === 'dimensions',
+    );
+    if (hasPositionOrResize) {
+      nodes = reconcileZoneMembership(nodes);
+    }
+
+    set({ nodes });
   },
 
   onEdgesChange: (changes) => {
@@ -177,6 +291,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       category,
       technologyType,
       internetFacing: false,
+      zoneInternetExposed: false,
+      isShared: false,
       dataClassification: 'internal' as DataClassification,
       tags: [],
     };
@@ -186,7 +302,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       type: 'component',
       position,
       data,
-      ...(parentId ? { parentId, extent: 'parent' as const } : {}),
+      ...(parentId ? { parentId } : {}),
     };
 
     set({ nodes: [...get().nodes, node] });
@@ -216,7 +332,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         width: size?.width || 400,
         height: size?.height || 300,
       },
-      ...(parentId ? { parentId, extent: 'parent' as const } : {}),
+      ...(parentId ? { parentId } : {}),
     };
 
     if (parentId) {
@@ -273,6 +389,62 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({ nodes: [...get().nodes, node] });
     return id;
+  },
+
+  splitEdgeWithControl: (edgeId, controlType, label, position) => {
+    const edge = get().edges.find((e) => e.id === edgeId);
+    if (!edge) return '';
+
+    const controlId = nextNodeId();
+    const data: InlineControlNodeData = {
+      kind: 'inline-control',
+      label,
+      description: '',
+      controlType: controlType as InlineControlNodeData['controlType'],
+      attachedEdgeId: edgeId,
+    };
+
+    const controlNode: Node<CanvasNodeData> = {
+      id: controlId,
+      type: 'inline-control',
+      position,
+      data,
+    };
+
+    // Inherit original edge data for both new edges
+    const inheritedData: ConnectionData = {
+      ...DEFAULT_CONNECTION_DATA,
+      ...(edge.data || {}),
+    };
+
+    const edge1: Edge<ConnectionData> = {
+      id: nextEdgeId(),
+      source: edge.source,
+      sourceHandle: edge.sourceHandle ?? undefined,
+      target: controlId,
+      type: 'protocol',
+      data: { ...inheritedData },
+    };
+
+    const edge2: Edge<ConnectionData> = {
+      id: nextEdgeId(),
+      source: controlId,
+      target: edge.target,
+      targetHandle: edge.targetHandle ?? undefined,
+      type: 'protocol',
+      data: { ...inheritedData },
+    };
+
+    set({
+      nodes: [...get().nodes, controlNode],
+      edges: [
+        ...get().edges.filter((e) => e.id !== edgeId),
+        edge1,
+        edge2,
+      ],
+    });
+
+    return controlId;
   },
 
   removeNode: (nodeId) => {
@@ -348,6 +520,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPropertyPanelOpen: (open) => set({ propertyPanelOpen: open }),
   toggleMinimap: () => set({ showMinimap: !get().showMinimap }),
   toggleGrid: () => set({ showGrid: !get().showGrid }),
+
+  // ── Analysis Helpers ──────────────────────────────────────────────────────
+
+  getNodeZoneId: (nodeId) => {
+    const node = get().nodes.find((n) => n.id === nodeId);
+    if (!node) return null;
+    // Walk up parentId chain to find the nearest zone ancestor
+    let current = node;
+    while (current.parentId) {
+      const parent = get().nodes.find((n) => n.id === current.parentId);
+      if (!parent) break;
+      const parentData = parent.data as CanvasNodeData;
+      if (parentData.kind === 'zone') return parent.id;
+      current = parent;
+    }
+    return null;
+  },
+
+  isBoundaryCrossing: (edgeId) => {
+    const edge = get().edges.find((e) => e.id === edgeId);
+    if (!edge) return false;
+    const sourceZone = get().getNodeZoneId(edge.source);
+    const targetZone = get().getNodeZoneId(edge.target);
+    // Crosses boundary if zones differ (including one being null/outside any zone)
+    return sourceZone !== targetZone;
+  },
 
   // ── Serialization ─────────────────────────────────────────────────────────
 
