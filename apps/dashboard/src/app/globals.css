@@ -31,3 +31,10 @@ body {
     text-wrap: balance;
   }
 }
+
+/* POC Editor — Property panel form inputs */
+@layer components {
+  .field-input {
+    @apply w-full px-2 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400;
+  }
+}

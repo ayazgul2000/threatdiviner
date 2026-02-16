@@ -1,7 +1,7 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { Queue, Job } from 'bullmq';
-import { QUEUE_NAMES, JOB_NAMES, SCAN_JOB_OPTIONS, NOTIFY_JOB_OPTIONS } from '../queue.constants';
-import { ScanJobData, NotifyJobData, CleanupJobData } from '../jobs';
+import { QUEUE_NAMES, JOB_NAMES, SCAN_JOB_OPTIONS, NOTIFY_JOB_OPTIONS, ANALYSIS_JOB_OPTIONS } from '../queue.constants';
+import { ScanJobData, NotifyJobData, CleanupJobData, AnalysisJobData } from '../jobs';
 
 @Injectable()
 export class QueueService {
@@ -11,22 +11,37 @@ export class QueueService {
     @Inject(`BullQueue_${QUEUE_NAMES.SCAN}`) private readonly scanQueue: Queue,
     @Inject(`BullQueue_${QUEUE_NAMES.NOTIFY}`) private readonly notifyQueue: Queue,
     @Inject(`BullQueue_${QUEUE_NAMES.CLEANUP}`) private readonly cleanupQueue: Queue,
+    @Inject(`BullQueue_${QUEUE_NAMES.ANALYSIS}`) private readonly analysisQueue: Queue,
   ) {}
 
   async enqueueScan(data: ScanJobData): Promise<Job<ScanJobData>> {
     this.logger.log(`Enqueueing scan job for ${data.fullName}@${data.branch}`);
+    this.logger.debug(`Scan config: enableSast=${data.config.enableSast}, enableSca=${data.config.enableSca}, enableSecrets=${data.config.enableSecrets}`);
 
-    const job = await this.scanQueue.add(
-      JOB_NAMES.PROCESS_SCAN,
-      data,
-      {
-        ...SCAN_JOB_OPTIONS,
-        jobId: `scan-${data.scanId}`,
-      },
-    );
+    try {
+      const job = await this.scanQueue.add(
+        JOB_NAMES.PROCESS_SCAN,
+        data,
+        {
+          ...SCAN_JOB_OPTIONS,
+          jobId: `scan-${data.scanId}`,
+        },
+      );
 
-    this.logger.log(`Scan job ${job.id} created for scan ${data.scanId}`);
-    return job;
+      this.logger.log(`Scan job ${job.id} created for scan ${data.scanId}`);
+
+      // Log queue stats for debugging
+      const [waiting, active] = await Promise.all([
+        this.scanQueue.getWaitingCount(),
+        this.scanQueue.getActiveCount(),
+      ]);
+      this.logger.log(`Queue stats: ${waiting} waiting, ${active} active`);
+
+      return job;
+    } catch (error) {
+      this.logger.error(`Failed to enqueue scan job: ${error}`);
+      throw error;
+    }
   }
 
   async enqueueNotification(data: NotifyJobData): Promise<Job<NotifyJobData>> {
@@ -55,6 +70,56 @@ export class QueueService {
     );
 
     return job;
+  }
+
+  async enqueueAnalysis(data: AnalysisJobData): Promise<Job<AnalysisJobData>> {
+    this.logger.log(`Enqueueing analysis job for threat model ${data.threatModelId}`);
+
+    try {
+      const job = await this.analysisQueue.add(
+        JOB_NAMES.RUN_ANALYSIS,
+        data,
+        {
+          ...ANALYSIS_JOB_OPTIONS,
+          jobId: `analysis-${data.analysisRunId}`,
+        },
+      );
+
+      this.logger.log(`Analysis job ${job.id} created for run ${data.analysisRunId}`);
+
+      // Log queue stats for debugging
+      const [waiting, active] = await Promise.all([
+        this.analysisQueue.getWaitingCount(),
+        this.analysisQueue.getActiveCount(),
+      ]);
+      this.logger.log(`Analysis queue stats: ${waiting} waiting, ${active} active`);
+
+      return job;
+    } catch (error) {
+      this.logger.error(`Failed to enqueue analysis job: ${error}`);
+      throw error;
+    }
+  }
+
+  async getAnalysisJob(analysisRunId: string): Promise<Job<AnalysisJobData> | null> {
+    const job = await this.analysisQueue.getJob(`analysis-${analysisRunId}`);
+    return job || null;
+  }
+
+  async cancelAnalysis(analysisRunId: string): Promise<boolean> {
+    const job = await this.getAnalysisJob(analysisRunId);
+    if (!job) return false;
+
+    const state = await job.getState();
+    if (state === 'active') {
+      await job.moveToFailed(new Error('Cancelled by user'), 'cancelled');
+      return true;
+    } else if (state === 'waiting' || state === 'delayed') {
+      await job.remove();
+      return true;
+    }
+
+    return false;
   }
 
   async getScanJob(scanId: string): Promise<Job<ScanJobData> | null> {
@@ -106,5 +171,66 @@ export class QueueService {
         failed: scanFailed,
       },
     };
+  }
+
+  async getQueueHealth(): Promise<{
+    connected: boolean;
+    queues: {
+      scan: { connected: boolean; workers: number };
+      notify: { connected: boolean; workers: number };
+    };
+  }> {
+    try {
+      // Check if queues are connected by getting their state
+      const [scanWorkers, notifyWorkers] = await Promise.all([
+        this.scanQueue.getWorkers(),
+        this.notifyQueue.getWorkers(),
+      ]);
+
+      return {
+        connected: true,
+        queues: {
+          scan: {
+            connected: true,
+            workers: scanWorkers.length,
+          },
+          notify: {
+            connected: true,
+            workers: notifyWorkers.length,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Queue health check failed: ${error}`);
+      return {
+        connected: false,
+        queues: {
+          scan: { connected: false, workers: 0 },
+          notify: { connected: false, workers: 0 },
+        },
+      };
+    }
+  }
+
+  async getWaitingJobs(): Promise<Job<ScanJobData>[]> {
+    return this.scanQueue.getWaiting();
+  }
+
+  async getActiveJobs(): Promise<Job<ScanJobData>[]> {
+    return this.scanQueue.getActive();
+  }
+
+  async retryFailedJobs(): Promise<number> {
+    const failedJobs = await this.scanQueue.getFailed();
+    let retried = 0;
+    for (const job of failedJobs) {
+      try {
+        await job.retry();
+        retried++;
+      } catch (error) {
+        this.logger.warn(`Failed to retry job ${job.id}: ${error}`);
+      }
+    }
+    return retried;
   }
 }

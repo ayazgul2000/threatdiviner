@@ -1,0 +1,60 @@
+rules:
+  - id: >-
+      terraform.azure.security.keyvault.keyvault-purge-enabled.keyvault-purge-enabled
+    message: Key vault should have purge protection enabled
+    patterns:
+      - pattern: resource
+      - pattern-not-inside: |
+          resource "azurerm_key_vault" "..." {
+          ...
+           purge_protection_enabled = true
+          ...
+          }
+      - pattern-either:
+          - pattern-inside: |
+              resource "azurerm_key_vault" "..." {
+              ...
+              }
+          - pattern-inside: |
+              resource "azurerm_key_vault" "..." {
+              ...
+                purge_protection_enabled = false
+              ...
+              }
+    metadata:
+      cwe:
+        - 'CWE-693: Protection Mechanism Failure'
+      category: security
+      technology:
+        - terraform
+        - azure
+      references:
+        - >-
+          https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault#purge_protection_enabled
+        - >-
+          https://docs.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview#purge-protection
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Authorization
+      source: >-
+        https://semgrep.dev/r/terraform.azure.security.keyvault.keyvault-purge-enabled.keyvault-purge-enabled
+      shortlink: https://sg.run/Z4xD
+      semgrep.dev:
+        rule:
+          r_id: 15135
+          rv_id: 946865
+          rule_id: 3qUjw9
+          version_id: RGTAPQ7
+          url: >-
+            https://semgrep.dev/playground/r/RGTAPQ7/terraform.azure.security.keyvault.keyvault-purge-enabled.keyvault-purge-enabled
+          origin: community
+    languages:
+      - hcl
+    severity: WARNING

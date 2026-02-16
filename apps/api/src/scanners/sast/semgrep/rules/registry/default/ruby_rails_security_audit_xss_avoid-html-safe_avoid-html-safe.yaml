@@ -1,0 +1,56 @@
+rules:
+  - id: ruby.rails.security.audit.xss.avoid-html-safe.avoid-html-safe
+    metadata:
+      source-rule-url: >-
+        https://github.com/presidentbeef/brakeman/blob/main/lib/brakeman/checks/check_cross_site_scripting.rb
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      references:
+        - >-
+          https://github.com/presidentbeef/brakeman/blob/main/docs/warning_types/cross_site_scripting/index.markdown
+        - >-
+          https://www.netsparker.com/blog/web-security/preventing-xss-ruby-on-rails-web-applications/
+      category: security
+      technology:
+        - rails
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/ruby.rails.security.audit.xss.avoid-html-safe.avoid-html-safe
+      shortlink: https://sg.run/Zeq7
+      semgrep.dev:
+        rule:
+          r_id: 9735
+          rv_id: 1263631
+          rule_id: 8GUEQK
+          version_id: 1QTyp69
+          url: >-
+            https://semgrep.dev/playground/r/1QTyp69/ruby.rails.security.audit.xss.avoid-html-safe.avoid-html-safe
+          origin: community
+    message: >-
+      'html_safe()' does not make the supplied string safe. 'html_safe()'
+      bypasses HTML escaping. If external data can reach here, this exposes your
+      application to cross-site scripting (XSS) attacks. Ensure no external data
+      reaches here.
+    languages:
+      - ruby
+    severity: WARNING
+    pattern-either:
+      - pattern: $STR.html_safe
+      - pattern: $STR.html_safe.$MORE

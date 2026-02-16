@@ -1,0 +1,32 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-os2-ok2
+    patterns:
+      - pattern-not-inside: |
+          if hasattr(os, 'pwritev'):
+              ...
+      - pattern: os.pwritev(...)
+    message: >-
+      os.pwritev() is only available on Python 3.3+ and is therefore not
+      backwards compatible. Instead, use a combination of pwrite() and writev().
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-os2-ok2
+      shortlink: https://sg.run/5Q9X
+      semgrep.dev:
+        rule:
+          r_id: 9591
+          rv_id: 946280
+          rule_id: 0oU5vW
+          version_id: l4Tx9Op
+          url: >-
+            https://semgrep.dev/playground/r/l4Tx9Op/python.lang.compatibility.python37.python37-compatibility-os2-ok2
+          origin: community

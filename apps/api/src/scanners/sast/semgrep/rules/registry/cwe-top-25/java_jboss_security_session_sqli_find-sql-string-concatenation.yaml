@@ -1,0 +1,69 @@
+rules:
+  - id: java.jboss.security.session_sqli.find-sql-string-concatenation
+    message: In $METHOD, $X is used to construct a SQL query via string concatenation.
+    languages:
+      - java
+    severity: ERROR
+    pattern-either:
+      - pattern: |
+          $RETURN $METHOD(...,String $X,...){
+            ...
+            Session $SESSION = ...;
+            ...
+            String $QUERY = ... + $X + ...;
+            ...
+            PreparedStatement $PS = $SESSION.connection().prepareStatement($QUERY);
+            ...
+            ResultSet $RESULT = $PS.executeQuery();
+            ...
+          }
+      - pattern: |
+          $RETURN $METHOD(...,String $X,...){
+            ...
+            String $QUERY = ... + $X + ...;
+            ...
+            Session $SESSION = ...;
+            ...
+            PreparedStatement $PS = $SESSION.connection().prepareStatement($QUERY);
+            ...
+            ResultSet $RESULT = $PS.executeQuery();
+            ...
+          }
+    metadata:
+      category: security
+      technology:
+        - jboss
+      confidence: MEDIUM
+      cwe:
+        - >-
+          CWE-89: Improper Neutralization of Special Elements used in an SQL
+          Command ('SQL Injection')
+      owasp:
+        - A01:2017 - Injection
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - https://owasp.org/Top10/A03_2021-Injection
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: HIGH
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - SQL Injection
+      source: >-
+        https://semgrep.dev/r/java.jboss.security.session_sqli.find-sql-string-concatenation
+      shortlink: https://sg.run/W8kA
+      semgrep.dev:
+        rule:
+          r_id: 9153
+          rv_id: 1262986
+          rule_id: X5U8rQ
+          version_id: 8KT5r3v
+          url: >-
+            https://semgrep.dev/playground/r/8KT5r3v/java.jboss.security.session_sqli.find-sql-string-concatenation
+          origin: community

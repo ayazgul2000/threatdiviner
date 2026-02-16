@@ -9,11 +9,13 @@ import {
   Query,
   Res,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard, CurrentUser, Roles, RolesGuard } from '../libs/auth';
 import { ScmService } from './services/scm.service';
 import { SarifUploadService } from './services/sarif-upload.service';
+import { ConnectionStatusService } from './services/connection-status.service';
 import {
   InitiateOAuthDto,
   OAuthCallbackDto,
@@ -29,6 +31,7 @@ export class ScmController {
   constructor(
     private readonly scmService: ScmService,
     private readonly sarifUploadService: SarifUploadService,
+    private readonly connectionStatusService: ConnectionStatusService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -48,13 +51,21 @@ export class ScmController {
     @Query() query: OAuthCallbackDto,
     @Res() res: Response,
   ) {
+    const dashboardUrl = this.configService.get('DASHBOARD_URL') || 'http://localhost:3000';
+
+    // Handle GitHub App installation callback (has installation_id, no state)
+    if (query.installation_id && query.setup_action) {
+      // GitHub App was installed - redirect to success
+      res.redirect(`${dashboardUrl}/dashboard/connections?app_installed=${query.installation_id}`);
+      return;
+    }
+
+    // Handle regular OAuth callback
     try {
-      const result = await this.scmService.handleOAuthCallback(query.code, query.state);
+      const result = await this.scmService.handleOAuthCallback(query.code, query.state!);
       // Redirect to dashboard with success
-      const dashboardUrl = this.configService.get('DASHBOARD_URL') || 'http://localhost:3000';
       res.redirect(`${dashboardUrl}/dashboard/connections?connected=${result.connectionId}`);
     } catch (error) {
-      const dashboardUrl = this.configService.get('DASHBOARD_URL') || 'http://localhost:3000';
       res.redirect(`${dashboardUrl}/dashboard/connections?error=oauth_failed`);
     }
   }
@@ -91,6 +102,32 @@ export class ScmController {
     return { success: true };
   }
 
+  @Get('connections/status')
+  @UseGuards(JwtAuthGuard)
+  async getConnectionsStatus(@CurrentUser() user: { tenantId: string }) {
+    return this.connectionStatusService.getConnectionStatusSummary(user.tenantId);
+  }
+
+  @Post('connections/:connectionId/check')
+  @UseGuards(JwtAuthGuard)
+  async checkConnection(
+    @CurrentUser() user: { tenantId: string },
+    @Param('connectionId') connectionId: string,
+  ) {
+    return this.connectionStatusService.checkConnectionById(user.tenantId, connectionId);
+  }
+
+  @Post('connections/:connectionId/sync')
+  @UseGuards(JwtAuthGuard)
+  async syncRepositories(
+    @CurrentUser() user: { tenantId: string },
+    @Param('connectionId') connectionId: string,
+  ) {
+    // Fetch available repos from provider and sync them
+    const repos = await this.scmService.listAvailableRepositories(user.tenantId, connectionId);
+    return { reposAvailable: repos.length, message: 'Repositories synced successfully' };
+  }
+
   // Available repositories (from provider)
   @Get('connections/:connectionId/available-repos')
   @UseGuards(JwtAuthGuard)
@@ -104,23 +141,48 @@ export class ScmController {
     );
   }
 
+  @Get('connections/:connectionId/available-repos-for-project')
+  @UseGuards(JwtAuthGuard)
+  async listAvailableRepositoriesForProject(
+    @CurrentUser() user: { tenantId: string },
+    @Param('connectionId') connectionId: string,
+    @Query('projectId') projectId: string,
+  ) {
+    if (!projectId) {
+      throw new BadRequestException('projectId query parameter is required');
+    }
+    return this.scmService.listAvailableRepositoriesForProject(
+      user.tenantId,
+      connectionId,
+      projectId,
+    );
+  }
+
   // Repositories (added to ThreatDiviner)
   @Get('repositories')
   @UseGuards(JwtAuthGuard)
-  async listRepositories(@CurrentUser() user: { tenantId: string }) {
-    return this.scmService.listRepositories(user.tenantId);
+  async listRepositories(
+    @CurrentUser() user: { tenantId: string },
+    @Query('projectId') projectId: string,
+    @Query('connectionId') connectionId?: string,
+  ) {
+    if (!projectId) {
+      throw new BadRequestException('projectId query parameter is required');
+    }
+    return this.scmService.listRepositories(user.tenantId, projectId, connectionId);
   }
 
   @Post('repositories')
   @UseGuards(JwtAuthGuard)
   async addRepository(
     @CurrentUser() user: { tenantId: string },
-    @Body() dto: AddRepositoryDto,
+    @Body() dto: AddRepositoryDto & { projectId?: string },
   ) {
     const repositoryId = await this.scmService.addRepository(
       user.tenantId,
       dto.connectionId,
       dto.fullName,
+      dto.projectId,
     );
     return { repositoryId };
   }
@@ -143,6 +205,23 @@ export class ScmController {
   ) {
     const branches = await this.scmService.getBranches(user.tenantId, repositoryId);
     return { branches };
+  }
+
+  @Get('repositories/:repositoryId/pulls')
+  @UseGuards(JwtAuthGuard)
+  async getPullRequests(
+    @CurrentUser() user: { tenantId: string },
+    @Param('repositoryId') repositoryId: string,
+    @Query('state') state: 'open' | 'closed' | 'merged' | 'all' = 'all',
+    @Query('limit') limit?: string,
+  ) {
+    const pulls = await this.scmService.getPullRequests(
+      user.tenantId,
+      repositoryId,
+      state,
+      limit ? parseInt(limit, 10) : 50,
+    );
+    return { pulls };
   }
 
   @Get('repositories/:repositoryId/languages')
@@ -182,13 +261,20 @@ export class ScmController {
   @UseGuards(JwtAuthGuard)
   async listScans(
     @CurrentUser() user: { tenantId: string },
+    @Query('projectId') projectId: string,
     @Query('repositoryId') repositoryId?: string,
+    @Query('branch') branch?: string,
     @Query('limit') limit?: string,
   ) {
+    if (!projectId) {
+      throw new BadRequestException('projectId query parameter is required');
+    }
     return this.scmService.listScans(
       user.tenantId,
       repositoryId,
       limit ? parseInt(limit, 10) : undefined,
+      projectId,
+      branch,
     );
   }
 
@@ -202,6 +288,9 @@ export class ScmController {
       user.tenantId,
       dto.repositoryId,
       dto.branch,
+      dto.pullRequestId,
+      dto.scanType,
+      dto.deepAnalysisOptions,
     );
     return { scanId };
   }
@@ -221,6 +310,7 @@ export class ScmController {
   @UseGuards(JwtAuthGuard)
   async listFindings(
     @CurrentUser() user: { tenantId: string },
+    @Query('projectId') projectId?: string,
     @Query('scanId') scanId?: string,
     @Query('repositoryId') repositoryId?: string,
     @Query('severity') severity?: string,
@@ -228,9 +318,15 @@ export class ScmController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
+    // If scanId is provided, we can look up projectId from the scan
+    // Otherwise projectId is required
+    if (!projectId && !scanId) {
+      throw new BadRequestException('Either projectId or scanId query parameter is required');
+    }
     return this.scmService.listFindings(user.tenantId, {
       scanId,
       repositoryId,
+      projectId,
       severity,
       status,
       limit: limit ? parseInt(limit, 10) : undefined,
@@ -244,13 +340,7 @@ export class ScmController {
     @CurrentUser() user: { tenantId: string },
     @Param('findingId') findingId: string,
   ) {
-    // Reuse listFindings with the specific ID
-    const result = await this.scmService.listFindings(user.tenantId, { limit: 1 });
-    const finding = result.findings.find(f => f.id === findingId);
-    if (!finding) {
-      throw new Error('Finding not found');
-    }
-    return finding;
+    return this.scmService.getFinding(user.tenantId, findingId);
   }
 
   @Put('findings/:findingId/status')

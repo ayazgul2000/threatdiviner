@@ -185,6 +185,8 @@ export class NucleiScanner implements IScanner {
       cweIds,
       cveIds,
       owaspIds: this.extractOwaspIds(result.info.tags || []),
+      capecIds: [],
+      attackIds: [],
       references: result.info.reference || [],
       fingerprint,
       metadata: {

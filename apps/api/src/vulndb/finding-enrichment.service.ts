@@ -73,11 +73,17 @@ export class FindingEnrichmentService {
         // Add CWE data if available
         if (enrichment.cwe) {
           updateData.cweData = {
+            id: enrichment.cwe.id,
             name: enrichment.cwe.name,
             description: enrichment.cwe.description,
             potentialMitigations: enrichment.cwe.potentialMitigations,
             detectionMethods: enrichment.cwe.detectionMethods,
+            capecIds: enrichment.cwe.capecIds || [],
           };
+          // Update cweId if it was derived from CVE
+          if (!finding.cweId && enrichment.cwe.id) {
+            updateData.cweId = enrichment.cwe.id;
+          }
         }
 
         // Add OWASP category if available
@@ -99,10 +105,11 @@ export class FindingEnrichmentService {
 
         // Add ATT&CK techniques
         if (enrichment.attackTechniques && enrichment.attackTechniques.length > 0) {
-          updateData.attackTechniques = enrichment.attackTechniques.map((t) => ({
+          updateData.attackTechniques = enrichment.attackTechniques.map((t: any) => ({
             id: t.id,
             name: t.name,
             tacticId: t.tacticId,
+            tactic: t.tactic ? { id: t.tactic.id, name: t.tactic.name } : undefined,
           }));
         }
 
@@ -164,11 +171,17 @@ export class FindingEnrichmentService {
 
     if (enrichment.cwe) {
       updateData.cweData = {
+        id: enrichment.cwe.id,
         name: enrichment.cwe.name,
         description: enrichment.cwe.description,
         potentialMitigations: enrichment.cwe.potentialMitigations,
         detectionMethods: enrichment.cwe.detectionMethods,
+        capecIds: enrichment.cwe.capecIds || [],
       };
+      // Update cweId if it was derived from CVE
+      if (!finding.cweId && enrichment.cwe.id) {
+        updateData.cweId = enrichment.cwe.id;
+      }
     }
 
     if (enrichment.owaspCategory) {
@@ -187,10 +200,11 @@ export class FindingEnrichmentService {
     }
 
     if (enrichment.attackTechniques && enrichment.attackTechniques.length > 0) {
-      updateData.attackTechniques = enrichment.attackTechniques.map((t) => ({
+      updateData.attackTechniques = enrichment.attackTechniques.map((t: any) => ({
         id: t.id,
         name: t.name,
         tacticId: t.tacticId,
+        tactic: t.tactic ? { id: t.tactic.id, name: t.tactic.name } : undefined,
       }));
     }
 
@@ -255,6 +269,10 @@ export class FindingEnrichmentService {
             name: enrichment.cwe.name,
             description: enrichment.cwe.description,
           };
+          // Update cweId if it was derived from CVE
+          if (!finding.cweId && enrichment.cwe.id) {
+            updateData.cweId = enrichment.cwe.id;
+          }
         }
 
         if (enrichment.owaspCategory) {

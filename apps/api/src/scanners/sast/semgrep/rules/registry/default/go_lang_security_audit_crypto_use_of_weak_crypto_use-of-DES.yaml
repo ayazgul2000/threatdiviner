@@ -1,0 +1,52 @@
+rules:
+  - id: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-DES
+    message: >-
+      Detected DES cipher algorithm which is insecure. The algorithm is
+      considered weak and has been deprecated. Use AES instead.
+    languages:
+      - go
+    severity: WARNING
+    metadata:
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A02:2021 - Cryptographic Failures
+        - A04:2025 - Cryptographic Failures
+      cwe:
+        - 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm'
+      source-rule-url: https://github.com/securego/gosec#available-rules
+      category: security
+      technology:
+        - go
+      references:
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/go.lang.security.audit.crypto.use_of_weak_crypto.use-of-DES
+      shortlink: https://sg.run/jREA
+      semgrep.dev:
+        rule:
+          r_id: 9121
+          rv_id: 1262930
+          rule_id: eqU8B3
+          version_id: kbTzGzA
+          url: >-
+            https://semgrep.dev/playground/r/kbTzGzA/go.lang.security.audit.crypto.use_of_weak_crypto.use-of-DES
+          origin: community
+    patterns:
+      - pattern-inside: |
+          import "crypto/des"
+          ...
+      - pattern-either:
+          - pattern: |
+              des.NewTripleDESCipher(...)
+          - pattern: |
+              des.NewCipher(...)

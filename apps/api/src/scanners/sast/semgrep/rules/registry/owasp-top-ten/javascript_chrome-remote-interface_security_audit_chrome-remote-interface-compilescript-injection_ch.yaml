@@ -1,0 +1,73 @@
+rules:
+  - id: >-
+      javascript.chrome-remote-interface.security.audit.chrome-remote-interface-compilescript-injection.chrome-remote-interface-compilescript-injection
+    message: >-
+      If unverified user data can reach the `compileScript` method it can result
+      in Server-Side Request Forgery vulnerabilities
+    metadata:
+      owasp:
+        - A10:2021 - Server-Side Request Forgery (SSRF)
+        - A01:2025 - Broken Access Control
+      cwe:
+        - 'CWE-918: Server-Side Request Forgery (SSRF)'
+      category: security
+      technology:
+        - chrome-remote-interface
+      references:
+        - https://github.com/cyrus-and/chrome-remote-interface
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Server-Side Request Forgery (SSRF)
+      source: >-
+        https://semgrep.dev/r/javascript.chrome-remote-interface.security.audit.chrome-remote-interface-compilescript-injection.chrome-remote-interface-compilescript-injection
+      shortlink: https://sg.run/J9kj
+      semgrep.dev:
+        rule:
+          r_id: 9246
+          rv_id: 1263126
+          rule_id: qNUjnb
+          version_id: 1QTypkQ
+          url: >-
+            https://semgrep.dev/playground/r/1QTypkQ/javascript.chrome-remote-interface.security.audit.chrome-remote-interface-compilescript-injection.chrome-remote-interface-compilescript-injection
+          origin: community
+    languages:
+      - javascript
+      - typescript
+    severity: WARNING
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-inside: function ... (..., $ARG,...) {...}
+          - focus-metavariable: $ARG
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern-inside: |
+                  require('chrome-remote-interface');
+                  ...
+              - pattern-inside: |
+                  import 'chrome-remote-interface';
+                  ...
+          - pattern-either:
+              - pattern: |
+                  $RUNTIME.compileScript({expression: $SINK},...)
+              - pattern: |
+                  $RUNTIME.evaluate({expression: $SINK},...)
+              - pattern: |
+                  $PAGE.navigate({url: $SINK},...)
+              - pattern: |
+                  $RUNTIME.printToPDF({headerTemplate: $SINK},...)
+              - pattern: |
+                  $RUNTIME.printToPDF({footerTemplate: $SINK},...)
+              - pattern: |
+                  $PAGE.setDocumentContent({html: $SINK},...)
+          - focus-metavariable: $SINK

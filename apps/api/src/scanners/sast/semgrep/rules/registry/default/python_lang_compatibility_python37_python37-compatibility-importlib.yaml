@@ -1,0 +1,29 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-importlib
+    pattern: importlib.source_hash()
+    message: >-
+      source_hash' is only available on Python 3.7+. This does not work in lower
+      versions, and therefore is not backwards compatible. Instead, use another
+      hash function.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-importlib
+      shortlink: https://sg.run/OPDn
+      semgrep.dev:
+        rule:
+          r_id: 9575
+          rv_id: 946265
+          rule_id: 7KUQOl
+          version_id: K3TJbqv
+          url: >-
+            https://semgrep.dev/playground/r/K3TJbqv/python.lang.compatibility.python37.python37-compatibility-importlib
+          origin: community

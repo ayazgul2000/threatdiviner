@@ -111,7 +111,25 @@ export class GitService {
 
   async checkout(workDir: string, commitSha: string): Promise<void> {
     this.logger.log(`Checking out commit ${commitSha}`);
-    await execAsync(`git checkout ${commitSha}`, { cwd: workDir });
+
+    try {
+      // First try direct checkout (works if commit is in shallow clone)
+      await execAsync(`git checkout ${commitSha}`, { cwd: workDir });
+    } catch (error) {
+      // If checkout fails, the commit might not be in shallow clone
+      // Fetch the specific commit and retry
+      this.logger.log(`Commit not in shallow clone, fetching ${commitSha}...`);
+      try {
+        // Fetch the specific commit by SHA
+        await execAsync(`git fetch --depth=1 origin ${commitSha}`, { cwd: workDir });
+        await execAsync(`git checkout ${commitSha}`, { cwd: workDir });
+      } catch (fetchError) {
+        // If fetch by SHA fails, try deepening the clone
+        this.logger.log(`Fetch by SHA failed, deepening clone...`);
+        await execAsync(`git fetch --unshallow || git fetch --depth=50`, { cwd: workDir });
+        await execAsync(`git checkout ${commitSha}`, { cwd: workDir });
+      }
+    }
   }
 
   async getChangedFiles(workDir: string, baseSha: string, headSha: string): Promise<string[]> {

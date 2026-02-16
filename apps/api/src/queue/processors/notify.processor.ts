@@ -20,21 +20,38 @@ export class NotifyProcessor implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
-    this.worker = new Worker(
-      QUEUE_NAMES.NOTIFY,
-      async (job: Job<NotifyJobData>) => this.process(job),
-      { connection: this.connection },
-    );
+    try {
+      this.logger.log(`Connecting to Redis at ${this.connection.host}:${this.connection.port}...`);
 
-    this.worker.on('completed', (job) => {
-      this.logger.log(`Notify job ${job.id} completed`);
-    });
+      this.worker = new Worker(
+        QUEUE_NAMES.NOTIFY,
+        async (job: Job<NotifyJobData>) => this.process(job),
+        { connection: this.connection },
+      );
 
-    this.worker.on('failed', (job, err) => {
-      this.logger.error(`Notify job ${job?.id} failed: ${err.message}`);
-    });
+      this.worker.on('completed', (job) => {
+        this.logger.log(`Notify job ${job.id} completed`);
+      });
 
-    this.logger.log('Notify worker started');
+      this.worker.on('failed', (job, err) => {
+        this.logger.error(`Notify job ${job?.id} failed: ${err.message}`);
+      });
+
+      this.worker.on('error', (err) => {
+        this.logger.error(`Notify worker error: ${err.message}`);
+      });
+
+      this.worker.on('ready', () => {
+        this.logger.log('Notify worker connected to Redis and ready to process jobs');
+      });
+
+      // Wait for the worker to be ready
+      await this.worker.waitUntilReady();
+      this.logger.log(`Notify worker started on queue '${QUEUE_NAMES.NOTIFY}'`);
+    } catch (error) {
+      this.logger.error(`Failed to start notify worker: ${error}`);
+      throw error;
+    }
   }
 
   async onModuleDestroy() {

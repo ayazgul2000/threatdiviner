@@ -1,0 +1,46 @@
+rules:
+  - id: >-
+      javascript.lang.security.detect-disable-mustache-escape.detect-disable-mustache-escape
+    message: >-
+      Markup escaping disabled. This can be used with some template engines to
+      escape disabling of HTML entities, which can lead to XSS attacks.
+    metadata:
+      cwe:
+        - 'CWE-116: Improper Encoding or Escaping of Output'
+      owasp:
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      source-rule-url: >-
+        https://github.com/nodesecurity/eslint-plugin-security/blob/master/rules/detect-disable-mustache-escape.js
+      category: security
+      technology:
+        - mustache
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      references:
+        - https://owasp.org/Top10/A03_2021-Injection
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Encoding
+      source: >-
+        https://semgrep.dev/r/javascript.lang.security.detect-disable-mustache-escape.detect-disable-mustache-escape
+      shortlink: https://sg.run/Yvwd
+      semgrep.dev:
+        rule:
+          r_id: 9314
+          rv_id: 1263213
+          rule_id: 9AU17r
+          version_id: DkTRb3X
+          url: >-
+            https://semgrep.dev/playground/r/DkTRb3X/javascript.lang.security.detect-disable-mustache-escape.detect-disable-mustache-escape
+          origin: community
+    languages:
+      - javascript
+      - typescript
+    severity: WARNING
+    pattern: $OBJ.escapeMarkup = false

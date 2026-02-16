@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface TechniqueDetail {
   id: string;
   name: string;
@@ -39,7 +41,7 @@ export default function TechniqueDetailPage() {
 
   const fetchTechnique = async () => {
     try {
-      const res = await fetch(`/api/vulndb/attack/techniques/${params.id}`);
+      const res = await fetch(`${API_URL}/vulndb/attack/techniques/${params.id}`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setTechnique(data);

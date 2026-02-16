@@ -11,6 +11,18 @@ export interface ScanJobData {
   checkRunId?: string;
   triggeredBy?: string;
   config: ScanConfig;
+  scanType?: 'standard' | 'deep-analysis';
+  deepAnalysisOptions?: DeepAnalysisOptions;
+}
+
+export interface DeepAnalysisOptions {
+  similarVulns?: boolean;
+  callChain?: boolean;
+  fixPropagation?: boolean;
+  secureAlternatives?: boolean;
+  securityTests?: boolean;
+  architecture?: boolean;
+  attackChain?: boolean;
 }
 
 export interface ScanConfig {
@@ -83,3 +95,20 @@ export interface CleanupJobData {
   workDir: string;
   scanId: string;
 }
+
+export interface AnalysisJobData {
+  analysisRunId: string;
+  threatModelId: string;
+  tenantId: string;
+  userId: string;
+  yaml: string;
+}
+
+export type AnalysisStage =
+  | 'queued'
+  | 'validating'
+  | 'generating'
+  | 'running'
+  | 'processing'
+  | 'completed'
+  | 'failed';

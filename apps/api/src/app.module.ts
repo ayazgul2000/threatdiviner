@@ -33,6 +33,16 @@ import { CacheModule } from './cache/cache.module';
 import { SecurityModule } from './common/security/security.module';
 import { VulnDbModule } from './vulndb/vulndb.module';
 import { RagModule } from './rag/rag.module';
+import { ThreatModelingModule } from './threat-modeling/threat-modeling.module';
+import { SbomModule } from './sbom/sbom.module';
+import { EnvironmentsModule } from './environments/environments.module';
+import { ThreatIntelModule } from './threat-intel/threat-intel.module';
+import { ContainersModule } from './containers/containers.module';
+import { ProjectsModule } from './projects/projects.module';
+import { AlertsModule } from './alerts/alerts.module';
+import { SettingsModule } from './settings/settings.module';
+import { PenTestModule } from './pentest/pentest.module';
+import { AdminModule } from './admin/admin.module';
 import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
 
 @Module({
@@ -94,6 +104,16 @@ import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
     SecurityModule,
     VulnDbModule,
     RagModule,
+    ThreatModelingModule,
+    SbomModule,
+    EnvironmentsModule,
+    ThreatIntelModule,
+    ContainersModule,
+    ProjectsModule,
+    AlertsModule,
+    SettingsModule,
+    PenTestModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [

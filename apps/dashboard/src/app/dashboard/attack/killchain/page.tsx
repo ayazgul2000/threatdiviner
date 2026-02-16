@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface KillChainStage {
   id: string;
   name: string;
@@ -33,7 +35,7 @@ export default function KillChainPage() {
 
   const fetchKillChain = async () => {
     try {
-      const res = await fetch('/api/vulndb/attack/killchain');
+      const res = await fetch(`${API_URL}/vulndb/attack/killchain`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         if (data && data.length > 0) {

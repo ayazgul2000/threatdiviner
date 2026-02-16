@@ -18,28 +18,17 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 interface ScannerConfig {
   id: string;
   name: string;
-  type: 'sast' | 'sca' | 'secrets' | 'iac' | 'dast';
+  type: 'sast' | 'sca' | 'secrets' | 'iac';
   description: string;
   enabled: boolean;
   isDefault: boolean;
-}
-
-interface DastConfig {
-  targetUrl: string;
-  scanType: 'baseline' | 'full' | 'api';
-  authEnabled: boolean;
-  authType?: 'basic' | 'bearer' | 'form';
-  authConfig?: Record<string, string>;
 }
 
 const SCANNERS: ScannerConfig[] = [
   { id: 'semgrep', name: 'Semgrep', type: 'sast', description: 'Static Application Security Testing for code vulnerabilities', enabled: true, isDefault: true },
   { id: 'trivy', name: 'Trivy', type: 'sca', description: 'Software Composition Analysis for dependency vulnerabilities', enabled: true, isDefault: true },
   { id: 'gitleaks', name: 'Gitleaks', type: 'secrets', description: 'Secret detection for API keys, passwords, tokens', enabled: true, isDefault: true },
-  { id: 'trufflehog', name: 'TruffleHog', type: 'secrets', description: 'Advanced secret scanning with entropy analysis', enabled: false, isDefault: false },
   { id: 'checkov', name: 'Checkov', type: 'iac', description: 'Infrastructure as Code scanning (Terraform, CloudFormation)', enabled: false, isDefault: false },
-  { id: 'nuclei', name: 'Nuclei', type: 'dast', description: 'Dynamic vulnerability scanning with templates', enabled: false, isDefault: false },
-  { id: 'zap', name: 'OWASP ZAP', type: 'dast', description: 'Web application security scanner', enabled: false, isDefault: false },
 ];
 
 const SCANNER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -47,7 +36,6 @@ const SCANNER_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   sca: { label: 'SCA', color: 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300' },
   secrets: { label: 'Secrets', color: 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300' },
   iac: { label: 'IaC', color: 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' },
-  dast: { label: 'DAST', color: 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300' },
 };
 
 const TIMEZONES = [
@@ -75,13 +63,6 @@ export default function RepositorySettingsPage() {
 
   // Scanner configuration
   const [scanners, setScanners] = useState<ScannerConfig[]>(SCANNERS);
-
-  // DAST configuration
-  const [dastConfig, setDastConfig] = useState<DastConfig>({
-    targetUrl: '',
-    scanType: 'baseline',
-    authEnabled: false,
-  });
 
   // Schedule configuration
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
@@ -112,8 +93,8 @@ export default function RepositorySettingsPage() {
         // Load existing scan config if available
         if (repo.scanConfig) {
           // Update scanner toggles based on saved config
-          if (repo.scanConfig.scanners) {
-            setScanners(scanners.map(s => ({
+          if (repo.scanConfig.scanners && repo.scanConfig.scanners.length > 0) {
+            setScanners(prevScanners => prevScanners.map(s => ({
               ...s,
               enabled: repo.scanConfig!.scanners.includes(s.id),
             })));
@@ -188,6 +169,10 @@ export default function RepositorySettingsPage() {
       });
 
       setSuccess('Settings saved successfully');
+      // Navigate back to repository page after short delay
+      setTimeout(() => {
+        router.push(`/dashboard/repos/${repositoryId}`);
+      }, 1000);
     } catch (err) {
       console.error('Failed to save settings:', err);
       setError('Failed to save settings');
@@ -210,7 +195,7 @@ export default function RepositorySettingsPage() {
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg">
           Repository not found
         </div>
-        <Link href="/dashboard/repositories" className="text-blue-600 hover:text-blue-700">
+        <Link href="/dashboard/repos" className="text-blue-600 hover:text-blue-700">
           Back to Repositories
         </Link>
       </div>
@@ -224,7 +209,7 @@ export default function RepositorySettingsPage() {
         <div>
           <div className="flex items-center gap-3">
             <Link
-              href={`/dashboard/repositories/${repositoryId}`}
+              href={`/dashboard/repos/${repositoryId}`}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -299,78 +284,6 @@ export default function RepositorySettingsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* DAST Configuration */}
-      {scanners.some(s => s.type === 'dast' && s.enabled) && (
-        <Card variant="bordered">
-          <CardHeader>
-            <CardTitle>DAST Configuration</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Target URL *
-                </label>
-                <input
-                  type="url"
-                  value={dastConfig.targetUrl}
-                  onChange={(e) => setDastConfig({ ...dastConfig, targetUrl: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                  placeholder="https://staging.example.com"
-                />
-                <p className="text-xs text-gray-500 mt-1">URL of your staging environment to scan</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Scan Type
-                </label>
-                <select
-                  value={dastConfig.scanType}
-                  onChange={(e) => setDastConfig({ ...dastConfig, scanType: e.target.value as DastConfig['scanType'] })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                >
-                  <option value="baseline">Baseline (Quick scan)</option>
-                  <option value="full">Full Scan (Comprehensive)</option>
-                  <option value="api">API Scan (OpenAPI/Swagger)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={dastConfig.authEnabled}
-                    onChange={(e) => setDastConfig({ ...dastConfig, authEnabled: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Enable Authentication</span>
-                </label>
-              </div>
-
-              {dastConfig.authEnabled && (
-                <div className="pl-6 space-y-4 border-l-2 border-gray-200 dark:border-gray-700">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Auth Type
-                    </label>
-                    <select
-                      value={dastConfig.authType || 'basic'}
-                      onChange={(e) => setDastConfig({ ...dastConfig, authType: e.target.value as DastConfig['authType'] })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                    >
-                      <option value="basic">Basic Auth</option>
-                      <option value="bearer">Bearer Token</option>
-                      <option value="form">Form Login</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Schedule Configuration */}
       <Card variant="bordered">

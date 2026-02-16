@@ -1,0 +1,56 @@
+rules:
+  - id: >-
+      scala.play.security.conf-insecure-cookie-settings.conf-insecure-cookie-settings
+    patterns:
+      - pattern: secure = false
+      - pattern-inside: |
+          session = {
+            ...
+          }
+    message: >-
+      Session cookie `Secure` flag is explicitly disabled. The `secure` flag for
+      cookies prevents the client from transmitting the cookie over insecure
+      channels such as HTTP. Set the `Secure` flag by setting `secure` to `true`
+      in configuration file.
+    languages:
+      - generic
+    severity: WARNING
+    paths:
+      include:
+        - '*.conf'
+    metadata:
+      category: security
+      references:
+        - https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#security
+        - >-
+          https://www.playframework.com/documentation/2.8.x/SettingsSession#Session-Configuration
+      technology:
+        - play
+        - scala
+      cwe:
+        - 'CWE-614: Sensitive Cookie in HTTPS Session Without ''Secure'' Attribute'
+      owasp:
+        - A05:2021 - Security Misconfiguration
+        - A02:2025 - Security Misconfiguration
+      confidence: MEDIUM
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cookie Security
+      source: >-
+        https://semgrep.dev/r/scala.play.security.conf-insecure-cookie-settings.conf-insecure-cookie-settings
+      shortlink: https://sg.run/8z8N
+      semgrep.dev:
+        rule:
+          r_id: 18284
+          rv_id: 1263685
+          rule_id: GdUDJO
+          version_id: e1TyjJv
+          url: >-
+            https://semgrep.dev/playground/r/e1TyjJv/scala.play.security.conf-insecure-cookie-settings.conf-insecure-cookie-settings
+          origin: community

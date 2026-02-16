@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface ThreatActor {
   id: string;
   name: string;
@@ -27,7 +29,7 @@ export default function ThreatActorsPage() {
 
   const fetchActors = async () => {
     try {
-      const res = await fetch('/api/vulndb/attack/groups/relevant');
+      const res = await fetch(`${API_URL}/vulndb/attack/groups/relevant`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setActors(data);

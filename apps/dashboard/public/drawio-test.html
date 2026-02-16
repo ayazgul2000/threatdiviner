@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Draw.io Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; display: flex; height: 100vh; }
+    #drawio { flex: 1; border: none; }
+    #panel { width: 300px; background: #f5f5f5; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
+    #content { flex: 1; padding: 10px; overflow-y: auto; }
+    #log { height: 120px; padding: 8px; font-size: 11px; color: #333; background: #fff; border-top: 1px solid #ccc; overflow-y: auto; font-family: monospace; }
+    .element { padding: 10px; margin: 5px 0; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; }
+    .element:hover { background: #e3f2fd; }
+    h3 { margin: 0 0 10px; font-size: 14px; color: #333; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; margin-bottom: 4px; color: #555; }
+    .form-group select, .form-group input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 8px; }
+    .btn-primary { background: #1976d2; color: white; }
+    .btn-secondary { background: #eee; color: #333; }
+    .props-box { background: #e8f5e9; padding: 8px; margin-top: 12px; border-radius: 4px; font-size: 11px; }
+    .props-box pre { margin: 4px 0 0; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <iframe id="drawio" src="https://embed.diagrams.net/?embed=1&proto=json&spin=1&configure=1&autosave=1"></iframe>
+  <div id="panel">
+    <div id="content"><h3>Loading...</h3></div>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // Simple logging
+    function log(msg) {
+      const logDiv = document.getElementById('log');
+      logDiv.innerHTML += msg + '<br>';
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log('[Test]', msg);
+    }
+
+    log('Page loaded');
+
+    const iframe = document.getElementById('drawio');
+    const contentDiv = document.getElementById('content');
+    let currentXml = '';
+    let selectedId = null;
+
+    function send(msg) {
+      log('SEND: ' + msg.action);
+      iframe.contentWindow.postMessage(JSON.stringify(msg), '*');
+    }
+
+    // Decode compressed XML
+    function decode(xml) {
+      if (!xml || !xml.includes('<mxfile')) return xml;
+      try {
+        const doc = new DOMParser().parseFromString(xml, 'text/xml');
+        const diagram = doc.querySelector('diagram');
+        if (!diagram) return xml;
+        const compressed = diagram.textContent;
+        if (!compressed || compressed.includes('<mxGraphModel')) return compressed || xml;
+        const decoded = atob(compressed);
+        const inflated = pako.inflateRaw(Uint8Array.from(decoded, c => c.charCodeAt(0)), { to: 'string' });
+        return decodeURIComponent(inflated);
+      } catch (e) {
+        log('Decode error: ' + e.message);
+        return xml;
+      }
+    }
+
+    // Parse elements
+    function getElements(xml) {
+      const decoded = decode(xml);
+      if (!decoded) return [];
+      const doc = new DOMParser().parseFromString(decoded, 'text/xml');
+      const els = [];
+      doc.querySelectorAll('object, mxCell[vertex="1"], mxCell[edge="1"]').forEach(cell => {
+        const id = cell.getAttribute('id');
+        if (!id || id === '0' || id === '1') return;
+        const name = cell.getAttribute('label') || cell.getAttribute('value') || '(unnamed)';
+        const props = {};
+        if (cell.tagName === 'object') {
+          Array.from(cell.attributes).forEach(a => {
+            if (!['id', 'label'].includes(a.name)) props[a.name] = a.value;
+          });
+        }
+        els.push({ id, name, props });
+      });
+      return els;
+    }
+
+    // Show element list
+    function showList() {
+      selectedId = null;
+      const els = getElements(currentXml);
+      log('Showing list: ' + els.length + ' elements');
+      if (els.length === 0) {
+        contentDiv.innerHTML = '<h3>No elements</h3><p>Add shapes in Draw.io</p>';
+        return;
+      }
+      contentDiv.innerHTML = '<h3>Elements (' + els.length + ')</h3>' +
+        els.map(el => `<div class="element" onclick="selectEl('${el.id}')">${el.name}<br><small>${Object.keys(el.props).length} props</small></div>`).join('');
+    }
+
+    // Select element
+    window.selectEl = function(id) {
+      log('Select: ' + id);
+      selectedId = id;
+      const els = getElements(currentXml);
+      const el = els.find(e => e.id === id);
+      if (!el) { log('Not found'); return; }
+
+      // Select in Draw.io
+      send({ action: 'select', cells: [id] });
+
+      // Show form
+      contentDiv.innerHTML = `
+        <button class="btn btn-secondary" onclick="showList()">← Back</button>
+        <h3>${el.name}</h3>
+        <small>ID: ${id}</small>
+        <div class="form-group">
+          <label>Technology</label>
+          <select id="f-tech">
+            <option value="">-</option>
+            <option value="web-application" ${el.props.technology==='web-application'?'selected':''}>Web App</option>
+            <option value="database" ${el.props.technology==='database'?'selected':''}>Database</option>
+            <option value="api" ${el.props.technology==='api'?'selected':''}>API</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Criticality</label>
+          <select id="f-crit">
+            <option value="">-</option>
+            <option value="critical" ${el.props.criticality==='critical'?'selected':''}>Critical</option>
+            <option value="important" ${el.props.criticality==='important'?'selected':''}>Important</option>
+            <option value="operational" ${el.props.criticality==='operational'?'selected':''}>Operational</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="saveProps()">Save</button>
+        <div class="props-box">
+          <strong>Stored:</strong>
+          <pre>${JSON.stringify(el.props, null, 2)}</pre>
+        </div>
+      `;
+    };
+
+    // Save properties
+    window.saveProps = function() {
+      if (!selectedId) return;
+      const tech = document.getElementById('f-tech').value;
+      const crit = document.getElementById('f-crit').value;
+      log('Save: tech=' + tech + ', crit=' + crit);
+
+      const decoded = decode(currentXml);
+      const doc = new DOMParser().parseFromString(decoded, 'text/xml');
+      const obj = doc.querySelector(`object[id="${selectedId}"]`);
+      const cell = doc.querySelector(`mxCell[id="${selectedId}"]`);
+
+      if (obj) {
+        if (tech) obj.setAttribute('technology', tech);
+        if (crit) obj.setAttribute('criticality', crit);
+        log('Updated object attrs');
+      } else if (cell) {
+        if (tech) cell.setAttribute('data-technology', tech);
+        if (crit) cell.setAttribute('data-criticality', crit);
+        log('Updated cell data-attrs');
+      } else {
+        log('Element not found in XML');
+        return;
+      }
+
+      const newXml = new XMLSerializer().serializeToString(doc);
+      log('Reload XML: ' + newXml.length + ' chars');
+      send({ action: 'load', xml: newXml, autosave: 1 });
+    };
+
+    // Message handler
+    window.addEventListener('message', e => {
+      if (!e.data) return;
+      let d;
+      try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+
+      log('EVENT: ' + d.event);
+
+      if (d.event === 'configure') {
+        send({ action: 'configure', config: {} });
+      }
+
+      if (d.event === 'init') {
+        send({
+          action: 'load',
+          autosave: 1,
+          xml: `<mxGraphModel><root>
+            <mxCell id="0"/><mxCell id="1" parent="0"/>
+            <object id="web" label="Web App" technology="web-application" criticality="important">
+              <mxCell style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                <mxGeometry x="50" y="50" width="100" height="50" as="geometry"/>
+              </mxCell>
+            </object>
+            <object id="db" label="Database" technology="database">
+              <mxCell style="shape=cylinder;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+                <mxGeometry x="200" y="50" width="80" height="70" as="geometry"/>
+              </mxCell>
+            </object>
+          </root></mxGraphModel>`
+        });
+      }
+
+      if (d.event === 'load') {
+        log('Loaded - requesting export');
+        setTimeout(() => send({ action: 'export', format: 'xml', xml: true }), 300);
+      }
+
+      if (d.event === 'export' && d.xml) {
+        log('Got XML: ' + d.xml.length + ' chars');
+        log('Is mxfile: ' + d.xml.includes('<mxfile'));
+        const decoded = decode(d.xml);
+        log('Decoded: ' + decoded.length + ' chars');
+        log('Preview: ' + decoded.substring(0, 200));
+        currentXml = d.xml;
+        if (selectedId) {
+          const els = getElements(d.xml);
+          const el = els.find(e => e.id === selectedId);
+          log('Props after save: ' + JSON.stringify(el?.props));
+          selectEl(selectedId); // Refresh form
+        } else {
+          showList();
+        }
+      }
+
+      if (d.event === 'autosave' || d.event === 'change') {
+        send({ action: 'export', format: 'xml', xml: true });
+      }
+    });
+
+    log('Waiting for Draw.io...');
+  </script>
+</body>
+</html>

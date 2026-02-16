@@ -1,0 +1,58 @@
+rules:
+  - id: >-
+      yaml.docker-compose.security.selinux-separation-disabled.selinux-separation-disabled
+    patterns:
+      - pattern-inside: |
+          version: ...
+          ...
+          services:
+            ...
+      - pattern: |
+          $SERVICE:
+            ...
+            image: ...
+            ...
+            security_opt:
+              - ...
+              - label:disable
+    message: >-
+      Service '$SERVICE' is explicitly disabling SELinux separation. This runs
+      the service as an unconfined type. Remove 'label:disable' to prevent this.
+    metadata:
+      cwe:
+        - 'CWE-284: Improper Access Control'
+      references:
+        - https://www.projectatomic.io/blog/2016/03/dwalsh_selinux_containers/
+        - https://docs.docker.com/engine/reference/run/#security-configuration
+      category: security
+      technology:
+        - docker-compose
+      owasp:
+        - A05:2017 - Broken Access Control
+        - A01:2021 - Broken Access Control
+        - A01:2025 - Broken Access Control
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: HIGH
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Authorization
+      source: >-
+        https://semgrep.dev/r/yaml.docker-compose.security.selinux-separation-disabled.selinux-separation-disabled
+      shortlink: https://sg.run/qryb
+      semgrep.dev:
+        rule:
+          r_id: 10056
+          rv_id: 1263924
+          rule_id: YGUrAG
+          version_id: qkTR7yg
+          url: >-
+            https://semgrep.dev/playground/r/qkTR7yg/yaml.docker-compose.security.selinux-separation-disabled.selinux-separation-disabled
+          origin: community
+    languages:
+      - yaml
+    severity: WARNING

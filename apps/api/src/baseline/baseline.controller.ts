@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { IsString, IsOptional, IsDateString } from 'class-validator';
@@ -53,17 +54,23 @@ export class BaselineController {
   @Get()
   @RequirePermission(Permission.BASELINES_READ)
   @ApiOperation({ summary: 'List baselines' })
+  @ApiQuery({ name: 'projectId', required: true })
   @ApiQuery({ name: 'repositoryId', required: false })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   async listBaselines(
     @CurrentTenant() tenantId: string,
+    @Query('projectId') projectId: string,
     @Query('repositoryId') repositoryId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    if (!projectId) {
+      throw new BadRequestException('projectId query parameter is required');
+    }
     return this.baselineService.listBaselines(
       tenantId,
+      projectId,
       repositoryId,
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 50,
@@ -78,7 +85,7 @@ export class BaselineController {
     @CurrentUser() user: any,
     @Body() dto: CreateBaselineDto,
   ) {
-    return this.baselineService.addToBaseline(tenantId, user.id, {
+    return this.baselineService.addToBaseline(tenantId, user.userId, {
       ...dto,
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
     });
@@ -94,7 +101,7 @@ export class BaselineController {
   ) {
     return this.baselineService.importBaselineFromScan(
       tenantId,
-      user.id,
+      user.userId,
       dto.scanId,
       dto.reason,
     );

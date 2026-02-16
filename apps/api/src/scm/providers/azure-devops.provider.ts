@@ -7,6 +7,7 @@ import {
   ScmCommit,
   ScmBranch,
   ScmLanguages,
+  ScmPullRequest,
   OAuthTokenResponse,
 } from './scm-provider.interface';
 
@@ -473,6 +474,32 @@ export class AzureDevOpsProvider implements ScmProvider {
     }
 
     return `Found ${total} issues: ${critical} critical, ${high} high, ${medium} medium, ${low} low`;
+  }
+
+  async getPullRequests(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    state: 'open' | 'closed' | 'merged' | 'all' = 'all',
+    limit: number = 50,
+  ): Promise<ScmPullRequest[]> {
+    const parts = repo.includes('/') ? repo.split('/') : [repo, repo];
+    const project = parts[0];
+    const repoName = parts[1];
+    const adoStatus = state === 'open' ? 'active' : state === 'closed' ? 'abandoned' : state === 'merged' ? 'completed' : 'all';
+    const url = 'https://dev.azure.com/' + owner + '/' + project + '/_apis/git/repositories/' + repoName + '/pullrequests?searchCriteria.status=' + adoStatus + '&$top=' + limit + '&api-version=7.0';
+    const response = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+    if (!response.ok) throw new Error('ADO API error: ' + response.status);
+    const data = await response.json();
+    return (data.value || []).map((pr: any) => ({
+      number: pr.pullRequestId,
+      title: pr.title,
+      state: pr.status === 'completed' ? 'merged' : pr.status === 'abandoned' ? 'closed' : 'open',
+      htmlUrl: pr._links?.web?.href || '',
+      headSha: pr.lastMergeSourceCommit?.commitId || '',
+      baseBranch: (pr.targetRefName || '').replace('refs/heads/', ''),
+      headBranch: (pr.sourceRefName || '').replace('refs/heads/', ''),
+    }));
   }
 
   getAuthenticatedCloneUrl(accessToken: string, cloneUrl: string): string {

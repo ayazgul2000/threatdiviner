@@ -1,0 +1,64 @@
+rules:
+  - id: python.twilio.security.twiml-injection.twiml-injection
+    languages:
+      - python
+    severity: WARNING
+    message: >-
+      Using non-constant TwiML (Twilio Markup Language) argument when creating a
+      Twilio conversation could allow the injection of additional TwiML commands
+    metadata:
+      cwe:
+        - 'CWE-91: XML Injection'
+      owasp:
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      category: security
+      technology:
+        - python
+        - twilio
+        - twiml
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: MEDIUM
+      subcategory:
+        - vuln
+      references:
+        - https://codeberg.org/fennix/funjection
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Other
+      source: >-
+        https://semgrep.dev/r/python.twilio.security.twiml-injection.twiml-injection
+      shortlink: https://sg.run/GdEEy
+      semgrep.dev:
+        rule:
+          r_id: 134692
+          rv_id: 1263580
+          rule_id: oqUgjj2
+          version_id: kbTzGp1
+          url: >-
+            https://semgrep.dev/playground/r/kbTzGp1/python.twilio.security.twiml-injection.twiml-injection
+          origin: community
+    mode: taint
+    pattern-sources:
+      - pattern: |
+          f"..."
+      - pattern: |
+          "..." % ...
+      - pattern: |
+          "...".format(...)
+      - patterns:
+          - pattern: $ARG
+          - pattern-inside: |
+              def $F(..., $ARG, ...):
+                  ...
+    pattern-sanitizers:
+      - pattern: xml.sax.saxutils.escape(...)
+      - pattern: html.escape(...)
+    pattern-sinks:
+      - patterns:
+          - pattern: |
+              $CLIENT.calls.create(..., twiml=$SINK, ...)
+          - focus-metavariable: $SINK

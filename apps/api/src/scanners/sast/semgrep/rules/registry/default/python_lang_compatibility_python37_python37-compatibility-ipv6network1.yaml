@@ -1,0 +1,28 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-ipv6network1
+    pattern: ipaddress.IPv6Network.subnet_of($X)
+    message: >-
+      IPv6Network.subnet_of is only available on Python 3.7+ and is therefore
+      not backwards compatible. Instead, check if the subnet is in 'subnets'.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-ipv6network1
+      shortlink: https://sg.run/EkLe
+      semgrep.dev:
+        rule:
+          r_id: 9581
+          rv_id: 946271
+          rule_id: 4bUko0
+          version_id: GxTP7Er
+          url: >-
+            https://semgrep.dev/playground/r/GxTP7Er/python.lang.compatibility.python37.python37-compatibility-ipv6network1
+          origin: community

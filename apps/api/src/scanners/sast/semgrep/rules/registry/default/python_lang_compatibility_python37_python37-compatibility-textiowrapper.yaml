@@ -1,0 +1,29 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-textiowrapper
+    pattern: TextIOWrapper.reconfigure(...)
+    message: >-
+      Found usage of 'importlib.abc.ResourceReader'. This module is only
+      available on Python 3.7+ and is therefore not backwards compatible.
+      Instead, use another loader.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-textiowrapper
+      shortlink: https://sg.run/ndL2
+      semgrep.dev:
+        rule:
+          r_id: 9580
+          rv_id: 946270
+          rule_id: 3qUPdy
+          version_id: 5PT9OD8
+          url: >-
+            https://semgrep.dev/playground/r/5PT9OD8/python.lang.compatibility.python37.python37-compatibility-textiowrapper
+          origin: community

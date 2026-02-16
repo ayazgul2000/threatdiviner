@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as https from 'https';
-import * as zlib from 'zlib';
 import { parseStringPromise } from 'xml2js';
+import AdmZip from 'adm-zip';
 
 interface CweEntry {
   $: { ID: string; Name: string };
@@ -89,37 +89,21 @@ export class CweSyncService {
         response.on('end', () => {
           try {
             const zipBuffer = Buffer.concat(chunks);
-            // The CWE zip contains a single XML file
-            const unzipped = zlib.gunzipSync(zipBuffer);
-            resolve(unzipped.toString('utf-8'));
-          } catch (unzipError) {
-            // If gunzip fails, try using the AdmZip for regular zip
-            this.extractFromZip(Buffer.concat(chunks))
-              .then(resolve)
-              .catch(reject);
+            const zip = new AdmZip(zipBuffer);
+            const entries = zip.getEntries();
+            const xmlEntry = entries.find((e: AdmZip.IZipEntry) => e.entryName.endsWith('.xml'));
+            if (xmlEntry) {
+              resolve(xmlEntry.getData().toString('utf-8'));
+            } else {
+              reject(new Error('No XML file found in CWE archive'));
+            }
+          } catch (error) {
+            reject(new Error(`Failed to extract CWE ZIP: ${error instanceof Error ? error.message : 'Unknown error'}`));
           }
         });
         response.on('error', reject);
       }).on('error', reject);
     });
-  }
-
-  private async extractFromZip(zipBuffer: Buffer): Promise<string> {
-    // For regular zip files, we'd need AdmZip, but let's try a simpler approach
-    // The CWE latest might be gzipped or regular zip
-    try {
-      const AdmZip = require('adm-zip');
-      const zip = new AdmZip(zipBuffer);
-      const entries = zip.getEntries();
-      const xmlEntry = entries.find((e: any) => e.entryName.endsWith('.xml'));
-      if (xmlEntry) {
-        return xmlEntry.getData().toString('utf-8');
-      }
-      throw new Error('No XML file found in CWE archive');
-    } catch {
-      // Fallback: try to parse as-is (maybe it's already XML)
-      return zipBuffer.toString('utf-8');
-    }
   }
 
   private async parseXml(xmlContent: string): Promise<CweEntry[]> {

@@ -1,0 +1,56 @@
+rules:
+  - id: >-
+      terraform.aws.security.aws-ebs-snapshot-encrypted-with-cmk.aws-ebs-snapshot-encrypted-with-cmk
+    patterns:
+      - pattern: |
+          resource "aws_ebs_snapshot_copy" $ANYTHING {
+            ...
+            encrypted = true
+            ...
+          }
+      - pattern-not-inside: |
+          resource "aws_ebs_snapshot_copy" $ANYTHING {
+            ...
+            encrypted = true
+            kms_key_id = ...
+            ...
+          }
+    message: >-
+      Ensure EBS Snapshot is encrypted at rest using KMS CMKs. CMKs gives you
+      control over the encryption key in terms of access and rotation.
+    metadata:
+      category: security
+      technology:
+        - terraform
+        - aws
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+      cwe:
+        - 'CWE-320: CWE CATEGORY: Key Management Errors'
+      references:
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.aws-ebs-snapshot-encrypted-with-cmk.aws-ebs-snapshot-encrypted-with-cmk
+      shortlink: https://sg.run/ByPW
+      semgrep.dev:
+        rule:
+          r_id: 17351
+          rv_id: 946677
+          rule_id: EwUqko
+          version_id: A8TJzb0
+          url: >-
+            https://semgrep.dev/playground/r/A8TJzb0/terraform.aws.security.aws-ebs-snapshot-encrypted-with-cmk.aws-ebs-snapshot-encrypted-with-cmk
+          origin: community
+    languages:
+      - hcl
+    severity: WARNING

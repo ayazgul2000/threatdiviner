@@ -8,6 +8,7 @@ import {
   ScmCommit,
   ScmBranch,
   ScmLanguages,
+  ScmPullRequest,
   OAuthTokenResponse,
 } from './scm-provider.interface';
 
@@ -313,6 +314,31 @@ export class GitLabProvider implements ScmProvider {
       old_path: f.old_path,
       new_file: f.new_file,
       deleted_file: f.deleted_file,
+    }));
+  }
+
+  async getPullRequests(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    state: 'open' | 'closed' | 'merged' | 'all' = 'all',
+    limit: number = 50,
+  ): Promise<ScmPullRequest[]> {
+    const projectPath = encodeURIComponent(owner + '/' + repo);
+    const glState = state === 'open' ? 'opened' : state;
+    const response = await fetch('https://gitlab.com/api/v4/projects/' + projectPath + '/merge_requests?state=' + glState + '&per_page=' + limit, {
+      headers: { 'Authorization': 'Bearer ' + accessToken },
+    });
+    if (!response.ok) throw new Error('GitLab API error: ' + response.status);
+    const data = await response.json();
+    return data.map((mr: any) => ({
+      number: mr.iid,
+      title: mr.title,
+      state: mr.state === 'merged' ? 'merged' : mr.state === 'closed' ? 'closed' : 'open',
+      htmlUrl: mr.web_url,
+      headSha: mr.sha || '',
+      baseBranch: mr.target_branch,
+      headBranch: mr.source_branch,
     }));
   }
 

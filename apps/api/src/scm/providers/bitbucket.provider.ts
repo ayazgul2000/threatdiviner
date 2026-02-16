@@ -7,6 +7,7 @@ import {
   ScmCommit,
   ScmBranch,
   ScmLanguages,
+  ScmPullRequest,
   OAuthTokenResponse,
 } from './scm-provider.interface';
 
@@ -495,6 +496,31 @@ export class BitbucketProvider implements ScmProvider {
       case 'note': return 'LOW';
       default: return 'LOW';
     }
+  }
+
+  async getPullRequests(
+    accessToken: string,
+    owner: string,
+    repo: string,
+    state: 'open' | 'closed' | 'merged' | 'all' = 'all',
+    limit: number = 50,
+  ): Promise<ScmPullRequest[]> {
+    const bbState = state === 'open' ? 'OPEN' : state === 'merged' ? 'MERGED' : state === 'closed' ? 'DECLINED' : '';
+    const stateQuery = bbState ? '&state=' + bbState : '';
+    const response = await fetch('https://api.bitbucket.org/2.0/repositories/' + owner + '/' + repo + '/pullrequests?pagelen=' + limit + stateQuery, {
+      headers: { 'Authorization': 'Bearer ' + accessToken },
+    });
+    if (!response.ok) throw new Error('Bitbucket API error: ' + response.status);
+    const data = await response.json();
+    return (data.values || []).map((pr: any) => ({
+      number: pr.id,
+      title: pr.title,
+      state: pr.state === 'MERGED' ? 'merged' : pr.state === 'OPEN' ? 'open' : 'closed',
+      htmlUrl: pr.links?.html?.href || '',
+      headSha: pr.source?.commit?.hash || '',
+      baseBranch: pr.destination?.branch?.name || '',
+      headBranch: pr.source?.branch?.name || '',
+    }));
   }
 
   getAuthenticatedCloneUrl(accessToken: string, cloneUrl: string): string {

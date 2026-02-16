@@ -1,0 +1,33 @@
+rules:
+  - id: ocaml.lang.portability.crlf-support.broken-input-line
+    pattern: |
+      input_line
+    message: >-
+      'input_line' leaves a '\r' (CR) character when reading lines from a
+      Windows text file, whose lines end in "\r\n" (CRLF). This is a problem for
+      any Windows file that is being read either on a Unix-like platform or on
+      Windows in binary mode. If the code already takes care of removing any
+      trailing '\r' after reading the line, add a '(* nosemgrep *)' comment to
+      disable this warning.
+    languages:
+      - ocaml
+    severity: WARNING
+    metadata:
+      category: portability
+      technology:
+        - ocaml
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/ocaml.lang.portability.crlf-support.broken-input-line
+      shortlink: https://sg.run/v2gY
+      semgrep.dev:
+        rule:
+          r_id: 12777
+          rv_id: 945971
+          rule_id: DbUKZX
+          version_id: BjT1Ngb
+          url: >-
+            https://semgrep.dev/playground/r/BjT1Ngb/ocaml.lang.portability.crlf-support.broken-input-line
+          origin: community

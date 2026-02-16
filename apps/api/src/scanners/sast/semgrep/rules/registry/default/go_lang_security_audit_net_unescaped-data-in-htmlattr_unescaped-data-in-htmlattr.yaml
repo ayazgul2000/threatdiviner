@@ -1,0 +1,76 @@
+rules:
+  - id: >-
+      go.lang.security.audit.net.unescaped-data-in-htmlattr.unescaped-data-in-htmlattr
+    message: >-
+      Found a formatted template string passed to 'template. HTMLAttr()'.
+      'template.HTMLAttr()' does not escape contents. Be absolutely sure there
+      is no user-controlled data in this template or validate and sanitize the
+      data before passing it into the template.
+    metadata:
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - https://golang.org/pkg/html/template/#HTMLAttr
+      category: security
+      technology:
+        - go
+      confidence: LOW
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/go.lang.security.audit.net.unescaped-data-in-htmlattr.unescaped-data-in-htmlattr
+      shortlink: https://sg.run/OPRp
+      semgrep.dev:
+        rule:
+          r_id: 9131
+          rv_id: 1262945
+          rule_id: QrUz9R
+          version_id: 3ZT4XRr
+          url: >-
+            https://semgrep.dev/playground/r/3ZT4XRr/go.lang.security.audit.net.unescaped-data-in-htmlattr.unescaped-data-in-htmlattr
+          origin: community
+    languages:
+      - go
+    severity: WARNING
+    pattern-either:
+      - pattern: template.HTMLAttr($T + $X, ...)
+      - pattern: template.HTMLAttr(fmt.$P("...", ...), ...)
+      - pattern: |
+          $T = "..."
+          ...
+          $T = $FXN(..., $T, ...)
+          ...
+          template.HTMLAttr($T, ...)
+      - pattern: |
+          $T = fmt.$P("...", ...)
+          ...
+          template.HTMLAttr($T, ...)
+      - pattern: |
+          $T, $ERR = fmt.$P("...", ...)
+          ...
+          template.HTMLAttr($T, ...)
+      - pattern: |
+          $T = $X + $Y
+          ...
+          template.HTMLAttr($T, ...)
+      - pattern: |-
+          $T = "..."
+          ...
+          $OTHER, $ERR = fmt.$P(..., $T, ...)
+          ...
+          template.HTMLAttr($OTHER, ...)

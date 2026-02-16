@@ -1,0 +1,51 @@
+rules:
+  - id: go.lang.security.reverseproxy-director.reverseproxy-director
+    message: >-
+      ReverseProxy can remove headers added by Director. Consider using
+      ReverseProxy.Rewrite instead of ReverseProxy.Director.
+    languages:
+      - go
+    severity: WARNING
+    patterns:
+      - pattern-inside: |
+          import "net/http/httputil"
+          ...
+      - pattern-either:
+          - pattern: $PROXY.Director = $FUNC
+          - patterns:
+              - pattern-inside: |
+                  httputil.ReverseProxy{
+                      ...
+                  }
+              - pattern: |
+                  Director: $FUNC
+    metadata:
+      cwe:
+        - 'CWE-115: Misinterpretation of Input'
+      category: security
+      subcategory:
+        - audit
+      technology:
+        - go
+      confidence: MEDIUM
+      likelihood: LOW
+      impact: LOW
+      references:
+        - https://github.com/golang/go/issues/50580
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Other
+      source: >-
+        https://semgrep.dev/r/go.lang.security.reverseproxy-director.reverseproxy-director
+      shortlink: https://sg.run/9AYYR
+      semgrep.dev:
+        rule:
+          r_id: 146567
+          rv_id: 945612
+          rule_id: zdUKzzA
+          version_id: DkTNpvx
+          url: >-
+            https://semgrep.dev/playground/r/DkTNpvx/go.lang.security.reverseproxy-director.reverseproxy-director
+          origin: community

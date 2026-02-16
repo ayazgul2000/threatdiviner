@@ -1,0 +1,23 @@
+threagile_version: 1.0.0
+title: ThreatDiviner Server
+author:
+  name: System
+  homepage: https://threatdiviner.io
+date: 2026-01-25
+business_criticality: important
+business_overview:
+  description: Placeholder for server mode
+  images: []
+technical_overview:
+  description: Placeholder for server mode
+  images: []
+questions: {}
+abuse_cases: {}
+security_requirements: {}
+tags_available: []
+data_assets: {}
+technical_assets: {}
+trust_boundaries: {}
+shared_runtimes: {}
+individual_risk_categories: {}
+risk_tracking: {}

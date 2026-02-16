@@ -1,0 +1,58 @@
+rules:
+  - id: >-
+      javascript.express.security.audit.xss.mustache.explicit-unescape.template-explicit-unescape
+    message: >-
+      Detected an explicit unescape in a Mustache template, using triple braces
+      '{{{...}}}' or ampersand '&'. If external data can reach these locations,
+      your application is exposed to a cross-site scripting (XSS) vulnerability.
+      If you must do this, ensure no external data can reach this location.
+    metadata:
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      references:
+        - https://github.com/janl/mustache.js/#variables
+        - https://ractive.js.org/v0.x/0.7/mustaches#variables
+      category: security
+      technology:
+        - express
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/javascript.express.security.audit.xss.mustache.explicit-unescape.template-explicit-unescape
+      shortlink: https://sg.run/Lwx9
+      semgrep.dev:
+        rule:
+          r_id: 9283
+          rv_id: 1263156
+          rule_id: ReUgG1
+          version_id: DkTRbep
+          url: >-
+            https://semgrep.dev/playground/r/DkTRbep/javascript.express.security.audit.xss.mustache.explicit-unescape.template-explicit-unescape
+          origin: community
+    languages:
+      - regex
+    severity: WARNING
+    paths:
+      include:
+        - '*.mustache'
+        - '*.hbs'
+        - '*.html'
+    pattern-either:
+      - pattern-regex: '{{{((?!include).)*?}}}'
+      - pattern-regex: '{{[\\s]*&.*}}'

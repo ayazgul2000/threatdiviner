@@ -1,0 +1,2443 @@
+﻿=== .ENV ===
+DATABASE_URL="postgresql://postgres:threatdiviner_dev@localhost:5433/threatdiviner"
+
+# JWT Configuration
+JWT_SECRET="threatdiviner-dev-secret-change-in-production"
+JWT_REFRESH_SECRET="threatdiviner-refresh-secret-change-in-production"
+JWT_EXPIRATION="15m"
+JWT_REFRESH_EXPIRATION="7d"
+
+# Server
+PORT=3001
+CORS_ORIGIN="http://localhost:3000"
+NODE_ENV="development"
+API_BASE_URL="http://localhost:3001"
+DASHBOARD_URL="http://localhost:3000"
+
+# SCM Integration
+TOKEN_ENCRYPTION_KEY="change-this-to-a-secure-random-string-in-production"
+GITHUB_CLIENT_ID="Ov23lihJO6YzKtjX8QGa"
+GITHUB_CLIENT_SECRET="81cb6770983e5daee5933d7e8a661e058e66755f"
+GITHUB_WEBHOOK_SECRET="threatdiviner-webhook-secret-2025"
+
+# Redis (for BullMQ)
+REDIS_HOST="localhost"
+REDIS_PORT=6379
+
+# Scanning
+SCAN_WORKDIR="C:/tmp/threatdiviner-scans"
+SCANNER_TIMEOUT=300000
+SCAN_TIMEOUT=900000
+MAX_CONCURRENT_SCANS=5
+MAX_REPO_SIZE_MB=500
+ENABLE_DOCKER_SCANNERS=false
+
+# Scanner paths (for local dev)
+SEMGREP_PATH="semgrep"
+BANDIT_PATH="bandit"
+GOSEC_PATH="gosec"
+GITLEAKS_PATH="gitleaks"
+TRIVY_PATH="trivy"
+
+# AI Triage (Claude)
+ANTHROPIC_API_KEY=""
+ANTHROPIC_MODEL="claude-sonnet-4-20250514"
+AI_TRIAGE_ENABLED=true
+AI_TRIAGE_BATCH_SIZE=10
+
+
+=== CUSTOM BULL MODULE ===
+import { Module, DynamicModule, Global, Provider, OnModuleDestroy } from '@nestjs/common';
+import { Queue } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
+import { QUEUE_NAMES } from './queue.constants';
+
+export const BULL_QUEUES = Symbol('BULL_QUEUES');
+export const BULL_CONNECTION = Symbol('BULL_CONNECTION');
+
+interface BullConnection {
+  host: string;
+  port: number;
+}
+
+interface QueueInstance {
+  queue: Queue;
+  name: string;
+}
+
+@Global()
+@Module({})
+export class CustomBullModule implements OnModuleDestroy {
+  private static queues: QueueInstance[] = [];
+
+  static forRoot(): DynamicModule {
+    const connectionProvider: Provider = {
+      provide: BULL_CONNECTION,
+      useFactory: (configService: ConfigService): BullConnection => ({
+        host: configService.get('REDIS_HOST', 'localhost'),
+        port: configService.get('REDIS_PORT', 6379),
+      }),
+      inject: [ConfigService],
+    };
+
+    const queueNames = Object.values(QUEUE_NAMES);
+    const queueProviders: Provider[] = queueNames.map((name) => ({
+      provide: `BullQueue_${name}`,
+      useFactory: (connection: BullConnection) => {
+        const queue = new Queue(name, { connection });
+        CustomBullModule.queues.push({ queue, name });
+        return queue;
+      },
+      inject: [BULL_CONNECTION],
+    }));
+
+    const allQueuesProvider: Provider = {
+      provide: BULL_QUEUES,
+      useFactory: (...queues: Queue[]) => queues,
+      inject: queueNames.map((name) => `BullQueue_${name}`),
+    };
+
+    return {
+      module: CustomBullModule,
+      providers: [connectionProvider, ...queueProviders, allQueuesProvider],
+      exports: [BULL_CONNECTION, BULL_QUEUES, ...queueNames.map((name) => `BullQueue_${name}`)],
+    };
+  }
+
+  async onModuleDestroy() {
+    for (const { queue, name } of CustomBullModule.queues) {
+      try {
+        await queue.close();
+      } catch (error) {
+        console.error(`Error closing queue ${name}:`, error);
+      }
+    }
+  }
+}
+
+
+=== QUEUE MODULE ===
+import { Module } from '@nestjs/common';
+import { QueueService } from './services/queue.service';
+
+@Module({
+  providers: [QueueService],
+  exports: [QueueService],
+})
+export class QueueModule {}
+
+
+=== QUEUE SERVICE ===
+import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Queue, Job } from 'bullmq';
+import { QUEUE_NAMES, JOB_NAMES, SCAN_JOB_OPTIONS, NOTIFY_JOB_OPTIONS } from '../queue.constants';
+import { ScanJobData, NotifyJobData, CleanupJobData } from '../jobs';
+
+@Injectable()
+export class QueueService {
+  private readonly logger = new Logger(QueueService.name);
+
+  constructor(
+    @Inject(`BullQueue_${QUEUE_NAMES.SCAN}`) private readonly scanQueue: Queue,
+    @Inject(`BullQueue_${QUEUE_NAMES.NOTIFY}`) private readonly notifyQueue: Queue,
+    @Inject(`BullQueue_${QUEUE_NAMES.CLEANUP}`) private readonly cleanupQueue: Queue,
+  ) {}
+
+  async enqueueScan(data: ScanJobData): Promise<Job<ScanJobData>> {
+    this.logger.log(`Enqueueing scan job for ${data.fullName}@${data.branch}`);
+    this.logger.debug(`Scan config: enableSast=${data.config.enableSast}, enableSca=${data.config.enableSca}, enableSecrets=${data.config.enableSecrets}`);
+
+    try {
+      const job = await this.scanQueue.add(
+        JOB_NAMES.PROCESS_SCAN,
+        data,
+        {
+          ...SCAN_JOB_OPTIONS,
+          jobId: `scan-${data.scanId}`,
+        },
+      );
+
+      this.logger.log(`Scan job ${job.id} created for scan ${data.scanId}`);
+
+      // Log queue stats for debugging
+      const [waiting, active] = await Promise.all([
+        this.scanQueue.getWaitingCount(),
+        this.scanQueue.getActiveCount(),
+      ]);
+      this.logger.log(`Queue stats: ${waiting} waiting, ${active} active`);
+
+      return job;
+    } catch (error) {
+      this.logger.error(`Failed to enqueue scan job: ${error}`);
+      throw error;
+    }
+  }
+
+  async enqueueNotification(data: NotifyJobData): Promise<Job<NotifyJobData>> {
+    this.logger.log(`Enqueueing notification for scan ${data.scanId}`);
+
+    const job = await this.notifyQueue.add(
+      JOB_NAMES.NOTIFY_GITHUB,
+      data,
+      {
+        ...NOTIFY_JOB_OPTIONS,
+        jobId: `notify-${data.scanId}`,
+      },
+    );
+
+    return job;
+  }
+
+  async enqueueCleanup(data: CleanupJobData): Promise<Job<CleanupJobData>> {
+    const job = await this.cleanupQueue.add(
+      JOB_NAMES.CLEANUP_WORKDIR,
+      data,
+      {
+        delay: 60000, // Wait 1 minute before cleanup
+        jobId: `cleanup-${data.scanId}`,
+      },
+    );
+
+    return job;
+  }
+
+  async getScanJob(scanId: string): Promise<Job<ScanJobData> | null> {
+    const job = await this.scanQueue.getJob(`scan-${scanId}`);
+    return job || null;
+  }
+
+  async getScanJobState(scanId: string): Promise<string | null> {
+    const job = await this.getScanJob(scanId);
+    if (!job) return null;
+    return job.getState();
+  }
+
+  async cancelScan(scanId: string): Promise<boolean> {
+    const job = await this.getScanJob(scanId);
+    if (!job) return false;
+
+    const state = await job.getState();
+    if (state === 'active') {
+      // Can't cancel active jobs directly, need to signal the processor
+      await job.moveToFailed(new Error('Cancelled by user'), 'cancelled');
+      return true;
+    } else if (state === 'waiting' || state === 'delayed') {
+      await job.remove();
+      return true;
+    }
+
+    return false;
+  }
+
+  async getQueueStats() {
+    const [
+      scanWaiting,
+      scanActive,
+      scanCompleted,
+      scanFailed,
+    ] = await Promise.all([
+      this.scanQueue.getWaitingCount(),
+      this.scanQueue.getActiveCount(),
+      this.scanQueue.getCompletedCount(),
+      this.scanQueue.getFailedCount(),
+    ]);
+
+    return {
+      scan: {
+        waiting: scanWaiting,
+        active: scanActive,
+        completed: scanCompleted,
+        failed: scanFailed,
+      },
+    };
+  }
+
+  async getQueueHealth(): Promise<{
+    connected: boolean;
+    queues: {
+      scan: { connected: boolean; workers: number };
+      notify: { connected: boolean; workers: number };
+    };
+  }> {
+    try {
+      // Check if queues are connected by getting their state
+      const [scanWorkers, notifyWorkers] = await Promise.all([
+        this.scanQueue.getWorkers(),
+        this.notifyQueue.getWorkers(),
+      ]);
+
+      return {
+        connected: true,
+        queues: {
+          scan: {
+            connected: true,
+            workers: scanWorkers.length,
+          },
+          notify: {
+            connected: true,
+            workers: notifyWorkers.length,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Queue health check failed: ${error}`);
+      return {
+        connected: false,
+        queues: {
+          scan: { connected: false, workers: 0 },
+          notify: { connected: false, workers: 0 },
+        },
+      };
+    }
+  }
+
+  async getWaitingJobs(): Promise<Job<ScanJobData>[]> {
+    return this.scanQueue.getWaiting();
+  }
+
+  async getActiveJobs(): Promise<Job<ScanJobData>[]> {
+    return this.scanQueue.getActive();
+  }
+
+  async retryFailedJobs(): Promise<number> {
+    const failedJobs = await this.scanQueue.getFailed();
+    let retried = 0;
+    for (const job of failedJobs) {
+      try {
+        await job.retry();
+        retried++;
+      } catch (error) {
+        this.logger.warn(`Failed to retry job ${job.id}: ${error}`);
+      }
+    }
+    return retried;
+  }
+}
+
+
+=== QUEUE CONSTANTS ===
+export const QUEUE_NAMES = {
+  SCAN: 'scan-jobs',
+  CLONE: 'clone-jobs',
+  SAST: 'sast-jobs',
+  SCA: 'sca-jobs',
+  SECRETS: 'secrets-jobs',
+  NOTIFY: 'notify-jobs',
+  CLEANUP: 'cleanup-jobs',
+} as const;
+
+export const JOB_NAMES = {
+  PROCESS_SCAN: 'process-scan',
+  CLONE_REPO: 'clone-repo',
+  RUN_SAST: 'run-sast',
+  RUN_SCA: 'run-sca',
+  RUN_SECRETS: 'run-secrets',
+  NOTIFY_GITHUB: 'notify-github',
+  CLEANUP_WORKDIR: 'cleanup-workdir',
+} as const;
+
+export const DEFAULT_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: {
+    type: 'exponential' as const,
+    delay: 5000, // 5s, 10s, 20s
+  },
+  removeOnComplete: {
+    age: 86400, // 24 hours
+    count: 1000,
+  },
+  removeOnFail: {
+    age: 604800, // 7 days (keep for debugging)
+  },
+};
+
+export const SCAN_JOB_OPTIONS = {
+  ...DEFAULT_JOB_OPTIONS,
+  timeout: 900000, // 15 minutes max
+  priority: 1,
+};
+
+export const CLONE_JOB_OPTIONS = {
+  ...DEFAULT_JOB_OPTIONS,
+  timeout: 300000, // 5 minutes
+  priority: 2,
+};
+
+export const SCANNER_JOB_OPTIONS = {
+  ...DEFAULT_JOB_OPTIONS,
+  timeout: 300000, // 5 minutes per scanner
+  priority: 3,
+};
+
+export const NOTIFY_JOB_OPTIONS = {
+  ...DEFAULT_JOB_OPTIONS,
+  timeout: 60000, // 1 minute
+  priority: 5,
+};
+
+
+=== APP MODULE ===
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { HealthController } from './health/health.controller';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { ScmModule } from './scm/scm.module';
+import { CustomBullModule } from './queue/custom-bull.module';
+import { QueueModule } from './queue/queue.module';
+import { ScannersModule } from './scanners/scanners.module';
+import { AiModule } from './ai/ai.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ReportingModule } from './reporting/reporting.module';
+import { PlatformModule } from './platform/platform.module';
+import { TeamModule } from './team/team.module';
+import { AuditModule } from './audit/audit.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
+import { JiraModule } from './integrations/jira/jira.module';
+import { ExportModule } from './export/export.module';
+import { BaselineModule } from './baseline/baseline.module';
+import { ApiKeysModule } from './apikeys/apikeys.module';
+import { RetentionModule } from './retention/retention.module';
+import { CspmModule } from './cspm/cspm.module';
+import { SiemModule } from './siem/siem.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { FixModule } from './fix/fix.module';
+import { PipelineModule } from './pipeline/pipeline.module';
+import { CliModule } from './cli/cli.module';
+import { ComplianceModule } from './compliance/compliance.module';
+import { CacheModule } from './cache/cache.module';
+import { SecurityModule } from './common/security/security.module';
+import { VulnDbModule } from './vulndb/vulndb.module';
+import { RagModule } from './rag/rag.module';
+import { ThreatModelingModule } from './threat-modeling/threat-modeling.module';
+import { SbomModule } from './sbom/sbom.module';
+import { EnvironmentsModule } from './environments/environments.module';
+import { ThreatIntelModule } from './threat-intel/threat-intel.module';
+import { ContainersModule } from './containers/containers.module';
+import { ProjectsModule } from './projects/projects.module';
+import { AlertsModule } from './alerts/alerts.module';
+import { SettingsModule } from './settings/settings.module';
+import { CustomThrottlerGuard } from './common/throttle/throttle.guard';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          {
+            name: 'short',
+            ttl: 1000, // 1 second
+            limit: configService.get('THROTTLE_SHORT_LIMIT', 10),
+          },
+          {
+            name: 'medium',
+            ttl: 60000, // 1 minute
+            limit: configService.get('THROTTLE_MEDIUM_LIMIT', 100),
+          },
+          {
+            name: 'long',
+            ttl: 3600000, // 1 hour
+            limit: configService.get('THROTTLE_LONG_LIMIT', 1000),
+          },
+        ],
+      }),
+    }),
+    CustomBullModule.forRoot(),
+    PrismaModule,
+    AuditModule,
+    AuthModule,
+    ScmModule,
+    QueueModule,
+    ScannersModule,
+    AiModule,
+    NotificationsModule,
+    ReportingModule,
+    PlatformModule,
+    TeamModule,
+    SchedulerModule,
+    JiraModule,
+    ExportModule,
+    BaselineModule,
+    ApiKeysModule,
+    RetentionModule,
+    CspmModule,
+    SiemModule,
+    DashboardModule,
+    AnalyticsModule,
+    FixModule,
+    PipelineModule,
+    CliModule,
+    ComplianceModule,
+    CacheModule,
+    SecurityModule,
+    VulnDbModule,
+    RagModule,
+    ThreatModelingModule,
+    SbomModule,
+    EnvironmentsModule,
+    ThreatIntelModule,
+    ContainersModule,
+    ProjectsModule,
+    AlertsModule,
+    SettingsModule,
+  ],
+  controllers: [HealthController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: CustomThrottlerGuard,
+    },
+  ],
+})
+export class AppModule {}
+
+
+=== SCANNERS MODULE ===
+import { Module, forwardRef } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from '../prisma/prisma.module';
+import { ScmModule } from '../scm/scm.module';
+import { QueueModule } from '../queue/queue.module';
+import { AiModule } from '../ai/ai.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+
+// Utils
+import { GitService } from './utils/git.service';
+
+// Execution
+import { LocalExecutorService } from './execution/local-executor.service';
+
+// Parsers
+import { SarifParser } from './parsers/sarif.parser';
+
+// SAST Scanners
+import { SemgrepScanner } from './sast/semgrep/semgrep.scanner';
+import { BanditScanner } from './sast/bandit/bandit.scanner';
+import { GosecScanner } from './sast/gosec/gosec.scanner';
+
+// SCA Scanners
+import { TrivyScanner } from './sca/trivy/trivy.scanner';
+
+// Secrets Scanners
+import { GitleaksScanner } from './secrets/gitleaks/gitleaks.scanner';
+import { TruffleHogScanner } from './secrets/trufflehog/trufflehog.scanner';
+
+// IaC Scanners
+import { CheckovScanner } from './iac/checkov/checkov.scanner';
+
+// DAST Scanners
+import { NucleiScanner } from './dast/nuclei/nuclei.scanner';
+import { ZapScanner } from './dast/zap/zap.scanner';
+
+// Services
+import { FindingProcessorService } from './services/finding-processor.service';
+import { DiffFilterService } from './services/diff-filter.service';
+
+// Processors
+import { ScanProcessor, NotifyProcessor } from '../queue/processors';
+
+@Module({
+  imports: [ConfigModule, PrismaModule, ScmModule, QueueModule, AiModule, forwardRef(() => NotificationsModule)],
+  providers: [
+    // Utils
+    GitService,
+
+    // Execution
+    LocalExecutorService,
+
+    // Parsers
+    SarifParser,
+
+    // SAST Scanners
+    SemgrepScanner,
+    BanditScanner,
+    GosecScanner,
+
+    // SCA Scanners
+    TrivyScanner,
+
+    // Secrets Scanners
+    GitleaksScanner,
+    TruffleHogScanner,
+
+    // IaC Scanners
+    CheckovScanner,
+
+    // DAST Scanners
+    NucleiScanner,
+    ZapScanner,
+
+    // Services
+    FindingProcessorService,
+    DiffFilterService,
+
+    // Queue Processors
+    ScanProcessor,
+    NotifyProcessor,
+  ],
+  exports: [
+    GitService,
+    LocalExecutorService,
+    SarifParser,
+    SemgrepScanner,
+    BanditScanner,
+    GosecScanner,
+    TrivyScanner,
+    GitleaksScanner,
+    TruffleHogScanner,
+    CheckovScanner,
+    NucleiScanner,
+    ZapScanner,
+    FindingProcessorService,
+    DiffFilterService,
+  ],
+})
+export class ScannersModule {}
+
+
+=== SCAN PROCESSOR ===
+
+=== processors ===
+
+=== notify.processor.ts ===
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject } from '@nestjs/common';
+import { Job, Worker } from 'bullmq';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CryptoService } from '../../scm/services/crypto.service';
+import { GitHubProvider } from '../../scm/providers';
+import { QUEUE_NAMES } from '../queue.constants';
+import { NotifyJobData } from '../jobs';
+import { BULL_CONNECTION } from '../custom-bull.module';
+
+@Injectable()
+export class NotifyProcessor implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(NotifyProcessor.name);
+  private worker: Worker | null = null;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cryptoService: CryptoService,
+    private readonly githubProvider: GitHubProvider,
+    @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
+  ) {}
+
+  async onModuleInit() {
+    try {
+      this.logger.log(`Connecting to Redis at ${this.connection.host}:${this.connection.port}...`);
+
+      this.worker = new Worker(
+        QUEUE_NAMES.NOTIFY,
+        async (job: Job<NotifyJobData>) => this.process(job),
+        { connection: this.connection },
+      );
+
+      this.worker.on('completed', (job) => {
+        this.logger.log(`Notify job ${job.id} completed`);
+      });
+
+      this.worker.on('failed', (job, err) => {
+        this.logger.error(`Notify job ${job?.id} failed: ${err.message}`);
+      });
+
+      this.worker.on('error', (err) => {
+        this.logger.error(`Notify worker error: ${err.message}`);
+      });
+
+      this.worker.on('ready', () => {
+        this.logger.log('Notify worker connected to Redis and ready to process jobs');
+      });
+
+      // Wait for the worker to be ready
+      await this.worker.waitUntilReady();
+      this.logger.log(`Notify worker started on queue '${QUEUE_NAMES.NOTIFY}'`);
+    } catch (error) {
+      this.logger.error(`Failed to start notify worker: ${error}`);
+      throw error;
+    }
+  }
+
+  async onModuleDestroy() {
+    if (this.worker) {
+      await this.worker.close();
+      this.logger.log('Notify worker stopped');
+    }
+  }
+
+  async process(job: Job<NotifyJobData>): Promise<void> {
+    const { scanId, connectionId, fullName, checkRunId, findingsCount, status } = job.data;
+
+    this.logger.log(`Processing notification for scan ${scanId}`);
+
+    try {
+      const connection = await this.prisma.scmConnection.findUnique({
+        where: { id: connectionId },
+      });
+
+      if (!connection) {
+        throw new Error('Connection not found');
+      }
+
+      const accessToken = this.cryptoService.decrypt(connection.accessToken);
+      const [owner, repo] = fullName.split('/');
+
+      // Get top findings for the summary
+      const topFindings = await this.prisma.finding.findMany({
+        where: { scanId },
+        orderBy: [
+          { severity: 'asc' }, // critical first (alphabetically)
+          { createdAt: 'desc' },
+        ],
+        take: 10,
+      });
+
+      // Build summary markdown
+      const summary = this.buildSummary(job.data, topFindings);
+
+      // Update check run with final results
+      if (checkRunId) {
+        const conclusion = this.mapStatusToConclusion(status);
+
+        await this.githubProvider.updateCheckRun(
+          accessToken,
+          owner,
+          repo,
+          checkRunId,
+          'completed',
+          conclusion,
+          {
+            title: this.getTitle(status, findingsCount),
+            summary,
+          },
+        );
+
+        this.logger.log(`Updated check run ${checkRunId} with conclusion: ${conclusion}`);
+      }
+
+    } catch (error) {
+      this.logger.error(`Failed to send notification for scan ${scanId}: ${error}`);
+      throw error;
+    }
+  }
+
+  private buildSummary(data: NotifyJobData, findings: any[]): string {
+    const { findingsCount, scanDuration, commitSha } = data;
+    const total = Object.values(findingsCount).reduce((a, b) => a + b, 0);
+    const durationSec = Math.round(scanDuration / 1000);
+
+    let md = `## ThreatDiviner Security Scan\n\n`;
+    md += `**Commit:** \`${commitSha.slice(0, 7)}\`\n`;
+    md += `**Duration:** ${durationSec} seconds\n\n`;
+
+    if (total === 0) {
+      md += `### No security issues found\n\n`;
+      md += `Great job! The scan completed without finding any security vulnerabilities.\n`;
+    } else {
+      md += `### Findings Summary\n\n`;
+      md += `| Severity | Count |\n`;
+      md += `|----------|-------|\n`;
+
+      if (findingsCount.critical > 0) {
+        md += `| Critical | ${findingsCount.critical} |\n`;
+      }
+      if (findingsCount.high > 0) {
+        md += `| High | ${findingsCount.high} |\n`;
+      }
+      if (findingsCount.medium > 0) {
+        md += `| Medium | ${findingsCount.medium} |\n`;
+      }
+      if (findingsCount.low > 0) {
+        md += `| Low | ${findingsCount.low} |\n`;
+      }
+      if (findingsCount.info > 0) {
+        md += `| Info | ${findingsCount.info} |\n`;
+      }
+
+      // Show critical/high findings
+      const criticalHighFindings = findings.filter(
+        (f) => f.severity === 'critical' || f.severity === 'high',
+      );
+
+      if (criticalHighFindings.length > 0) {
+        md += `\n### Critical & High Severity Findings\n\n`;
+
+        for (const finding of criticalHighFindings.slice(0, 5)) {
+          const severity = finding.severity === 'critical' ? 'CRITICAL' : 'HIGH';
+          md += `- **[${severity}]** ${finding.title} in \`${finding.filePath}:${finding.startLine}\`\n`;
+        }
+
+        if (criticalHighFindings.length > 5) {
+          md += `\n*...and ${criticalHighFindings.length - 5} more critical/high findings*\n`;
+        }
+      }
+    }
+
+    md += `\n---\n`;
+    md += `*Scanned by [ThreatDiviner](https://threatdiviner.com)*\n`;
+
+    return md;
+  }
+
+  private getTitle(status: string, counts: NotifyJobData['findingsCount']): string {
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+
+    if (total === 0) {
+      return 'No security issues found';
+    }
+
+    if (status === 'failure') {
+      return `Found ${counts.critical} critical, ${counts.high} high severity issues`;
+    }
+
+    return `Found ${total} security issue(s)`;
+  }
+
+  private mapStatusToConclusion(
+    status: 'success' | 'failure' | 'neutral',
+  ): 'success' | 'failure' | 'neutral' {
+    return status;
+  }
+}
+
+
+=== scan.processor.ts ===
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Job, Worker } from 'bullmq';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CryptoService } from '../../scm/services/crypto.service';
+import { PRCommentsService } from '../../scm/services/pr-comments.service';
+import { GitHubProvider } from '../../scm/providers';
+import { GitService, LanguageStats } from '../../scanners/utils';
+import { SemgrepScanner } from '../../scanners/sast/semgrep';
+import { BanditScanner } from '../../scanners/sast/bandit';
+import { GosecScanner } from '../../scanners/sast/gosec';
+import { TrivyScanner } from '../../scanners/sca/trivy';
+import { GitleaksScanner } from '../../scanners/secrets/gitleaks';
+import { TruffleHogScanner } from '../../scanners/secrets/trufflehog';
+import { CheckovScanner } from '../../scanners/iac/checkov';
+import { NucleiScanner } from '../../scanners/dast/nuclei';
+import { FindingProcessorService } from '../../scanners/services/finding-processor.service';
+import { DiffFilterService } from '../../scanners/services/diff-filter.service';
+import { QueueService } from '../services/queue.service';
+import { QUEUE_NAMES } from '../queue.constants';
+import { ScanJobData, NotifyJobData, FindingsCount } from '../jobs';
+import { IScanner, NormalizedFinding, ScanContext } from '../../scanners/interfaces';
+import { BULL_CONNECTION } from '../custom-bull.module';
+import { AiService, TriageRequest } from '../../ai/ai.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+
+type ScanStatus = 'pending' | 'queued' | 'cloning' | 'scanning' | 'analyzing' | 'storing' | 'notifying' | 'completed' | 'failed';
+
+@Injectable()
+export class ScanProcessor implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ScanProcessor.name);
+  private worker: Worker | null = null;
+
+  private readonly aiTriageEnabled: boolean;
+  private readonly aiTriageBatchSize: number;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cryptoService: CryptoService,
+    private readonly configService: ConfigService,
+    private readonly gitService: GitService,
+    private readonly semgrepScanner: SemgrepScanner,
+    private readonly banditScanner: BanditScanner,
+    private readonly gosecScanner: GosecScanner,
+    private readonly trivyScanner: TrivyScanner,
+    private readonly gitleaksScanner: GitleaksScanner,
+    private readonly trufflehogScanner: TruffleHogScanner,
+    private readonly checkovScanner: CheckovScanner,
+    private readonly nucleiScanner: NucleiScanner,
+    private readonly findingProcessor: FindingProcessorService,
+    private readonly diffFilterService: DiffFilterService,
+    private readonly queueService: QueueService,
+    private readonly githubProvider: GitHubProvider,
+    private readonly aiService: AiService,
+    private readonly notificationsService: NotificationsService,
+    private readonly prCommentsService: PRCommentsService,
+    @Inject(BULL_CONNECTION) private readonly connection: { host: string; port: number },
+  ) {
+    this.aiTriageEnabled = this.configService.get('AI_TRIAGE_ENABLED', 'false') === 'true';
+    this.aiTriageBatchSize = parseInt(this.configService.get('AI_TRIAGE_BATCH_SIZE', '10'), 10);
+  }
+
+  async onModuleInit() {
+    try {
+      this.logger.log(`Connecting to Redis at ${this.connection.host}:${this.connection.port}...`);
+
+      this.worker = new Worker(
+        QUEUE_NAMES.SCAN,
+        async (job: Job<ScanJobData>) => this.process(job),
+        {
+          connection: this.connection,
+          concurrency: 2, // Process up to 2 jobs concurrently
+        },
+      );
+
+      this.worker.on('completed', (job) => {
+        this.logger.log(`Job ${job.id} completed successfully`);
+      });
+
+      this.worker.on('failed', (job, err) => {
+        this.logger.error(`Job ${job?.id} failed: ${err.message}`, err.stack);
+      });
+
+      this.worker.on('error', (err) => {
+        this.logger.error(`Worker error: ${err.message}`, err.stack);
+      });
+
+      this.worker.on('ready', () => {
+        this.logger.log('Scan worker connected to Redis and ready to process jobs');
+      });
+
+      this.worker.on('active', (job) => {
+        this.logger.log(`Job ${job.id} started processing for ${job.data?.fullName || 'unknown'}`);
+      });
+
+      this.worker.on('progress', (job, progress) => {
+        this.logger.debug(`Job ${job.id} progress: ${progress}%`);
+      });
+
+      this.worker.on('stalled', (jobId) => {
+        this.logger.warn(`Job ${jobId} has stalled`);
+      });
+
+      // Wait for the worker to be ready
+      await this.worker.waitUntilReady();
+      this.logger.log(`Scan worker started on queue '${QUEUE_NAMES.SCAN}'`);
+    } catch (error) {
+      this.logger.error(`Failed to start scan worker: ${error}`);
+      // Don't throw - allow app to start even if Redis is not available
+      this.logger.warn('Scan processing will not work until Redis is available');
+    }
+  }
+
+  async onModuleDestroy() {
+    if (this.worker) {
+      await this.worker.close();
+      this.logger.log('Scan worker stopped');
+    }
+  }
+
+  async process(job: Job<ScanJobData>): Promise<void> {
+    const { scanId, tenantId, repositoryId, fullName } = job.data;
+    let workDir: string | undefined;
+    const startTime = Date.now();
+
+    this.logger.log(`Processing scan ${scanId} for ${fullName}`);
+
+    try {
+      // 1. Clone repository
+      await this.updateScanStatus(scanId, 'cloning');
+      await this.updateCheckRun(job.data, 'in_progress', 'Cloning repository...');
+      await job.updateProgress(10);
+
+      workDir = await this.cloneRepository(job.data);
+      await job.updateProgress(30);
+
+      // 2. Detect languages
+      await this.updateScanStatus(scanId, 'scanning');
+      const languages = await this.gitService.detectLanguages(workDir);
+      this.logger.log(`Detected languages: ${JSON.stringify(languages)}`);
+
+      // 3. Select and run scanners
+      await this.updateCheckRun(job.data, 'in_progress', 'Running security scanners...');
+      this.logger.log(`DEBUG: Job config: ${JSON.stringify(job.data.config)}`);
+      const scanners = this.selectScanners(languages, job.data.config);
+      this.logger.log(`DEBUG: Selected ${scanners.length} scanners: ${scanners.map(s => s.name).join(', ') || 'NONE'}`);
+      const allFindings = await this.runScanners(scanners, {
+        scanId,
+        workDir,
+        languages: Object.keys(languages.languages),
+        excludePaths: job.data.config.skipPaths,
+        timeout: 300000, // 5 min per scanner
+        config: {
+          hasTerraform: languages.hasTerraform,
+          hasDockerfile: languages.hasDockerfile,
+          hasKubernetes: languages.hasKubernetes,
+          hasCloudFormation: languages.hasCloudFormation,
+          targetUrls: job.data.config.targetUrls,
+          containerImages: job.data.config.containerImages,
+        },
+      });
+      await job.updateProgress(70);
+
+      // 4. Process and store findings
+      await this.updateScanStatus(scanId, 'analyzing');
+      let dedupedFindings = this.findingProcessor.deduplicateFindings(allFindings);
+      await job.updateProgress(75);
+
+      // 4b. Apply diff filter for PR scans (diff-only mode)
+      if (job.data.pullRequestId && job.data.config.prDiffOnly) {
+        dedupedFindings = await this.applyDiffFilter(job.data, dedupedFindings);
+      }
+      await job.updateProgress(80);
+
+      await this.updateScanStatus(scanId, 'storing');
+      const storedCount = await this.findingProcessor.storeFindings(
+        scanId,
+        tenantId,
+        repositoryId,
+        dedupedFindings,
+        workDir, // Pass workDir to strip from file paths
+      );
+      await job.updateProgress(85);
+
+      // 5. AI Auto-triage (if enabled)
+      if (this.aiTriageEnabled && storedCount > 0) {
+        await this.runAutoTriage(scanId, repositoryId, job.data);
+      }
+      await job.updateProgress(90);
+
+      // 6. Count findings by severity
+      const findingsCount = await this.findingProcessor.countFindingsBySeverity(scanId);
+
+      // 7. Notify (GitHub check run, PR comment)
+      if (job.data.pullRequestId || job.data.checkRunId) {
+        await this.updateScanStatus(scanId, 'notifying');
+        await this.enqueueNotification(job.data, findingsCount, startTime);
+      }
+
+      // 7b. Post PR inline comments (if PR scan)
+      if (job.data.pullRequestId) {
+        await this.postPRComments(scanId, job.data.checkRunId);
+      }
+
+      // 8. Complete
+      await this.completeScan(scanId, storedCount, Date.now() - startTime);
+      await job.updateProgress(100);
+
+      // 9. Send Slack notifications
+      await this.sendSlackNotification(job.data, findingsCount, Math.round((Date.now() - startTime) / 1000));
+
+      this.logger.log(`Scan ${scanId} completed: ${storedCount} findings stored`);
+
+    } catch (error) {
+      this.logger.error(`Scan ${scanId} failed: ${error}`);
+      await this.failScan(scanId, error instanceof Error ? error.message : 'Unknown error');
+      await this.updateCheckRun(job.data, 'completed', 'Scan failed', 'failure');
+      throw error;
+    } finally {
+      // Always cleanup
+      if (workDir) {
+        await this.gitService.cleanup(workDir);
+      }
+    }
+  }
+
+  private async cloneRepository(data: ScanJobData): Promise<string> {
+    // Get access token
+    const connection = await this.prisma.scmConnection.findUnique({
+      where: { id: data.connectionId },
+    });
+
+    if (!connection) {
+      throw new Error('Connection not found');
+    }
+
+    const accessToken = this.cryptoService.decrypt(connection.accessToken);
+
+    // Create work directory
+    const workDir = await this.gitService.createWorkDir(data.scanId);
+
+    // Clone
+    await this.gitService.clone({
+      url: data.cloneUrl,
+      workDir,
+      accessToken,
+      branch: data.branch,
+      depth: 1,
+      timeout: 300000, // 5 minutes
+    });
+
+    // Checkout specific commit
+    await this.gitService.checkout(workDir, data.commitSha);
+
+    return workDir;
+  }
+
+  private selectScanners(languages: LanguageStats, config: ScanJobData['config']): IScanner[] {
+    const scanners: IScanner[] = [];
+    const detectedLangs = Object.keys(languages.languages);
+
+    this.logger.log(`Selecting scanners for languages: ${detectedLangs.join(', ')}`);
+
+    // SAST Scanners
+    if (config.enableSast) {
+      // Semgrep - supports most languages
+      const semgrepLanguages = this.semgrepScanner.supportedLanguages;
+      const hasSemgrepSupported = detectedLangs.some((lang) =>
+        semgrepLanguages.includes(lang),
+      );
+      if (hasSemgrepSupported) {
+        scanners.push(this.semgrepScanner);
+        this.logger.log('Added Semgrep scanner');
+      }
+
+      // Bandit - Python only
+      if (detectedLangs.includes('python')) {
+        scanners.push(this.banditScanner);
+        this.logger.log('Added Bandit scanner (Python)');
+      }
+
+      // Gosec - Go only
+      if (detectedLangs.includes('go')) {
+        scanners.push(this.gosecScanner);
+        this.logger.log('Added Gosec scanner (Go)');
+      }
+    }
+
+    // SCA Scanner (Trivy) - always run for dependency scanning
+    if (config.enableSca !== false) {
+      scanners.push(this.trivyScanner);
+      this.logger.log('Added Trivy scanner (SCA)');
+    }
+
+    // Secrets Scanners - always run for secrets detection
+    if (config.enableSecrets !== false) {
+      scanners.push(this.gitleaksScanner);
+      this.logger.log('Added Gitleaks scanner (secrets)');
+      scanners.push(this.trufflehogScanner);
+      this.logger.log('Added TruffleHog scanner (secrets)');
+    }
+
+    // IaC Scanner (Checkov) - run when IaC files detected
+    if (config.enableIac !== false) {
+      const hasIacFiles = languages.hasTerraform || languages.hasDockerfile ||
+        languages.hasKubernetes || languages.hasCloudFormation;
+      if (hasIacFiles) {
+        scanners.push(this.checkovScanner);
+        this.logger.log('Added Checkov scanner (IaC)');
+      }
+    }
+
+    // DAST Scanner (Nuclei) - run when target URLs configured
+    if (config.enableDast && config.targetUrls && config.targetUrls.length > 0) {
+      scanners.push(this.nucleiScanner);
+      this.logger.log('Added Nuclei scanner (DAST)');
+    }
+
+    this.logger.log(`Selected ${scanners.length} scanners: ${scanners.map(s => s.name).join(', ')}`);
+    return scanners;
+  }
+
+  private async runScanners(
+    scanners: IScanner[],
+    context: ScanContext,
+  ): Promise<NormalizedFinding[]> {
+    const allFindings: NormalizedFinding[] = [];
+
+    // Run scanners in parallel with settled to handle partial failures
+    const results = await Promise.allSettled(
+      scanners.map(async (scanner) => {
+        this.logger.log(`Running ${scanner.name}...`);
+
+        const isAvailable = await scanner.isAvailable();
+        if (!isAvailable) {
+          this.logger.warn(`Scanner ${scanner.name} is not available`);
+          return [];
+        }
+
+        const output = await scanner.scan(context);
+
+        if (output.timedOut) {
+          this.logger.warn(`Scanner ${scanner.name} timed out`);
+          return [];
+        }
+
+        if (output.exitCode !== 0 && output.exitCode !== 1) {
+          // Exit code 1 usually means findings were found
+          this.logger.warn(`Scanner ${scanner.name} exited with code ${output.exitCode}`);
+        }
+
+        return scanner.parseOutput(output);
+      }),
+    );
+
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        allFindings.push(...result.value);
+      } else {
+        this.logger.error(`Scanner ${scanners[i].name} failed: ${result.reason}`);
+      }
+    }
+
+    return allFindings;
+  }
+
+  private async updateScanStatus(scanId: string, status: ScanStatus): Promise<void> {
+    const updateData: Record<string, unknown> = { status };
+
+    if (status === 'cloning') {
+      updateData.startedAt = new Date();
+    }
+
+    await this.prisma.scan.update({
+      where: { id: scanId },
+      data: updateData,
+    });
+  }
+
+  private async completeScan(scanId: string, _findingsCount: number, duration: number): Promise<void> {
+    await this.prisma.scan.update({
+      where: { id: scanId },
+      data: {
+        status: 'completed',
+        completedAt: new Date(),
+        duration: Math.round(duration / 1000), // Convert to seconds
+      },
+    });
+
+    // Update repository last scan time
+    const scan = await this.prisma.scan.findUnique({
+      where: { id: scanId },
+      select: { repositoryId: true },
+    });
+
+    if (scan) {
+      await this.prisma.repository.update({
+        where: { id: scan.repositoryId },
+        data: { lastScanAt: new Date() },
+      });
+    }
+  }
+
+  private async failScan(scanId: string, errorMessage: string): Promise<void> {
+    await this.prisma.scan.update({
+      where: { id: scanId },
+      data: {
+        status: 'failed',
+        completedAt: new Date(),
+        errorMessage,
+      },
+    });
+  }
+
+  private async updateCheckRun(
+    data: ScanJobData,
+    status: 'queued' | 'in_progress' | 'completed',
+    summary: string,
+    conclusion?: 'success' | 'failure' | 'neutral',
+  ): Promise<void> {
+    if (!data.checkRunId) return;
+
+    try {
+      const connection = await this.prisma.scmConnection.findUnique({
+        where: { id: data.connectionId },
+      });
+
+      if (!connection) return;
+
+      const accessToken = this.cryptoService.decrypt(connection.accessToken);
+      const [owner, repo] = data.fullName.split('/');
+
+      await this.githubProvider.updateCheckRun(
+        accessToken,
+        owner,
+        repo,
+        data.checkRunId,
+        status,
+        conclusion,
+        {
+          title: 'ThreatDiviner Security Scan',
+          summary,
+        },
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to update check run: ${error}`);
+    }
+  }
+
+  private async enqueueNotification(
+    data: ScanJobData,
+    findingsCount: FindingsCount,
+    startTime: number,
+  ): Promise<void> {
+    const notifyData: NotifyJobData = {
+      scanId: data.scanId,
+      tenantId: data.tenantId,
+      repositoryId: data.repositoryId,
+      connectionId: data.connectionId,
+      fullName: data.fullName,
+      pullRequestId: data.pullRequestId,
+      checkRunId: data.checkRunId,
+      commitSha: data.commitSha,
+      findingsCount,
+      status: this.determineStatus(findingsCount),
+      scanDuration: Date.now() - startTime,
+    };
+
+    await this.queueService.enqueueNotification(notifyData);
+  }
+
+  private determineStatus(counts: FindingsCount): 'success' | 'failure' | 'neutral' {
+    if (counts.critical > 0 || counts.high > 0) {
+      return 'failure';
+    }
+    if (counts.medium > 0) {
+      return 'neutral';
+    }
+    return 'success';
+  }
+
+  private async runAutoTriage(
+    scanId: string,
+    repositoryId: string,
+    data: ScanJobData,
+  ): Promise<void> {
+    try {
+      // Check if AI is available
+      const isAvailable = await this.aiService.isAvailable();
+      if (!isAvailable) {
+        this.logger.warn('AI triage not available - skipping auto-triage');
+        return;
+      }
+
+      // Get the repository info for context
+      const repository = await this.prisma.repository.findUnique({
+        where: { id: repositoryId },
+        select: { name: true, language: true },
+      });
+
+      // Get high and critical severity findings that haven't been triaged
+      const findings = await this.prisma.finding.findMany({
+        where: {
+          scanId,
+          severity: { in: ['critical', 'high'] },
+          aiTriagedAt: null, // Not already triaged
+        },
+        take: this.aiTriageBatchSize,
+        orderBy: [
+          { severity: 'asc' }, // critical first (alphabetical)
+          { createdAt: 'asc' },
+        ],
+      });
+
+      if (findings.length === 0) {
+        this.logger.log('No high/critical findings to auto-triage');
+        return;
+      }
+
+      this.logger.log(`Auto-triaging ${findings.length} high/critical findings...`);
+
+      // Build triage requests
+      const requests: TriageRequest[] = findings.map((f) => ({
+        finding: {
+          id: f.id,
+          title: f.title,
+          description: f.description || '',
+          severity: f.severity,
+          ruleId: f.ruleId,
+          filePath: f.filePath,
+          startLine: f.startLine || 0,
+          snippet: f.snippet || undefined,
+          cweId: f.cweId || undefined,
+        },
+        repositoryContext: {
+          name: repository?.name || data.fullName,
+          language: repository?.language || 'unknown',
+        },
+      }));
+
+      // Run batch triage
+      const results = await this.aiService.batchTriageFindings(requests);
+
+      // Update findings with AI triage results
+      let triaged = 0;
+      for (const finding of findings) {
+        const result = results.get(finding.id);
+        if (result) {
+          await this.prisma.finding.update({
+            where: { id: finding.id },
+            data: {
+              aiAnalysis: result.analysis,
+              aiConfidence: result.confidence,
+              aiSeverity: result.suggestedSeverity,
+              aiFalsePositive: result.isLikelyFalsePositive,
+              aiExploitability: result.exploitability,
+              aiRemediation: result.remediation,
+              aiTriagedAt: new Date(),
+            },
+          });
+          triaged++;
+        }
+      }
+
+      this.logger.log(`Auto-triaged ${triaged} findings`);
+    } catch (error) {
+      // Log but don't fail the scan if AI triage fails
+      this.logger.error(`Auto-triage failed: ${error}`);
+    }
+  }
+
+  private async sendSlackNotification(
+    data: ScanJobData,
+    findingsCount: FindingsCount,
+    durationSeconds: number,
+  ): Promise<void> {
+    try {
+      const status = this.determineStatus(findingsCount);
+
+      await this.notificationsService.notifyScanCompleted({
+        scanId: data.scanId,
+        tenantId: data.tenantId,
+        repositoryName: data.fullName,
+        branch: data.branch,
+        commitSha: data.commitSha,
+        triggeredBy: data.triggeredBy || 'manual',
+        status,
+        duration: durationSeconds,
+        findings: {
+          critical: findingsCount.critical,
+          high: findingsCount.high,
+          medium: findingsCount.medium,
+          low: findingsCount.low,
+          total: findingsCount.critical + findingsCount.high + findingsCount.medium + findingsCount.low + findingsCount.info,
+        },
+      });
+    } catch (error) {
+      // Log but don't fail the scan if notifications fail
+      this.logger.error(`Slack notification failed: ${error}`);
+    }
+  }
+
+  private async postPRComments(scanId: string, checkRunId?: string): Promise<void> {
+    try {
+      // Post inline comments on PR
+      const { posted, skipped } = await this.prCommentsService.postPRComments(scanId);
+      this.logger.log(`Posted ${posted} PR comments (${skipped} skipped due to limit)`);
+
+      // Update check run with annotations
+      if (checkRunId) {
+        await this.prCommentsService.updateCheckRunWithAnnotations(scanId, checkRunId);
+      }
+    } catch (error) {
+      // Log but don't fail the scan if PR comments fail
+      this.logger.error(`PR comments failed: ${error}`);
+    }
+  }
+
+  /**
+   * Apply diff filter to only include findings in changed lines
+   */
+  private async applyDiffFilter(
+    data: ScanJobData,
+    findings: NormalizedFinding[],
+  ): Promise<NormalizedFinding[]> {
+    try {
+      this.logger.log(`Applying diff filter for PR #${data.pullRequestId}`);
+
+      // Get the PR diff from GitHub
+      const connection = await this.prisma.scmConnection.findUnique({
+        where: { id: data.connectionId },
+      });
+
+      if (!connection) {
+        this.logger.warn('Connection not found for diff filter, skipping');
+        return findings;
+      }
+
+      const accessToken = this.cryptoService.decrypt(connection.accessToken);
+      const [owner, repo] = data.fullName.split('/');
+
+      // Get PR diff
+      const diffText = await this.githubProvider.getPullRequestDiff(
+        accessToken,
+        owner,
+        repo,
+        data.pullRequestId!,
+      );
+
+      if (!diffText) {
+        this.logger.warn('No diff found, skipping filter');
+        return findings;
+      }
+
+      // Parse the diff
+      const diffData = this.diffFilterService.parseDiff(diffText);
+
+      // Cache the diff for later use (e.g., for PR comments)
+      await this.diffFilterService.cacheDiff(
+        data.scanId,
+        data.pullRequestId!,
+        diffData,
+      );
+
+      // Filter findings
+      const filtered = this.diffFilterService.filterFindingsByDiff(findings, diffData);
+
+      this.logger.log(
+        `Diff filter: ${findings.length} â†’ ${filtered.length} findings (${findings.length - filtered.length} filtered out)`,
+      );
+
+      return filtered;
+    } catch (error) {
+      this.logger.error(`Diff filter failed: ${error}`);
+      // On error, return all findings rather than failing
+      return findings;
+    }
+  }
+}
+
+
+=== finding-processor.service.ts ===
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { NormalizedFinding } from '../interfaces';
+import { FindingsCount } from '../../queue/jobs';
+
+@Injectable()
+export class FindingProcessorService {
+  private readonly logger = new Logger(FindingProcessorService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async storeFindings(
+    scanId: string,
+    tenantId: string,
+    repositoryId: string,
+    findings: NormalizedFinding[],
+    workDir?: string,
+  ): Promise<number> {
+    if (findings.length === 0) {
+      return 0;
+    }
+
+    this.logger.log(`Storing ${findings.length} findings for scan ${scanId}`);
+
+    // Transform to Prisma format
+    const findingsData = findings.map((f) => ({
+      tenantId,
+      scanId,
+      repositoryId,
+      scanner: f.scanner,
+      ruleId: this.extractShortRuleId(f.ruleId),
+      severity: f.severity,
+      title: f.title,
+      description: f.description,
+      filePath: this.getRelativePath(f.filePath, workDir),
+      startLine: f.startLine,
+      endLine: f.endLine,
+      snippet: f.snippet,
+      cweId: f.cweIds[0] || null,
+      cveId: f.cveIds[0] || null,
+      owasp: f.owaspIds[0] || null,
+      confidence: f.confidence,
+      status: 'open',
+      updatedAt: new Date(),
+    }));
+
+    // Batch insert
+    const result = await this.prisma.finding.createMany({
+      data: findingsData,
+      skipDuplicates: true,
+    });
+
+    this.logger.log(`Stored ${result.count} findings`);
+    return result.count;
+  }
+
+  async countFindingsBySeverity(scanId: string): Promise<FindingsCount> {
+    const counts = await this.prisma.finding.groupBy({
+      by: ['severity'],
+      where: { scanId },
+      _count: { id: true },
+    });
+
+    const result: FindingsCount = {
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+    };
+
+    for (const count of counts) {
+      const severity = count.severity as keyof FindingsCount;
+      if (severity in result) {
+        result[severity] = count._count.id;
+      }
+    }
+
+    return result;
+  }
+
+  deduplicateFindings(findings: NormalizedFinding[]): NormalizedFinding[] {
+    const seen = new Set<string>();
+    const deduplicated: NormalizedFinding[] = [];
+
+    for (const finding of findings) {
+      if (!seen.has(finding.fingerprint)) {
+        seen.add(finding.fingerprint);
+        deduplicated.push(finding);
+      }
+    }
+
+    this.logger.log(
+      `Deduplicated ${findings.length} â†’ ${deduplicated.length} findings`,
+    );
+
+    return deduplicated;
+  }
+
+  async getExistingFingerprints(
+    repositoryId: string,
+  ): Promise<Set<string>> {
+    // Get fingerprints of existing open findings for this repo
+    // to avoid re-reporting the same issues
+    const existing = await this.prisma.finding.findMany({
+      where: {
+        repositoryId,
+        status: { in: ['open', 'triaged'] },
+      },
+      select: {
+        ruleId: true,
+        filePath: true,
+        startLine: true,
+      },
+    });
+
+    const fingerprints = new Set<string>();
+    for (const f of existing) {
+      // Simple fingerprint for existing findings
+      fingerprints.add(`${f.ruleId}|${f.filePath}|${f.startLine}`);
+    }
+
+    return fingerprints;
+  }
+
+  /**
+   * Extract short rule ID from full path
+   * e.g., "C.Dev.threatdiviner.apps.api.src...sql-injection-string-concat" -> "sql-injection-string-concat"
+   */
+  private extractShortRuleId(ruleId: string): string {
+    // Split by dots and take the last segment
+    const parts = ruleId.split('.');
+    return parts[parts.length - 1] || ruleId;
+  }
+
+  /**
+   * Convert absolute file path to relative path
+   * Strips the workDir prefix from the path
+   */
+  private getRelativePath(filePath: string, workDir?: string): string {
+    if (!workDir) {
+      return filePath;
+    }
+
+    // Normalize both paths (forward slashes, no trailing slash)
+    const normalizedWorkDir = workDir.replace(/\\/g, '/').replace(/\/$/, '');
+    const normalizedPath = filePath.replace(/\\/g, '/');
+
+    // If path starts with workDir, strip it
+    if (normalizedPath.startsWith(normalizedWorkDir + '/')) {
+      return normalizedPath.slice(normalizedWorkDir.length + 1);
+    }
+
+    // Also try with backslashes for Windows paths
+    const backslashWorkDir = workDir.replace(/\//g, '\\').replace(/\\$/, '');
+    const backslashPath = filePath.replace(/\//g, '\\');
+    if (backslashPath.startsWith(backslashWorkDir + '\\')) {
+      return backslashPath.slice(backslashWorkDir.length + 1).replace(/\\/g, '/');
+    }
+
+    return filePath;
+  }
+}
+
+
+=== SCM SERVICE TRIGGER SCAN ===
+
+> import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CryptoService } from './crypto.service';
+import { GitHubProvider, GitLabProvider, ScmProvider, ScmRepository } from '../providers';
+import { QueueService } from '../../queue/services/queue.service';
+import { ScanJobData } from '../../queue/jobs';
+import * as crypto from 'crypto';
+
+@Injectable()
+export class ScmService {
+  private readonly logger = new Logger(ScmService.name);
+  private readonly providers: Map<string, ScmProvider> = new Map();
+  private readonly oauthStates: Map<string, { tenantId: string; expiresAt: number; provider: string }> = new Map();
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cryptoService: CryptoService,
+    private readonly configService: ConfigService,
+    private readonly queueService: QueueService,
+    githubProvider: GitHubProvider,
+    gitlabProvider: GitLabProvider,
+  ) {
+    this.providers.set('github', githubProvider);
+    this.providers.set('gitlab', gitlabProvider);
+  }
+
+  private getProvider(provider: string): ScmProvider {
+    const p = this.providers.get(provider);
+    if (!p) {
+      throw new BadRequestException(`Unknown provider: ${provider}`);
+    }
+    return p;
+  }
+
+  // OAuth flow
+  initiateOAuth(tenantId: string, provider: string): string {
+    const scmProvider = this.getProvider(provider);
+    const state = crypto.randomBytes(32).toString('hex');
+
+    // Store state for verification (expires in 10 minutes)
+    this.oauthStates.set(state, {
+      tenantId,
+      provider,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+
+    const redirectUri = `${this.configService.get('API_BASE_URL')}/scm/oauth/callback`;
+    return scmProvider.getOAuthUrl(state, redirectUri);
+  }
+
+  async handleOAuthCallback(code: string, state: string): Promise<{ tenantId: string; connectionId: string }> {
+    const stateData = this.oauthStates.get(state);
+    if (!stateData || stateData.expiresAt < Date.now()) {
+      this.oauthStates.delete(state);
+      throw new BadRequestException('Invalid or expired OAuth state');
+    }
+
+    this.oauthStates.delete(state);
+    const { tenantId, provider: providerName } = stateData;
+
+    // Get the provider from the stored state
+    const provider = this.getProvider(providerName);
+    const redirectUri = `${this.configService.get('API_BASE_URL')}/scm/oauth/callback`;
+
+    const tokenResponse = await provider.exchangeCodeForToken(code, redirectUri);
+    const user = await provider.getCurrentUser(tokenResponse.accessToken);
+
+    // Encrypt tokens before storing
+    const encryptedAccessToken = this.cryptoService.encrypt(tokenResponse.accessToken);
+    const encryptedRefreshToken = tokenResponse.refreshToken
+      ? this.cryptoService.encrypt(tokenResponse.refreshToken)
+      : null;
+
+    // Create or update connection
+    const connection = await this.prisma.scmConnection.upsert({
+      where: {
+        tenantId_provider_externalId: {
+          tenantId,
+          provider: providerName,
+          externalId: user.id,
+        },
+      },
+      update: {
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
+        tokenExpiresAt: tokenResponse.expiresAt,
+        scope: tokenResponse.scope,
+        isActive: true,
+        updatedAt: new Date(),
+      },
+      create: {
+        tenantId,
+        provider: providerName,
+        authMethod: 'oauth',
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
+        tokenExpiresAt: tokenResponse.expiresAt,
+        externalId: user.id,
+        externalName: user.login,
+        scope: tokenResponse.scope,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { tenantId, connectionId: connection.id };
+  }
+
+  async connectWithPat(tenantId: string, provider: string, token: string): Promise<string> {
+    const scmProvider = this.getProvider(provider);
+
+    // Verify token works
+    const user = await scmProvider.getCurrentUser(token);
+
+    // Encrypt token
+    const encryptedToken = this.cryptoService.encrypt(token);
+
+    // Create connection
+    const connection = await this.prisma.scmConnection.upsert({
+      where: {
+        tenantId_provider_externalId: {
+          tenantId,
+          provider,
+          externalId: user.id,
+        },
+      },
+      update: {
+        accessToken: encryptedToken,
+        isActive: true,
+        updatedAt: new Date(),
+      },
+      create: {
+        tenantId,
+        provider,
+        authMethod: 'pat',
+        accessToken: encryptedToken,
+        externalId: user.id,
+        externalName: user.login,
+        scope: ['repo', 'read:user'],
+        updatedAt: new Date(),
+      },
+    });
+
+    return connection.id;
+  }
+
+  // Connection management
+  async listConnections(tenantId: string) {
+    const connections = await this.prisma.scmConnection.findMany({
+      where: { tenantId, isActive: true },
+      select: {
+        id: true,
+        provider: true,
+        authMethod: true,
+        externalId: true,
+        externalName: true,
+        scope: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        repositories: {
+          select: { id: true },
+        },
+      },
+    });
+
+    // Map to frontend expected format
+    return connections.map((conn) => ({
+      id: conn.id,
+      provider: conn.provider,
+      authMethod: conn.authMethod,
+      accountName: conn.externalName || 'Unknown',
+      accountId: conn.externalId || '',
+      status: conn.isActive ? 'active' : 'revoked',
+      scopes: conn.scope || [],
+      createdAt: conn.createdAt,
+      updatedAt: conn.updatedAt,
+      repositoryCount: conn.repositories.length,
+    }));
+  }
+
+  async deleteConnection(tenantId: string, connectionId: string): Promise<void> {
+    const connection = await this.prisma.scmConnection.findFirst({
+      where: { id: connectionId, tenantId },
+    });
+
+    if (!connection) {
+      throw new NotFoundException('Connection not found');
+    }
+
+    await this.prisma.scmConnection.update({
+      where: { id: connectionId },
+      data: { isActive: false },
+    });
+  }
+
+  // Repository management
+  async listAvailableRepositories(tenantId: string, connectionId: string): Promise<ScmRepository[]> {
+    const connection = await this.getConnection(tenantId, connectionId);
+    const provider = this.getProvider(connection.provider);
+    const token = this.cryptoService.decrypt(connection.accessToken);
+
+    return provider.listRepositories(token);
+  }
+
+  async listAvailableRepositoriesForProject(
+    tenantId: string,
+    connectionId: string,
+    projectId: string,
+  ): Promise<ScmRepository[]> {
+    const projectAccess = await this.prisma.projectScmAccess.findFirst({
+      where: { projectId, connectionId },
+      include: { repoAccess: true, connection: true },
+    });
+
+    if (!projectAccess || projectAccess.connection.tenantId !== tenantId) {
+      return [];
+    }
+
+    const connection = await this.getConnection(tenantId, connectionId);
+    const provider = this.getProvider(connection.provider);
+    const token = this.cryptoService.decrypt(connection.accessToken);
+    const allRepos = await provider.listRepositories(token);
+
+    if (projectAccess.repoAccess.length === 0) {
+      return allRepos;
+    }
+
+    const allowedRepoIds = new Set(projectAccess.repoAccess.map((r) => r.externalRepoId));
+    return allRepos.filter((repo) => allowedRepoIds.has(repo.id));
+  }
+
+  async addRepository(tenantId: string, connectionId: string, fullName: string, projectId?: string): Promise<string> {
+    // Check if repository already exists
+    const existing = await this.prisma.repository.findFirst({
+      where: { tenantId, fullName, isActive: true },
+    });
+    if (existing) {
+      // Update projectId if provided and different
+      if (projectId && existing.projectId !== projectId) {
+        await this.prisma.repository.update({
+          where: { id: existing.id },
+          data: { projectId },
+        });
+      }
+      return existing.id;
+    }
+
+    const connection = await this.getConnection(tenantId, connectionId);
+    const provider = this.getProvider(connection.provider);
+    const token = this.cryptoService.decrypt(connection.accessToken);
+
+    const [owner, repoName] = fullName.split('/');
+    const repoData = await provider.getRepository(token, owner, repoName);
+
+    // Create webhook
+    const webhookSecret = this.cryptoService.generateWebhookSecret();
+    const webhookUrl = `${this.configService.get('API_BASE_URL')}/webhooks/${connection.provider}`;
+
+    try {
+      const webhookId = await provider.createWebhook(token, owner, repoName, webhookUrl, webhookSecret);
+      this.logger.log(`Created webhook ${webhookId} for ${fullName}`);
+    } catch (error) {
+      this.logger.warn(`Failed to create webhook for ${fullName}: ${error}`);
+      // Continue without webhook - can be added later
+    }
+
+    // Create repository
+    const repository = await this.prisma.repository.create({
+      data: {
+        tenantId,
+        connectionId,
+        projectId,
+        name: repoData.name,
+        fullName: repoData.fullName,
+        cloneUrl: repoData.cloneUrl,
+        htmlUrl: repoData.htmlUrl,
+        defaultBranch: repoData.defaultBranch,
+        language: repoData.language,
+        isPrivate: repoData.isPrivate,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Create default scan config
+    await this.prisma.scanConfig.create({
+      data: {
+        tenantId,
+        repositoryId: repository.id,
+        updatedAt: new Date(),
+      },
+    });
+
+    return repository.id;
+  }
+
+  async listRepositories(tenantId: string, projectId?: string, connectionId?: string) {
+    const repositories = await this.prisma.repository.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        ...(projectId && { projectId }),
+        ...(connectionId && { connectionId }),
+      },
+      include: {
+        connection: {
+          select: {
+            provider: true,
+            externalName: true,
+          },
+        },
+        scanConfig: true,
+        _count: {
+          select: { scans: true },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    // Transform scanConfig to frontend expected format
+    return repositories.map((repo) => ({
+      ...repo,
+      scanConfig: repo.scanConfig ? this.transformScanConfig(repo.scanConfig) : null,
+    }));
+  }
+
+  /**
+   * Transform database ScanConfig to frontend expected format
+   */
+  private transformScanConfig(config: {
+    id: string;
+    repositoryId: string;
+    enableSast: boolean;
+    enableSca: boolean;
+    enableSecrets: boolean;
+    enableIac: boolean;
+    enableDast: boolean;
+    autoScanOnPush: boolean;
+    autoScanOnPR: boolean;
+    scheduleEnabled: boolean;
+    scheduleCron: string | null;
+    skipPaths: string[];
+    branches: string[];
+  }) {
+    // Build scanners array from enable flags
+    const scanners: string[] = [];
+    if (config.enableSast) scanners.push('semgrep');
+    if (config.enableSca) scanners.push('trivy');
+    if (config.enableSecrets) {
+      scanners.push('gitleaks');
+      scanners.push('trufflehog');
+    }
+    if (config.enableIac) scanners.push('checkov');
+    if (config.enableDast) {
+      scanners.push('nuclei');
+      scanners.push('zap');
+    }
+
+    return {
+      id: config.id,
+      repositoryId: config.repositoryId,
+      enabled: true,
+      scanOnPush: config.autoScanOnPush,
+      scanOnPr: config.autoScanOnPR,
+      scanOnSchedule: config.scheduleEnabled,
+      schedulePattern: config.scheduleCron,
+      scanners,
+      excludePaths: config.skipPaths,
+      branches: config.branches,
+    };
+  }
+
+  async getRepository(tenantId: string, repositoryId: string) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: {
+        connection: {
+          select: {
+            provider: true,
+            externalName: true,
+          },
+        },
+        scanConfig: true,
+        scans: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            _count: {
+              select: { findings: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    // Transform scanConfig to frontend expected format
+    return {
+      ...repository,
+      scanConfig: repository.scanConfig ? this.transformScanConfig(repository.scanConfig) : null,
+    };
+  }
+
+  async getBranches(tenantId: string, repositoryId: string) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { connection: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    const provider = this.getProvider(repository.connection.provider);
+    const token = this.cryptoService.decrypt(repository.connection.accessToken);
+    const [owner, repoName] = repository.fullName.split('/');
+
+    return provider.getBranches(token, owner, repoName);
+  }
+
+  async getLanguages(tenantId: string, repositoryId: string) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { connection: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    const provider = this.getProvider(repository.connection.provider);
+    const token = this.cryptoService.decrypt(repository.connection.accessToken);
+    const [owner, repoName] = repository.fullName.split('/');
+
+    return provider.getLanguages(token, owner, repoName);
+  }
+
+  async updateScanConfig(tenantId: string, repositoryId: string, config: Partial<{
+    enableSast: boolean;
+    enableSca: boolean;
+    enableSecrets: boolean;
+    enableIac: boolean;
+    enableDast: boolean;
+    branches: string[];
+    skipPaths: string[];
+    scanners: string[];
+    enabled: boolean;
+    scanOnPush: boolean;
+    scanOnPr: boolean;
+    scanOnSchedule: boolean;
+    schedulePattern: string | null;
+  }>) {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { scanConfig: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    // Build update data, converting scanners array to individual fields
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+
+    // Handle scanners array -> individual enable fields
+    if (config.scanners) {
+      updateData.enableSast = config.scanners.includes('semgrep');
+      updateData.enableSca = config.scanners.includes('trivy');
+      updateData.enableSecrets = config.scanners.includes('gitleaks') || config.scanners.includes('trufflehog');
+      updateData.enableIac = config.scanners.includes('checkov');
+      updateData.enableDast = config.scanners.includes('nuclei') || config.scanners.includes('zap');
+    }
+
+    // Handle individual enable fields (if passed directly)
+    if (config.enableSast !== undefined) updateData.enableSast = config.enableSast;
+    if (config.enableSca !== undefined) updateData.enableSca = config.enableSca;
+    if (config.enableSecrets !== undefined) updateData.enableSecrets = config.enableSecrets;
+    if (config.enableIac !== undefined) updateData.enableIac = config.enableIac;
+    if (config.enableDast !== undefined) updateData.enableDast = config.enableDast;
+
+    // Handle scan triggers
+    if (config.scanOnPush !== undefined) updateData.autoScanOnPush = config.scanOnPush;
+    if (config.scanOnPr !== undefined) updateData.autoScanOnPR = config.scanOnPr;
+    if (config.scanOnSchedule !== undefined) updateData.scheduleEnabled = config.scanOnSchedule;
+    if (config.schedulePattern !== undefined) updateData.scheduleCron = config.schedulePattern;
+
+    // Handle other fields
+    if (config.branches !== undefined) updateData.branches = config.branches;
+    if (config.skipPaths !== undefined) updateData.skipPaths = config.skipPaths;
+
+    return this.prisma.scanConfig.update({
+      where: { repositoryId },
+      data: updateData,
+    });
+  }
+
+  async removeRepository(tenantId: string, repositoryId: string): Promise<void> {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    await this.prisma.repository.update({
+      where: { id: repositoryId },
+      data: { isActive: false },
+    });
+  }
+
+  // Scan operations
+  async triggerScan(tenantId: string, repositoryId: string, branch?: string): Promise<string> {
+    const repository = await this.prisma.repository.findFirst({
+      where: { id: repositoryId, tenantId },
+      include: { connection: true, scanConfig: true },
+    });
+
+    if (!repository) {
+      throw new NotFoundException('Repository not found');
+    }
+
+    const provider = this.getProvider(repository.connection.provider);
+    const token = this.cryptoService.decrypt(repository.connection.accessToken);
+    const targetBranch = branch || repository.defaultBranch;
+
+    const [owner, repoName] = repository.fullName.split('/');
+    const commit = await provider.getLatestCommit(token, owner, repoName, targetBranch);
+
+    const scan = await this.prisma.scan.create({
+      data: {
+        tenantId,
+        repositoryId,
+        commitSha: commit.sha,
+        branch: targetBranch,
+        triggeredBy: 'manual',
+        status: 'queued',
+      },
+    });
+
+    // Get scan config (use defaults if not configured)
+    const scanConfig = repository.scanConfig || {
+      enableSast: true,
+      enableSca: true,
+      enableSecrets: true,
+      enableIac: true,
+      enableDast: false,
+      enableContainerScan: false,
+      targetUrls: [] as string[],
+      containerImages: [] as string[],
+      skipPaths: ['node_modules', 'vendor', '.git'] as string[],
+      branches: [repository.defaultBranch] as string[],
+    };
+
+    // Build job data
+    const jobData: ScanJobData = {
+      scanId: scan.id,
+      tenantId,
+      repositoryId,
+      connectionId: repository.connectionId,
+      commitSha: commit.sha,
+      branch: targetBranch,
+      cloneUrl: repository.cloneUrl,
+      fullName: repository.fullName,
+      config: {
+        enableSast: scanConfig.enableSast,
+        enableSca: scanConfig.enableSca,
+        enableSecrets: scanConfig.enableSecrets,
+        enableIac: scanConfig.enableIac,
+        enableDast: 'enableDast' in scanConfig ? scanConfig.enableDast : false,
+        enableContainerScan: 'enableContainerScan' in scanConfig ? scanConfig.enableContainerScan : false,
+        targetUrls: 'targetUrls' in scanConfig ? (scanConfig.targetUrls as string[]) : [],
+        containerImages: 'containerImages' in scanConfig ? (scanConfig.containerImages as string[]) : [],
+        skipPaths: (scanConfig.skipPaths as string[]) || [],
+        branches: (scanConfig.branches as string[]) || [repository.defaultBranch],
+      },
+    };
+
+    // Queue scan job
+    await this.queueService.enqueueScan(jobData);
+    this.logger.log(`Scan ${scan.id} queued for ${repository.fullName}@${targetBranch}`);
+
+    return scan.id;
+  }
+
+  async getScan(tenantId: string, scanId: string) {
+    const scan = await this.prisma.scan.findFirst({
+      where: { id: scanId, tenantId },
+      include: {
+        repository: {
+          select: {
+            fullName: true,
+            htmlUrl: true,
+          },
+        },
+        findings: {
+          orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
+        },
+      },
+    });
+
+    if (!scan) {
+      throw new NotFoundException('Scan not found');
+    }
+
+    return scan;
+  }
+
+  async listScans(tenantId: string, repositoryId?: string, limit = 50, projectId?: string) {
+    const scans = await this.prisma.scan.findMany({
+      where: {
+        tenantId,
+        ...(repositoryId && { repositoryId }),
+        ...(projectId && { projectId }),
+      },
+      include: {
+        repository: {
+          select: {
+            fullName: true,
+            htmlUrl: true,
+          },
+        },
+        _count: {
+          select: { findings: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    // Add findings breakdown by severity for each scan
+    const scansWithStats = await Promise.all(
+      scans.map(async (scan) => {
+        const severityStats = await this.prisma.finding.groupBy({
+          by: ['severity'],
+          where: { scanId: scan.id },
+          _count: { severity: true },
+        });
+
+        const stats = {
+          total: scan._count.findings,
+          critical: severityStats.find((s) => s.severity === 'critical')?._count?.severity || 0,
+          high: severityStats.find((s) => s.severity === 'high')?._count?.severity || 0,
+          medium: severityStats.find((s) => s.severity === 'medium')?._count?.severity || 0,
+          low: severityStats.find((s) => s.severity === 'low')?._count?.severity || 0,
+          info: severityStats.find((s) => s.severity === 'info')?._count?.severity || 0,
+        };
+
+        return {
+          ...scan,
+          findingsCount: stats.total,
+          stats,
+        };
+      }),
+    );
+
+    return scansWithStats;
+  }
+
+  async listFindings(
+    tenantId: string,
+    filters: {
+      scanId?: string;
+      repositoryId?: string;
+      projectId?: string;
+      severity?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) {
+    const { scanId, repositoryId, projectId, severity, status, limit = 50, offset = 0 } = filters;
+
+    const where: any = { tenantId };
+    if (scanId) where.scanId = scanId;
+    if (severity) where.severity = severity;
+    if (status) where.status = status;
+    if (projectId) where.projectId = projectId;
+    if (repositoryId) {
+      where.scan = { repositoryId };
+    }
+
+    const [findings, total] = await Promise.all([
+      this.prisma.finding.findMany({
+        where,
+        include: {
+          scan: {
+            select: {
+              repository: {
+                select: {
+                  fullName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.finding.count({ where }),
+    ]);
+
+    return { findings, total };
+  }
+
+  async getFinding(tenantId: string, findingId: string) {
+    const finding = await this.prisma.finding.findFirst({
+      where: { id: findingId, tenantId },
+      include: {
+        scan: {
+          select: {
+            repository: {
+              select: {
+                fullName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!finding) {
+      throw new NotFoundException('Finding not found');
+    }
+
+    return finding;
+  }
+
+  async updateFindingStatus(tenantId: string, findingId: string, status: string) {
+    const finding = await this.prisma.finding.findFirst({
+      where: { id: findingId, tenantId },
+    });
+
+    if (!finding) {
+      throw new NotFoundException('Finding not found');
+    }
+
+    return this.prisma.finding.update({
+      where: { id: findingId },
+      data: { status, updatedAt: new Date() },
+    });
+  }
+
+  // Helper methods
+  private async getConnection(tenantId: string, connectionId: string) {
+    const connection = await this.prisma.scmConnection.findFirst({
+      where: { id: connectionId, tenantId, isActive: true },
+    });
+
+    if (!connection) {
+      throw new NotFoundException('Connection not found');
+    }
+
+    return connection;
+  }
+
+  getDecryptedToken(connection: { accessToken: string }): string {
+    return this.cryptoService.decrypt(connection.accessToken);
+  }
+}
+
+
+
+
+
+=== REDIS TEST ===
+
+
+ComputerName     : localhost
+RemoteAddress    : ::1
+RemotePort       : 6379
+InterfaceAlias   : Loopback Pseudo-Interface 1
+SourceAddress    : ::1
+TcpTestSucceeded : True
+
+
+
+

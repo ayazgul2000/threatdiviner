@@ -1,0 +1,55 @@
+rules:
+  - id: kotlin.lang.security.cookie-missing-secure-flag.cookie-missing-secure-flag
+    metadata:
+      cwe:
+        - 'CWE-614: Sensitive Cookie in HTTPS Session Without ''Secure'' Attribute'
+      owasp:
+        - A05:2021 - Security Misconfiguration
+        - A02:2025 - Security Misconfiguration
+      source-rule-url: https://find-sec-bugs.github.io/bugs.htm#INSECURE_COOKIE
+      category: security
+      technology:
+        - kt
+      references:
+        - https://owasp.org/Top10/A05_2021-Security_Misconfiguration
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: LOW
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cookie Security
+      source: >-
+        https://semgrep.dev/r/kotlin.lang.security.cookie-missing-secure-flag.cookie-missing-secure-flag
+      shortlink: https://sg.run/zv7n
+      semgrep.dev:
+        rule:
+          r_id: 9361
+          rv_id: 1263261
+          rule_id: bwUw3j
+          version_id: qkTR7r9
+          url: >-
+            https://semgrep.dev/playground/r/qkTR7r9/kotlin.lang.security.cookie-missing-secure-flag.cookie-missing-secure-flag
+          origin: community
+    message: >-
+      A cookie was detected without setting the 'secure' flag. The 'secure' flag
+      for cookies prevents the client from transmitting the cookie over insecure
+      channels such as HTTP. Set the 'secure' flag by calling
+      '$COOKIE.setSecure(true);'
+    severity: WARNING
+    languages:
+      - kt
+    patterns:
+      - pattern-not-inside: |
+          $COOKIE.setValue("")
+          ...
+      - pattern-either:
+          - pattern: $COOKIE.setSecure(false)
+          - patterns:
+              - pattern-not-inside: |
+                  $COOKIE.setSecure(...)
+                  ...
+              - pattern: $RESPONSE.addCookie($COOKIE)

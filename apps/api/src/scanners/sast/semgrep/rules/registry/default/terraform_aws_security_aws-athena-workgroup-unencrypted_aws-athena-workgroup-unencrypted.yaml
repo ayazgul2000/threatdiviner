@@ -1,0 +1,74 @@
+rules:
+  - id: >-
+      terraform.aws.security.aws-athena-workgroup-unencrypted.aws-athena-workgroup-unencrypted
+    patterns:
+      - pattern: |
+          resource "aws_athena_workgroup" $ANYTHING {
+            ...
+            configuration {
+              ...
+              result_configuration {
+                ...
+              }
+              ...
+            }
+            ...
+          }
+      - pattern-not-inside: |
+          resource "aws_athena_workgroup" $ANYTHING {
+            ...
+            configuration {
+              ...
+              result_configuration {
+                ...
+                encryption_configuration {
+                  ...
+                }
+                ...
+              }
+              ...
+            }
+            ...
+          }
+    message: >-
+      The AWS Athena Work Group is unencrypted. The AWS KMS encryption key
+      protects backups in the work group. To create your own, create a
+      aws_kms_key resource or use the ARN string of a key in your account.
+    languages:
+      - hcl
+    severity: WARNING
+    metadata:
+      category: security
+      technology:
+        - terraform
+        - aws
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      cwe:
+        - 'CWE-311: Missing Encryption of Sensitive Data'
+      references:
+        - https://owasp.org/Top10/A04_2021-Insecure_Design
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.aws-athena-workgroup-unencrypted.aws-athena-workgroup-unencrypted
+      shortlink: https://sg.run/gX7J
+      semgrep.dev:
+        rule:
+          r_id: 17341
+          rv_id: 1263699
+          rule_id: NbUXOA
+          version_id: JdTzx8e
+          url: >-
+            https://semgrep.dev/playground/r/JdTzx8e/terraform.aws.security.aws-athena-workgroup-unencrypted.aws-athena-workgroup-unencrypted
+          origin: community

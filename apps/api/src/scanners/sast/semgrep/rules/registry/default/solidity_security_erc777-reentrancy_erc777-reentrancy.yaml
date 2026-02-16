@@ -1,0 +1,40 @@
+rules:
+  - id: solidity.security.erc777-reentrancy.erc777-reentrancy
+    message: ERC777 tokensReceived() reentrancy
+    metadata:
+      category: security
+      technology:
+        - solidity
+      cwe: 'CWE-841: Improper Enforcement of Behavioral Workflow'
+      confidence: HIGH
+      likelihood: LOW
+      impact: HIGH
+      subcategory:
+        - vuln
+      references:
+        - >-
+          https://mirror.xyz/baconcoin.eth/LHaPiX38mnx8eJ2RVKNXHttHfweQMKNGmEnX4KUksk0
+        - >-
+          https://etherscan.io/address/0xf53f00f844b381963a47fde3325011566870b31f
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Other
+      source: >-
+        https://semgrep.dev/r/solidity.security.erc777-reentrancy.erc777-reentrancy
+      shortlink: https://sg.run/0Jpw
+      semgrep.dev:
+        rule:
+          r_id: 67654
+          rv_id: 946616
+          rule_id: QrUrJj
+          version_id: JdTDyg1
+          url: >-
+            https://semgrep.dev/playground/r/JdTDyg1/solidity.security.erc777-reentrancy.erc777-reentrancy
+          origin: community
+    patterns:
+      - pattern: $X.tokensReceived(...);
+    languages:
+      - solidity
+    severity: WARNING

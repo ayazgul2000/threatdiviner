@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const { admin: adminData } = await platformAuthApi.login(email, password);
     setAdmin(adminData);
-    router.push('/');
+    router.push('/dashboard');
   };
 
   const logout = async () => {

@@ -344,6 +344,8 @@ export class ZapScanner implements IScanner {
       cweIds,
       cveIds: [],
       owaspIds,
+      capecIds: [],
+      attackIds: [],
       references,
       fix: {
         description: this.stripHtml(alert.solution),

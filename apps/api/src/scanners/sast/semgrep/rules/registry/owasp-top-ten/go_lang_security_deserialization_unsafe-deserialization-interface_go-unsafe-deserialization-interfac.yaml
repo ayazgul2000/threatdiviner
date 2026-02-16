@@ -1,0 +1,60 @@
+rules:
+  - id: >-
+      go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+    languages:
+      - go
+    message: >-
+      Deserializing into `interface{}` allows arbitrary data structures and
+      types, which can lead to security vulnerabilities (CWE-502). Use a
+      concrete struct type instead. Consider using
+      github.com/ravisastryk/go-safeinput/safedeserialize for automatic
+      protection.
+    severity: WARNING
+    metadata:
+      cwe:
+        - 'CWE-502: Deserialization of Untrusted Data'
+      owasp:
+        - A08:2017 - Insecure Deserialization
+        - A08:2021 - Software and Data Integrity Failures
+      category: security
+      technology:
+        - go
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      subcategory:
+        - vuln
+      references:
+        - https://cwe.mitre.org/data/definitions/502.html
+        - https://github.com/ravisastryk/go-safeinput
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - 'Insecure Deserialization '
+      source: >-
+        https://semgrep.dev/r/go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+      shortlink: https://sg.run/6WbKL
+      semgrep.dev:
+        rule:
+          r_id: 274359
+          rv_id: 1262966
+          rule_id: 4bUAQDG
+          version_id: X0Tzy4N
+          url: >-
+            https://semgrep.dev/playground/r/X0Tzy4N/go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
+          origin: community
+    patterns:
+      - pattern-either:
+          - pattern: |
+              var $VAR interface{}
+              ...
+              json.Unmarshal($DATA, &$VAR)
+          - pattern: |
+              var $VAR interface{}
+              ...
+              yaml.Unmarshal($DATA, &$VAR)
+          - pattern: |
+              var $VAR interface{}
+              ...
+              xml.Unmarshal($DATA, &$VAR)

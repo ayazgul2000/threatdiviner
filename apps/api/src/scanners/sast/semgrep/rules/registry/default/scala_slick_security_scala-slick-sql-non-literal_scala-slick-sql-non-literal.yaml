@@ -1,0 +1,57 @@
+rules:
+  - id: >-
+      scala.slick.security.scala-slick-sql-non-literal.scala-slick-sql-non-literal
+    patterns:
+      - pattern: sql"..."
+      - pattern-regex: \#\$
+      - pattern-inside: |
+          import slick.$DEPS
+          ...
+    message: >-
+      Detected a formatted string in a SQL statement. This could lead to SQL
+      injection if variables in the SQL statement are not properly sanitized.
+      Avoid using `#$variable` and use `$variable` in `sql"..."` strings
+      instead.
+    languages:
+      - scala
+    severity: ERROR
+    metadata:
+      source-rule-url: https://find-sec-bugs.github.io/bugs.htm#SCALA_SQL_INJECTION_SLICK
+      references:
+        - https://scala-slick.org/doc/3.3.3/sql.html#splicing-literal-values
+      category: security
+      cwe:
+        - >-
+          CWE-89: Improper Neutralization of Special Elements used in an SQL
+          Command ('SQL Injection')
+      owasp:
+        - A01:2017 - Injection
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      technology:
+        - scala
+        - slick
+      confidence: LOW
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: HIGH
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - SQL Injection
+      source: >-
+        https://semgrep.dev/r/scala.slick.security.scala-slick-sql-non-literal.scala-slick-sql-non-literal
+      shortlink: https://sg.run/JgDk
+      semgrep.dev:
+        rule:
+          r_id: 17502
+          rv_id: 1263693
+          rule_id: x8UNKe
+          version_id: 8KT5rwy
+          url: >-
+            https://semgrep.dev/playground/r/8KT5rwy/scala.slick.security.scala-slick-sql-non-literal.scala-slick-sql-non-literal
+          origin: community

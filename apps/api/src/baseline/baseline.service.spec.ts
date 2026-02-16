@@ -171,7 +171,7 @@ describe('BaselineService', () => {
       mockPrismaService.findingBaseline.count.mockResolvedValue(1);
       mockPrismaService.finding.count.mockResolvedValue(5);
 
-      const result = await service.listBaselines('tenant-1', 'repo-1', 1, 50);
+      const result = await service.listBaselines('tenant-1', 'project-1', 'repo-1', 1, 50);
 
       expect(result.baselines).toHaveLength(1);
       expect(result.total).toBe(1);

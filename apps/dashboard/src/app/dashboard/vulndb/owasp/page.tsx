@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface OwaspCategory {
   id: string;
   category: string;
@@ -39,7 +41,7 @@ export default function OwaspTop10Page() {
   const fetchOwasp = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/vulndb/owasp?year=${selectedYear}`);
+      const res = await fetch(`${API_URL}/vulndb/owasp?year=${selectedYear}`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setCategories(data);

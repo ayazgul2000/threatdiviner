@@ -1,0 +1,50 @@
+rules:
+  - id: typescript.lang.security.audit.cors-regex-wildcard.cors-regex-wildcard
+    message: 'Unescaped ''.'' character in CORS domain regex $CORS: $PATTERN'
+    metadata:
+      cwe:
+        - 'CWE-183: Permissive List of Allowed Inputs'
+      category: security
+      technology:
+        - cors
+      owasp:
+        - A04:2021 - Insecure Design
+        - A06:2025 - Insecure Design
+      references:
+        - https://owasp.org/Top10/A04_2021-Insecure_Design
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: LOW
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Improper Validation
+      source: >-
+        https://semgrep.dev/r/typescript.lang.security.audit.cors-regex-wildcard.cors-regex-wildcard
+      shortlink: https://sg.run/w13x
+      semgrep.dev:
+        rule:
+          r_id: 11929
+          rv_id: 1263908
+          rule_id: qNUbXo
+          version_id: WrTqKwN
+          url: >-
+            https://semgrep.dev/playground/r/WrTqKwN/typescript.lang.security.audit.cors-regex-wildcard.cors-regex-wildcard
+          origin: community
+    languages:
+      - ts
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: $CORS = [...,/$PATTERN/,...]
+          - pattern: $CORS = /$PATTERN/
+      - focus-metavariable: $PATTERN
+      - metavariable-regex:
+          metavariable: $PATTERN
+          regex: .+?(?<!\\).\..+(?<!\\)\..+
+      - metavariable-regex:
+          metavariable: $CORS
+          regex: (?i)cors

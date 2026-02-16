@@ -1,0 +1,28 @@
+rules:
+  - id: python.sqlalchemy.performance.performance-improvements.len-all-count
+    pattern: len($X.all())
+    message: >-
+      Using QUERY.count() instead of len(QUERY.all()) sends less data to the
+      client since the SQLAlchemy method is performed server-side.
+    languages:
+      - python
+    severity: WARNING
+    metadata:
+      category: performance
+      technology:
+        - sqlalchemy
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.sqlalchemy.performance.performance-improvements.len-all-count
+      shortlink: https://sg.run/4y8g
+      semgrep.dev:
+        rule:
+          r_id: 9700
+          rv_id: 946449
+          rule_id: ReUPOw
+          version_id: ExTg2Gr
+          url: >-
+            https://semgrep.dev/playground/r/ExTg2Gr/python.sqlalchemy.performance.performance-improvements.len-all-count
+          origin: community

@@ -1,0 +1,55 @@
+rules:
+  - id: java.lang.security.audit.crypto.use-of-md5.use-of-md5
+    message: >-
+      Detected MD5 hash algorithm which is considered insecure. MD5 is not
+      collision resistant and is therefore not suitable as a cryptographic
+      signature. Use HMAC instead.
+    languages:
+      - java
+    severity: WARNING
+    metadata:
+      functional-categories:
+        - crypto::search::hash-algorithm::java.security
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A02:2021 - Cryptographic Failures
+        - A04:2025 - Cryptographic Failures
+      cwe:
+        - 'CWE-328: Use of Weak Hash'
+      source-rule-url: https://find-sec-bugs.github.io/bugs.htm#WEAK_MESSAGE_DIGEST_MD5
+      category: security
+      technology:
+        - java
+      references:
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      confidence: HIGH
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Insecure Hashing Algorithm
+      source: >-
+        https://semgrep.dev/r/java.lang.security.audit.crypto.use-of-md5.use-of-md5
+      shortlink: https://sg.run/ryJn
+      semgrep.dev:
+        rule:
+          r_id: 17325
+          rv_id: 1263013
+          rule_id: KxU5lW
+          version_id: 0bTKzGX
+          url: >-
+            https://semgrep.dev/playground/r/0bTKzGX/java.lang.security.audit.crypto.use-of-md5.use-of-md5
+          origin: community
+    patterns:
+      - pattern: |
+          java.security.MessageDigest.getInstance($ALGO, ...);
+      - metavariable-regex:
+          metavariable: $ALGO
+          regex: (?i)(.MD5.)
+      - focus-metavariable: $ALGO
+    fix: |
+      "SHA-512"

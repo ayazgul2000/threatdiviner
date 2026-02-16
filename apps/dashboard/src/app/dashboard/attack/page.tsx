@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { MatrixSkeleton } from '@/components/ui/skeletons';
 import Link from 'next/link';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface Technique {
   id: string;
@@ -29,7 +31,7 @@ export default function AttackMatrixPage() {
 
   const fetchTactics = async () => {
     try {
-      const res = await fetch('/api/vulndb/attack/tactics');
+      const res = await fetch(`${API_URL}/vulndb/attack/tactics`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setTactics(data);
@@ -51,12 +53,11 @@ export default function AttackMatrixPage() {
   if (loading) {
     return (
       <div className="p-6 space-y-6">
-        <h1 className="text-2xl font-bold">MITRE ATT&CK Matrix</h1>
-        <div className="grid grid-cols-7 gap-2">
-          {Array.from({ length: 70 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
+        <div>
+          <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-4 w-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-2" />
         </div>
+        <MatrixSkeleton rows={12} columns={10} />
       </div>
     );
   }

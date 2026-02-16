@@ -1,0 +1,61 @@
+rules:
+  - id: python.aws-lambda.security.tainted-html-response.tainted-html-response
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern: event
+          - pattern-inside: |
+              def $HANDLER(event, context):
+                ...
+    pattern-sinks:
+      - patterns:
+          - pattern: $BODY
+          - pattern-inside: >
+              {..., "headers": {..., "Content-Type": "text/html", ...}, "body":
+              $BODY, ... }
+    message: >-
+      Detected user input flowing into an HTML response. You may be accidentally
+      bypassing secure methods of rendering HTML by manually constructing HTML
+      and this could create a cross-site scripting vulnerability, which could
+      let attackers steal sensitive user data.
+    metadata:
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      category: security
+      technology:
+        - aws-lambda
+      references:
+        - https://owasp.org/Top10/A03_2021-Injection
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: HIGH
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/python.aws-lambda.security.tainted-html-response.tainted-html-response
+      shortlink: https://sg.run/k9vP
+      semgrep.dev:
+        rule:
+          r_id: 18272
+          rv_id: 1263343
+          rule_id: ReUKrk
+          version_id: ExTEx5o
+          url: >-
+            https://semgrep.dev/playground/r/ExTEx5o/python.aws-lambda.security.tainted-html-response.tainted-html-response
+          origin: community
+    languages:
+      - python
+    severity: WARNING

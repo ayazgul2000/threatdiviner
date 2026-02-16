@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface Cwe {
   id: string;
   cweId: string;
@@ -29,7 +31,7 @@ export default function CweBrowserPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/vulndb/cwe?keyword=${encodeURIComponent(keyword)}`);
+      const res = await fetch(`${API_URL}/vulndb/cwe?keyword=${encodeURIComponent(keyword)}`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setResults(data);

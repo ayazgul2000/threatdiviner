@@ -1,0 +1,66 @@
+rules:
+  - id: >-
+      terraform.aws.security.aws-config-aggregator-not-all-regions.aws-config-aggregator-not-all-regions
+    pattern-either:
+      - pattern: |
+          resource "aws_config_configuration_aggregator" $ANYTHING {
+            ...
+            account_aggregation_source {
+              ...
+              regions = ...
+              ...
+            }
+            ...
+          }
+      - pattern: |
+          resource "aws_config_configuration_aggregator" $ANYTHING {
+            ...
+            organization_aggregation_source {
+              ...
+              regions = ...
+              ...
+            }
+            ...
+          }
+    message: >-
+      The AWS configuration aggregator does not aggregate all AWS Config region.
+      This may result in unmonitored configuration in regions that are thought
+      to be unused. Configure the aggregator with all_regions for the source.
+    languages:
+      - hcl
+    severity: WARNING
+    metadata:
+      category: security
+      technology:
+        - terraform
+        - aws
+      owasp:
+        - A09:2021 - Security Logging and Monitoring Failures
+        - A09:2025 - Security Logging & Alerting Failures
+      cwe:
+        - 'CWE-778: Insufficient Logging'
+      references:
+        - >-
+          https://owasp.org/Top10/A09_2021-Security_Logging_and_Monitoring_Failures/
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: HIGH
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Insufficient Logging
+      source: >-
+        https://semgrep.dev/r/terraform.aws.security.aws-config-aggregator-not-all-regions.aws-config-aggregator-not-all-regions
+      shortlink: https://sg.run/O6A7
+      semgrep.dev:
+        rule:
+          r_id: 47275
+          rv_id: 1263703
+          rule_id: DbUo7v
+          version_id: A8Tgdwv
+          url: >-
+            https://semgrep.dev/playground/r/A8Tgdwv/terraform.aws.security.aws-config-aggregator-not-all-regions.aws-config-aggregator-not-all-regions
+          origin: community

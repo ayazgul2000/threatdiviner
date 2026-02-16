@@ -1,0 +1,52 @@
+rules:
+  - id: >-
+      terraform.azure.security.azure-mysql-encryption-enabled.azure-mysql-encryption-enabled
+    message: Ensure that MySQL server enables infrastructure encryption
+    patterns:
+      - pattern: resource
+      - pattern-inside: |
+          resource "azurerm_mysql_server" "..." {
+          ...
+          }
+      - pattern-not-inside: |
+          resource "azurerm_mysql_server" "..." {
+          ...
+          infrastructure_encryption_enabled = true
+          ...
+          }
+    metadata:
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+      cwe:
+        - 'CWE-320: CWE CATEGORY: Key Management Errors'
+      category: security
+      technology:
+        - terraform
+        - azure
+      references:
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.azure.security.azure-mysql-encryption-enabled.azure-mysql-encryption-enabled
+      shortlink: https://sg.run/Dd6Y
+      semgrep.dev:
+        rule:
+          r_id: 23996
+          rv_id: 946840
+          rule_id: oqUloL
+          version_id: yeT0vBn
+          url: >-
+            https://semgrep.dev/playground/r/yeT0vBn/terraform.azure.security.azure-mysql-encryption-enabled.azure-mysql-encryption-enabled
+          origin: community
+    languages:
+      - hcl
+    severity: WARNING

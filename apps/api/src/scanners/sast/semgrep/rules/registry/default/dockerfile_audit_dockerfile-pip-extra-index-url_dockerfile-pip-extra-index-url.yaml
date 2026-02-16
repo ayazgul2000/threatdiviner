@@ -1,0 +1,53 @@
+rules:
+  - id: >-
+      dockerfile.audit.dockerfile-pip-extra-index-url.dockerfile-pip-extra-index-url
+    patterns:
+      - pattern: |
+          RUN ... $PIP install ... --extra-index-url ...
+      - metavariable-regex:
+          metavariable: $PIP
+          regex: pip|pip3
+    message: >-
+      When `--extra-index-url` is used in a `pip install` command, this is
+      usually meant to  install a package from a package index other than the
+      public one.  However, if a package is added with the same name to the
+      public PyPi repository, and if the version number is high enough, this
+      package will be installed when building this docker image. This package
+      may be a malicious dependency. Such an attack is called a dependency
+      confusion attack. If using a private package index, prefer to use
+      `--index-url` if possible. 
+    languages:
+      - dockerfile
+    severity: INFO
+    metadata:
+      references:
+        - >-
+          https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-extra-index-url
+        - https://github.com/semgrep/semgrep-rules/issues/3032
+      category: security
+      subcategory:
+        - audit
+      confidence: MEDIUM
+      impact: HIGH
+      likelihood: LOW
+      technology:
+        - docker
+      cwe:
+        - 'CWE-427: Uncontrolled Search Path Element'
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Other
+      source: >-
+        https://semgrep.dev/r/dockerfile.audit.dockerfile-pip-extra-index-url.dockerfile-pip-extra-index-url
+      shortlink: https://sg.run/qk4p8
+      semgrep.dev:
+        rule:
+          r_id: 197112
+          rv_id: 1039209
+          rule_id: pKUkLD3
+          version_id: 1QTY5L3
+          url: >-
+            https://semgrep.dev/playground/r/1QTY5L3/dockerfile.audit.dockerfile-pip-extra-index-url.dockerfile-pip-extra-index-url
+          origin: community

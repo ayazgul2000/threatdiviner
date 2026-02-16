@@ -1,0 +1,29 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-importlib2
+    pattern: import importlib.resources
+    message: >-
+      Found 'importlib.resources', which is a module only available on Python
+      3.7+. This does not work in lower versions, and therefore is not backwards
+      compatible. Use importlib_resources instead for older Python versions.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-importlib2
+      shortlink: https://sg.run/eL3y
+      semgrep.dev:
+        rule:
+          r_id: 9576
+          rv_id: 946266
+          rule_id: L1Uy0n
+          version_id: qkT4jn5
+          url: >-
+            https://semgrep.dev/playground/r/qkT4jn5/python.lang.compatibility.python37.python37-compatibility-importlib2
+          origin: community

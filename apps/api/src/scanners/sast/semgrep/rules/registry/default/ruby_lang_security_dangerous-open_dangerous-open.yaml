@@ -1,0 +1,51 @@
+rules:
+  - id: ruby.lang.security.dangerous-open.dangerous-open
+    patterns:
+      - pattern: |
+          open($CMD,...)
+      - pattern-not: |
+          open("...",...)
+      - metavariable-regex:
+          metavariable: $CMD
+          regex: '|'
+    message: >-
+      Detected non-static command inside 'open'. Audit the input to 'open'. If
+      unverified user data can reach this call site, this is a code injection
+      vulnerability. A malicious actor can inject a malicious script to execute
+      arbitrary code.
+    metadata:
+      cwe:
+        - 'CWE-94: Improper Control of Generation of Code (''Code Injection'')'
+      owasp:
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      category: security
+      technology:
+        - ruby
+      references:
+        - https://owasp.org/Top10/A03_2021-Injection
+      cwe2022-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: HIGH
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Code Injection
+      source: https://semgrep.dev/r/ruby.lang.security.dangerous-open.dangerous-open
+      shortlink: https://sg.run/Al8Q
+      semgrep.dev:
+        rule:
+          r_id: 9806
+          rv_id: 1263599
+          rule_id: 0oUEyd
+          version_id: 5PTo1WL
+          url: >-
+            https://semgrep.dev/playground/r/5PTo1WL/ruby.lang.security.dangerous-open.dangerous-open
+          origin: community
+    severity: WARNING
+    languages:
+      - ruby

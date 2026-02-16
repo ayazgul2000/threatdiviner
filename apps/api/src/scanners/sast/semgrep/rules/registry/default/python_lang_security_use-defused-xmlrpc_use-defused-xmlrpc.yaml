@@ -1,0 +1,51 @@
+rules:
+  - id: python.lang.security.use-defused-xmlrpc.use-defused-xmlrpc
+    pattern-either:
+      - pattern: import xmlrpclib
+      - pattern: import SimpleXMLRPCServer
+      - pattern: import xmlrpc
+    message: >-
+      Detected use of xmlrpc. xmlrpc is not inherently safe from
+      vulnerabilities. Use defusedxml.xmlrpc instead.
+    metadata:
+      cwe:
+        - >-
+          CWE-776: Improper Restriction of Recursive Entity References in DTDs
+          ('XML Entity Expansion')
+      owasp:
+        - A04:2017 - XML External Entities (XXE)
+        - A05:2021 - Security Misconfiguration
+        - A02:2025 - Security Misconfiguration
+      source-rule-url: >-
+        https://github.com/PyCQA/bandit/blob/07f84cb5f5e7c1055e6feaa0fe93afa471de0ac3/bandit/blacklists/imports.py#L160
+      references:
+        - https://pypi.org/project/defusedxml/
+        - https://docs.python.org/3/library/xml.html#xml-vulnerabilities
+      category: security
+      technology:
+        - python
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - XML Injection
+      source: >-
+        https://semgrep.dev/r/python.lang.security.use-defused-xmlrpc.use-defused-xmlrpc
+      shortlink: https://sg.run/weqY
+      semgrep.dev:
+        rule:
+          r_id: 9629
+          rv_id: 1263543
+          rule_id: ZqU5EZ
+          version_id: ZRTKA8z
+          url: >-
+            https://semgrep.dev/playground/r/ZRTKA8z/python.lang.security.use-defused-xmlrpc.use-defused-xmlrpc
+          origin: community
+    severity: ERROR
+    languages:
+      - python

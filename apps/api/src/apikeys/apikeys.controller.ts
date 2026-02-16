@@ -46,7 +46,7 @@ export class ApiKeysController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
   ) {
-    return this.apiKeysService.listApiKeys(tenantId, user.id);
+    return this.apiKeysService.listApiKeys(tenantId, user.userId);
   }
 
   @Post()
@@ -56,7 +56,7 @@ export class ApiKeysController {
     @CurrentUser() user: any,
     @Body() dto: CreateApiKeyDto,
   ) {
-    const result = await this.apiKeysService.createApiKey(tenantId, user.id, {
+    const result = await this.apiKeysService.createApiKey(tenantId, user.userId, {
       name: dto.name,
       scopes: dto.scopes,
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
@@ -76,7 +76,7 @@ export class ApiKeysController {
     @CurrentUser() user: any,
     @Param('id') keyId: string,
   ) {
-    const result = await this.apiKeysService.rotateApiKey(tenantId, user.id, keyId);
+    const result = await this.apiKeysService.rotateApiKey(tenantId, user.userId, keyId);
 
     return {
       ...result.apiKey,
@@ -92,7 +92,7 @@ export class ApiKeysController {
     @CurrentUser() user: any,
     @Param('id') keyId: string,
   ) {
-    await this.apiKeysService.deleteApiKey(tenantId, user.id, keyId);
+    await this.apiKeysService.deleteApiKey(tenantId, user.userId, keyId);
     return { success: true };
   }
 }

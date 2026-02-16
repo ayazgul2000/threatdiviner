@@ -1,0 +1,65 @@
+rules:
+  - id: trailofbits.go.iterate-over-empty-map.iterate-over-empty-map
+    message: >-
+      Iteration over a possibly empty map `$C`. This is likely a bug or
+      redundant code
+    languages:
+      - go
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: 'CWE-665: Improper Initialization'
+      subcategory:
+        - audit
+      confidence: MEDIUM
+      likelihood: LOW
+      impact: LOW
+      technology:
+        - '--no-technology--'
+      description: Probably redundant iteration over an empty map
+      references:
+        - https://blog.trailofbits.com/2019/11/07/attacking-go-vr-ttps/
+      license: AGPL-3.0 license
+      vulnerability_class:
+        - Other
+      source: >-
+        https://semgrep.dev/r/trailofbits.go.iterate-over-empty-map.iterate-over-empty-map
+      shortlink: https://sg.run/08jj
+      semgrep.dev:
+        rule:
+          r_id: 17198
+          rv_id: 1039527
+          rule_id: wdUlww
+          version_id: ExTNqnL
+          url: >-
+            https://semgrep.dev/playground/r/ExTNqnL/trailofbits.go.iterate-over-empty-map.iterate-over-empty-map
+          origin: community
+    patterns:
+      - pattern: |
+          $C = make(map[$T1] $T2)
+          ...
+          for $K := range $C { ... }
+      - pattern-not: |
+          $C = make(map[$T1] $T2, ...)
+          ...
+          $C[$X] = $V
+          ...
+          for $K := range $C { ... }
+      - pattern-not: |
+          $C = make(map[$T1] $T2, ...)
+          ...
+          $C[$X]++
+          ...
+          for $K := range $C { ... }
+      - pattern-not: |
+          $C = make(map[$T1] $T2, ...)
+          ...
+          $C[$X]--
+          ...
+          for $K := range $C { ... }
+      - pattern-not: |
+          $C = make(map[$T1] $T2, ...)
+          ...
+          $CODEC.Unmarshal($BYTES, &$C)
+          ...
+          for $K := range $C { ... }

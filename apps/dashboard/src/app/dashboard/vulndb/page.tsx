@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatsSkeleton, CardSkeleton } from '@/components/ui/skeletons';
 import Link from 'next/link';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface VulnDbStats {
   cves: number;
@@ -23,7 +26,7 @@ export default function VulnDbPage() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/vulndb/stats');
+      const res = await fetch(`${API_URL}/vulndb/stats`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setStats(data);

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -12,7 +12,7 @@ import {
 } from './sync';
 
 @Injectable()
-export class VulnDbSchedulerService implements OnModuleInit {
+export class VulnDbSchedulerService {
   private readonly logger = new Logger(VulnDbSchedulerService.name);
   private readonly enableScheduledSync: boolean;
 
@@ -26,16 +26,7 @@ export class VulnDbSchedulerService implements OnModuleInit {
     private readonly cweMappingSyncService: CweMappingSyncService,
     private readonly attackSyncService: AttackSyncService,
   ) {
-    this.enableScheduledSync = this.configService.get<boolean>('VULNDB_SCHEDULED_SYNC', false);
-  }
-
-  async onModuleInit() {
-    // Check if initial data load is needed
-    const shouldInitialize = this.configService.get<boolean>('VULNDB_INITIAL_LOAD', false);
-    if (shouldInitialize) {
-      this.logger.log('Starting initial VulnDB data load...');
-      await this.initialLoad();
-    }
+    this.enableScheduledSync = this.configService.get<boolean>('VULNDB_SCHEDULED_SYNC', true);
   }
 
   /**
@@ -85,10 +76,10 @@ export class VulnDbSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Daily CVE sync at 2 AM UTC
+   * Daily CVE sync at 1 PM (dev schedule)
    * Syncs CVEs modified in the last 7 days
    */
-  @Cron('0 2 * * *')
+  @Cron('0 13 * * *')
   async syncCvesDaily(): Promise<void> {
     if (!this.enableScheduledSync) return;
 
@@ -102,9 +93,9 @@ export class VulnDbSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Daily EPSS sync at 3 AM UTC
+   * Daily EPSS sync at 1:05 PM (dev schedule)
    */
-  @Cron('0 3 * * *')
+  @Cron('5 13 * * *')
   async syncEpssDaily(): Promise<void> {
     if (!this.enableScheduledSync) return;
 
@@ -118,9 +109,9 @@ export class VulnDbSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Daily KEV sync at 4 AM UTC
+   * Daily KEV sync at 1:10 PM (dev schedule)
    */
-  @Cron('0 4 * * *')
+  @Cron('10 13 * * *')
   async syncKevDaily(): Promise<void> {
     if (!this.enableScheduledSync) return;
 
@@ -134,10 +125,10 @@ export class VulnDbSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Weekly CWE sync on Sunday at 1 AM UTC
+   * Daily CWE sync at 1:15 PM (dev schedule)
    */
-  @Cron('0 1 * * 0')
-  async syncCweWeekly(): Promise<void> {
+  @Cron('15 13 * * *')
+  async syncCweDaily(): Promise<void> {
     if (!this.enableScheduledSync) return;
 
     this.logger.log('Starting weekly CWE sync...');
@@ -150,10 +141,10 @@ export class VulnDbSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Weekly ATT&CK sync on Sunday at 5 AM UTC
+   * Daily ATT&CK sync at 1:20 PM (dev schedule)
    */
-  @Cron('0 5 * * 0')
-  async syncAttackWeekly(): Promise<void> {
+  @Cron('20 13 * * *')
+  async syncAttackDaily(): Promise<void> {
     if (!this.enableScheduledSync) return;
 
     this.logger.log('Starting weekly ATT&CK sync...');
@@ -166,11 +157,42 @@ export class VulnDbSchedulerService implements OnModuleInit {
   }
 
   /**
-   * Monthly full CVE sync on the 1st at midnight UTC
-   * This is resource-intensive and takes a long time
+   * Daily OWASP sync at 1:25 PM (dev schedule)
    */
-  @Cron('0 0 1 * *')
-  async syncCvesMonthly(): Promise<void> {
+  @Cron('25 13 * * *')
+  async syncOwaspDaily(): Promise<void> {
+    if (!this.enableScheduledSync) return;
+
+    this.logger.log('Starting OWASP sync...');
+    try {
+      const result = await this.owaspSyncService.sync();
+      this.logger.log(`OWASP sync complete: ${result.processed} categories`);
+    } catch (error) {
+      this.logger.error('OWASP sync failed:', error);
+    }
+  }
+
+  /**
+   * Daily CWE-Mapping sync at 1:30 PM (dev schedule)
+   */
+  @Cron('30 13 * * *')
+  async syncCweMappingDaily(): Promise<void> {
+    if (!this.enableScheduledSync) return;
+
+    this.logger.log('Starting CWE-Mapping sync...');
+    try {
+      const result = await this.cweMappingSyncService.sync();
+      this.logger.log(`CWE-Mapping sync complete: ${result.processed} mappings`);
+    } catch (error) {
+      this.logger.error('CWE-Mapping sync failed:', error);
+    }
+  }
+
+  /**
+   * Full CVE sync at 1:35 PM (dev schedule - resource intensive)
+   */
+  @Cron('35 13 * * *')
+  async syncCvesFull(): Promise<void> {
     if (!this.enableScheduledSync) return;
 
     this.logger.log('Starting monthly full CVE sync...');

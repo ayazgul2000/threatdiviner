@@ -21,12 +21,58 @@ export interface CweWithCompliance {
 
 export interface FindingEnrichment {
   cve?: Cve | null;
-  cwe?: Cwe | null;
+  cwe?: (Cwe & { capecIds?: string[] }) | null;
   owaspCategory?: OwaspTop10 | null;
   complianceMappings?: CweComplianceMapping[];
   attackTechniques?: AttackTechnique[];
   riskScore: number;
 }
+
+// Static CWE to CAPEC mappings for common vulnerabilities
+const CWE_CAPEC_MAPPINGS: Record<string, string[]> = {
+  'CWE-89': ['CAPEC-66', 'CAPEC-108', 'CAPEC-109', 'CAPEC-110'], // SQL Injection
+  'CWE-79': ['CAPEC-86', 'CAPEC-198', 'CAPEC-199', 'CAPEC-244'], // XSS
+  'CWE-78': ['CAPEC-6', 'CAPEC-15', 'CAPEC-43', 'CAPEC-88'], // OS Command Injection
+  'CWE-22': ['CAPEC-126', 'CAPEC-139', 'CAPEC-213'], // Path Traversal
+  'CWE-798': ['CAPEC-70', 'CAPEC-191'], // Hardcoded Credentials
+  'CWE-352': ['CAPEC-62', 'CAPEC-111'], // CSRF
+  'CWE-287': ['CAPEC-21', 'CAPEC-90', 'CAPEC-114'], // Improper Authentication
+  'CWE-502': ['CAPEC-586'], // Deserialization
+  'CWE-918': ['CAPEC-664'], // SSRF
+  'CWE-611': ['CAPEC-221'], // XXE
+  'CWE-434': ['CAPEC-17'], // Unrestricted File Upload
+  'CWE-94': ['CAPEC-242', 'CAPEC-35'], // Code Injection
+  'CWE-95': ['CAPEC-242', 'CAPEC-35'], // Eval Injection
+  'CWE-327': ['CAPEC-20', 'CAPEC-97'], // Weak Crypto
+  'CWE-328': ['CAPEC-20', 'CAPEC-97'], // Weak Hash (MD5/SHA1)
+  'CWE-330': ['CAPEC-20', 'CAPEC-97'], // Insufficient Randomness
+  'CWE-338': ['CAPEC-20', 'CAPEC-97'], // Weak PRNG
+  'CWE-532': ['CAPEC-118'], // Log Exposure
+  'CWE-200': ['CAPEC-118', 'CAPEC-169'], // Information Exposure
+  'CWE-942': ['CAPEC-111'], // Permissive CORS
+  'CWE-1321': ['CAPEC-586'], // Prototype Pollution
+  'CWE-601': ['CAPEC-194'], // Open Redirect
+};
+
+// Static CWE to ATT&CK technique mappings
+const CWE_ATTACK_MAPPINGS: Record<string, string[]> = {
+  'CWE-89': ['T1190', 'T1059'], // SQL Injection -> Exploit Public-Facing App, Command Execution
+  'CWE-79': ['T1189', 'T1059.007'], // XSS -> Drive-by Compromise, JavaScript
+  'CWE-78': ['T1059', 'T1203'], // Command Injection -> Command Execution, Exploitation for Client Execution
+  'CWE-22': ['T1083', 'T1005'], // Path Traversal -> File Discovery, Data from Local System
+  'CWE-798': ['T1552.001', 'T1078'], // Hardcoded Creds -> Credentials in Files, Valid Accounts
+  'CWE-352': ['T1189'], // CSRF -> Drive-by Compromise
+  'CWE-287': ['T1078', 'T1110'], // Auth Failure -> Valid Accounts, Brute Force
+  'CWE-502': ['T1059', 'T1203'], // Deserialization -> Command Execution, Exploitation
+  'CWE-918': ['T1090', 'T1071'], // SSRF -> Connection Proxy, Application Layer Protocol
+  'CWE-611': ['T1059', 'T1005'], // XXE -> Command Execution, Data from Local System
+  'CWE-434': ['T1059', 'T1105'], // File Upload -> Command Execution, Ingress Tool Transfer
+  'CWE-94': ['T1059', 'T1203'], // Code Injection -> Command Execution, Exploitation
+  'CWE-95': ['T1059', 'T1203'], // Eval Injection -> Command Execution, Exploitation
+  'CWE-532': ['T1530', 'T1005'], // Log Exposure -> Data from Cloud Storage, Data from Local System
+  'CWE-200': ['T1530', 'T1005'], // Info Exposure -> Data from Cloud Storage, Data from Local System
+  'CWE-1321': ['T1059', 'T1203'], // Prototype Pollution -> Command Execution, Exploitation
+};
 
 @Injectable()
 export class VulnDbService {
@@ -236,11 +282,38 @@ export class VulnDbService {
       result.cve = await this.getCve(finding.cveId);
     }
 
-    if (finding.cweId) {
-      result.cwe = await this.getCwe(finding.cweId);
-      result.owaspCategory = await this.getOwaspCategory(finding.cweId);
-      result.complianceMappings = await this.getControlsByCwe(finding.cweId);
-      result.attackTechniques = await this.getAttackTechniquesForCwe(finding.cweId);
+    // Determine CWE ID - use provided cweId, or extract from CVE if available
+    let effectiveCweId = finding.cweId;
+    if (!effectiveCweId && result.cve && result.cve.cweIds && result.cve.cweIds.length > 0) {
+      // Use the first CWE ID from the CVE record
+      effectiveCweId = result.cve.cweIds[0];
+    }
+
+    if (effectiveCweId) {
+      const cwe = await this.getCwe(effectiveCweId);
+      if (cwe) {
+        // Add CAPEC IDs from static mapping
+        const capecIds = CWE_CAPEC_MAPPINGS[effectiveCweId] || [];
+        result.cwe = { ...cwe, capecIds };
+      }
+      result.owaspCategory = await this.getOwaspCategory(effectiveCweId);
+      result.complianceMappings = await this.getControlsByCwe(effectiveCweId);
+
+      // Try database lookup first, fallback to static mapping
+      result.attackTechniques = await this.getAttackTechniquesForCwe(effectiveCweId);
+
+      // If no techniques from DB, use static mapping
+      if (!result.attackTechniques || result.attackTechniques.length === 0) {
+        const attackIds = CWE_ATTACK_MAPPINGS[effectiveCweId] || [];
+        if (attackIds.length > 0) {
+          // Fetch technique details from database
+          const techniques = await this.prisma.attackTechnique.findMany({
+            where: { id: { in: attackIds } },
+            include: { tactic: true },
+          });
+          result.attackTechniques = techniques;
+        }
+      }
     }
 
     // Calculate risk score based on CVSS, EPSS, KEV

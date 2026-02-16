@@ -1,0 +1,72 @@
+rules:
+  - id: >-
+      terraform.gcp.security.gcp-sql-database-require-ssl.gcp-sql-database-require-ssl
+    patterns:
+      - pattern: resource
+      - pattern-inside: |
+          resource "google_sql_database_instance" "..." {
+              ...
+          }
+      - pattern-not-inside: |
+          resource "google_sql_database_instance" "..." {
+              ...
+              ip_configuration {
+                  ...
+                  require_ssl = true
+                  ...
+              }
+              ...
+          }
+      - pattern-not-inside: |
+          resource "google_sql_database_instance" "..." {
+              ...
+              ip_configuration {
+                  ...
+                  ssl_mode = ...
+                  ...
+              }
+              ...
+          }
+    message: >-
+      Ensure all Cloud SQL database instance requires all incoming connections
+      to use SSL
+    metadata:
+      owasp:
+        - A03:2017 - Sensitive Data Exposure
+        - A02:2021 - Cryptographic Failures
+        - A04:2025 - Cryptographic Failures
+      cwe:
+        - 'CWE-326: Inadequate Encryption Strength'
+      category: security
+      technology:
+        - terraform
+        - gcp
+      references:
+        - >-
+          https://cloud.google.com/sql/docs/postgres/admin-api/rest/v1/instances#ipconfiguration
+        - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/terraform.gcp.security.gcp-sql-database-require-ssl.gcp-sql-database-require-ssl
+      shortlink: https://sg.run/W4Yg
+      semgrep.dev:
+        rule:
+          r_id: 33709
+          rv_id: 1263873
+          rule_id: v8Uod5
+          version_id: pZT033e
+          url: >-
+            https://semgrep.dev/playground/r/pZT033e/terraform.gcp.security.gcp-sql-database-require-ssl.gcp-sql-database-require-ssl
+          origin: community
+    languages:
+      - hcl
+    severity: WARNING

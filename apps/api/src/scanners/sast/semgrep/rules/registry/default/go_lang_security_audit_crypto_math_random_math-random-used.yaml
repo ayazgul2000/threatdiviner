@@ -1,0 +1,62 @@
+rules:
+  - id: go.lang.security.audit.crypto.math_random.math-random-used
+    metadata:
+      cwe:
+        - >-
+          CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator
+          (PRNG)
+      owasp:
+        - A02:2021 - Cryptographic Failures
+        - A04:2025 - Cryptographic Failures
+      references:
+        - >-
+          https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html#secure-random-number-generation
+      category: security
+      technology:
+        - go
+      confidence: MEDIUM
+      subcategory:
+        - vuln
+      likelihood: MEDIUM
+      impact: MEDIUM
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cryptographic Issues
+      source: >-
+        https://semgrep.dev/r/go.lang.security.audit.crypto.math_random.math-random-used
+      shortlink: https://sg.run/6nK6
+      semgrep.dev:
+        rule:
+          r_id: 9115
+          rv_id: 1262923
+          rule_id: bwUwy8
+          version_id: jQTn5nj
+          url: >-
+            https://semgrep.dev/playground/r/jQTn5nj/go.lang.security.audit.crypto.math_random.math-random-used
+          origin: community
+    message: Do not use `math/rand`. Use `crypto/rand` instead.
+    languages:
+      - go
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import $RAND "$MATH"
+          - pattern: |
+              import "$MATH"
+      - metavariable-regex:
+          metavariable: $MATH
+          regex: ^(math/rand(\/v[0-9]+)*)$
+      - pattern-either:
+          - pattern-inside: |
+              ...
+              rand.$FUNC(...)
+          - pattern-inside: |
+              ...
+              $RAND.$FUNC(...)
+      - focus-metavariable:
+          - $MATH
+    fix: |
+      crypto/rand

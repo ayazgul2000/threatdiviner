@@ -11,6 +11,8 @@ import {
   OwaspSyncService,
   CweMappingSyncService,
   AttackSyncService,
+  CapecSyncService,
+  CweViewSyncService,
 } from './sync';
 
 @Controller('vulndb')
@@ -27,6 +29,8 @@ export class VulnDbController {
     private readonly owaspSyncService: OwaspSyncService,
     private readonly cweMappingSyncService: CweMappingSyncService,
     private readonly attackSyncService: AttackSyncService,
+    private readonly capecSyncService: CapecSyncService,
+    private readonly cweViewSyncService: CweViewSyncService,
   ) {}
 
   // ==================
@@ -281,6 +285,16 @@ export class VulnDbController {
     return this.attackSyncService.sync();
   }
 
+  @Post('sync/capec')
+  async syncCapec() {
+    return this.capecSyncService.sync();
+  }
+
+  @Post('sync/cwe-views')
+  async syncCweViews() {
+    return this.cweViewSyncService.sync();
+  }
+
   @Post('sync/all')
   async syncAll() {
     const results: Record<string, any> = {};
@@ -307,6 +321,12 @@ export class VulnDbController {
       results.attack = await this.attackSyncService.sync();
     } catch (e) {
       results.attack = { error: e instanceof Error ? e.message : 'Unknown error' };
+    }
+
+    try {
+      results.capec = await this.capecSyncService.sync();
+    } catch (e) {
+      results.capec = { error: e instanceof Error ? e.message : 'Unknown error' };
     }
 
     return results;

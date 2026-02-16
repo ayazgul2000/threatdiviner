@@ -71,17 +71,17 @@ export const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(
     return (
       <div
         ref={ref}
-        className={`flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${className}`}
+        className={`flex items-center justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${className}`}
         {...props}
       >
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex-1 min-w-0 overflow-hidden">
           {children}
         </h2>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+            className="flex-shrink-0 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
           >
             <span className="sr-only">Close</span>
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

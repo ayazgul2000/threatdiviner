@@ -76,6 +76,61 @@ export const GDPR_CONTROLS: ComplianceControl[] = [
   { id: 'GDPR-35', name: 'Impact Assessment', description: 'Data protection impact assessment', category: 'Risk' },
 ];
 
+// OWASP Top 10 2021 Controls (FREE TIER)
+export const OWASP2021_CONTROLS: ComplianceControl[] = [
+  { id: 'A01:2021', name: 'Broken Access Control', description: 'Failures related to access control enforcement', category: 'Access Control' },
+  { id: 'A02:2021', name: 'Cryptographic Failures', description: 'Failures related to cryptography or lack thereof', category: 'Cryptography' },
+  { id: 'A03:2021', name: 'Injection', description: 'SQL, NoSQL, OS, LDAP injection vulnerabilities', category: 'Injection' },
+  { id: 'A04:2021', name: 'Insecure Design', description: 'Design flaws in architecture and threat modeling', category: 'Design' },
+  { id: 'A05:2021', name: 'Security Misconfiguration', description: 'Missing or incorrect security hardening', category: 'Configuration' },
+  { id: 'A06:2021', name: 'Vulnerable Components', description: 'Using components with known vulnerabilities', category: 'Dependencies' },
+  { id: 'A07:2021', name: 'Auth Failures', description: 'Identification and authentication failures', category: 'Authentication' },
+  { id: 'A08:2021', name: 'Software Integrity', description: 'Software and data integrity failures', category: 'Integrity' },
+  { id: 'A09:2021', name: 'Logging Failures', description: 'Security logging and monitoring failures', category: 'Logging' },
+  { id: 'A10:2021', name: 'SSRF', description: 'Server-Side Request Forgery', category: 'Network' },
+];
+
+// CWE Top 25 2023 (FREE TIER)
+export const CWE_TOP25_CONTROLS: ComplianceControl[] = [
+  { id: 'CWE-787', name: 'Out-of-bounds Write', description: 'Software writes data past allocated memory', category: 'Memory Safety' },
+  { id: 'CWE-79', name: 'XSS', description: 'Improper neutralization of input during web page generation', category: 'Injection' },
+  { id: 'CWE-89', name: 'SQL Injection', description: 'Improper neutralization of SQL commands', category: 'Injection' },
+  { id: 'CWE-416', name: 'Use After Free', description: 'Referencing memory after it has been freed', category: 'Memory Safety' },
+  { id: 'CWE-78', name: 'OS Command Injection', description: 'Improper neutralization of OS commands', category: 'Injection' },
+  { id: 'CWE-20', name: 'Improper Input Validation', description: 'Failure to validate or incorrectly validate input', category: 'Validation' },
+  { id: 'CWE-125', name: 'Out-of-bounds Read', description: 'Software reads data past allocated memory', category: 'Memory Safety' },
+  { id: 'CWE-22', name: 'Path Traversal', description: 'Improper limitation of pathname to restricted directory', category: 'Access Control' },
+  { id: 'CWE-352', name: 'CSRF', description: 'Cross-Site Request Forgery', category: 'Session' },
+  { id: 'CWE-434', name: 'Dangerous File Upload', description: 'Unrestricted upload of dangerous file types', category: 'File Handling' },
+  { id: 'CWE-862', name: 'Missing Authorization', description: 'Missing authorization checks', category: 'Access Control' },
+  { id: 'CWE-476', name: 'NULL Pointer Dereference', description: 'Null pointer dereference causing crash', category: 'Memory Safety' },
+  { id: 'CWE-287', name: 'Improper Authentication', description: 'Failure to properly authenticate users', category: 'Authentication' },
+  { id: 'CWE-190', name: 'Integer Overflow', description: 'Integer overflow or wraparound', category: 'Memory Safety' },
+  { id: 'CWE-502', name: 'Deserialization', description: 'Deserialization of untrusted data', category: 'Injection' },
+  { id: 'CWE-77', name: 'Command Injection', description: 'Improper neutralization of command elements', category: 'Injection' },
+  { id: 'CWE-119', name: 'Buffer Overflow', description: 'Improper restriction of operations in memory bounds', category: 'Memory Safety' },
+  { id: 'CWE-798', name: 'Hardcoded Credentials', description: 'Use of hardcoded credentials', category: 'Secrets' },
+  { id: 'CWE-918', name: 'SSRF', description: 'Server-Side Request Forgery', category: 'Network' },
+  { id: 'CWE-306', name: 'Missing Authentication', description: 'Missing authentication for critical function', category: 'Authentication' },
+  { id: 'CWE-362', name: 'Race Condition', description: 'Concurrent execution with shared resource', category: 'Concurrency' },
+  { id: 'CWE-269', name: 'Improper Privilege Management', description: 'Improper privilege management', category: 'Access Control' },
+  { id: 'CWE-94', name: 'Code Injection', description: 'Improper control of code generation', category: 'Injection' },
+  { id: 'CWE-863', name: 'Incorrect Authorization', description: 'Incorrect authorization checks', category: 'Access Control' },
+  { id: 'CWE-276', name: 'Incorrect Default Permissions', description: 'Incorrect default permissions', category: 'Configuration' },
+];
+
+// Essential Eight 2023 (FREE TIER - Australian Cyber Security Centre)
+export const ESSENTIAL_EIGHT_CONTROLS: ComplianceControl[] = [
+  { id: 'E8-1', name: 'Application Control', description: 'Control execution of applications', category: 'Application' },
+  { id: 'E8-2', name: 'Patch Applications', description: 'Patch applications within 48 hours of release', category: 'Patching' },
+  { id: 'E8-3', name: 'Configure MS Office Macros', description: 'Configure Microsoft Office macro settings', category: 'Configuration' },
+  { id: 'E8-4', name: 'User App Hardening', description: 'Configure user application hardening', category: 'Configuration' },
+  { id: 'E8-5', name: 'Restrict Admin Privileges', description: 'Restrict administrative privileges', category: 'Access Control' },
+  { id: 'E8-6', name: 'Patch Operating Systems', description: 'Patch operating systems within 48 hours', category: 'Patching' },
+  { id: 'E8-7', name: 'Multi-Factor Auth', description: 'Multi-factor authentication for all users', category: 'Authentication' },
+  { id: 'E8-8', name: 'Regular Backups', description: 'Regular backups of important data', category: 'Recovery' },
+];
+
 // ISO 27001:2022 Controls
 export const ISO27001_CONTROLS: ComplianceControl[] = [
   { id: 'A.5', name: 'Organizational Controls', description: 'Policies for information security', category: 'Organizational' },
@@ -182,10 +237,16 @@ export function getControlsForCategory(category: string, framework: string): str
 
 export function getAllFrameworks() {
   return [
-    { id: 'soc2', name: 'SOC 2 Type II', version: '2017', controls: SOC2_CONTROLS },
-    { id: 'pci', name: 'PCI DSS', version: '4.0', controls: PCIDSS_CONTROLS },
-    { id: 'hipaa', name: 'HIPAA Security Rule', version: '2013', controls: HIPAA_CONTROLS },
-    { id: 'gdpr', name: 'GDPR', version: '2018', controls: GDPR_CONTROLS },
-    { id: 'iso27001', name: 'ISO 27001', version: '2022', controls: ISO27001_CONTROLS },
+    // Free Tier Frameworks
+    { id: 'owasp-2021', name: 'OWASP Top 10', version: '2021', tier: 'free', controls: OWASP2021_CONTROLS },
+    { id: 'cwe-top-25', name: 'CWE Top 25', version: '2023', tier: 'free', controls: CWE_TOP25_CONTROLS },
+    { id: 'essential-eight', name: 'Essential Eight', version: '2023', tier: 'free', controls: ESSENTIAL_EIGHT_CONTROLS },
+    // Growth Tier Frameworks
+    { id: 'soc2', name: 'SOC 2 Type II', version: '2017', tier: 'growth', controls: SOC2_CONTROLS },
+    { id: 'pci', name: 'PCI DSS', version: '4.0', tier: 'growth', controls: PCIDSS_CONTROLS },
+    { id: 'iso27001', name: 'ISO 27001', version: '2022', tier: 'growth', controls: ISO27001_CONTROLS },
+    // Scale Tier Frameworks
+    { id: 'hipaa', name: 'HIPAA Security Rule', version: '2013', tier: 'scale', controls: HIPAA_CONTROLS },
+    { id: 'gdpr', name: 'GDPR', version: '2018', tier: 'scale', controls: GDPR_CONTROLS },
   ];
 }

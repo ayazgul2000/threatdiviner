@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from './crypto.service';
 import { GitHubProvider } from '../providers';
+import { AiService, AutoFixResultWithSource } from '../../ai/ai.service';
 
 interface Finding {
   id: string;
@@ -15,6 +16,16 @@ interface Finding {
   snippet: string | null;
   scanner: string;
   aiRemediation: string | null;
+  autoFix?: string | null;
+  fixConfidence?: number | null;
+  fixSource?: string | null;
+}
+
+export interface SuggestionResult {
+  findingId: string;
+  success: boolean;
+  commentId?: string;
+  error?: string;
 }
 
 @Injectable()
@@ -25,6 +36,7 @@ export class PRCommentsService {
     private readonly prisma: PrismaService,
     private readonly cryptoService: CryptoService,
     private readonly githubProvider: GitHubProvider,
+    private readonly aiService: AiService,
   ) {}
 
   /**
@@ -144,6 +156,8 @@ export class PRCommentsService {
 
   /**
    * Update check run with annotations for all findings
+   * For PR scans: includes annotations (they link correctly) - batched in chunks of 50
+   * For non-PR scans: skip annotations (they don't link correctly), use enhanced summary with direct links
    */
   async updateCheckRunWithAnnotations(
     scanId: string,
@@ -173,17 +187,10 @@ export class PRCommentsService {
 
     const accessToken = this.cryptoService.decrypt(connection.accessToken);
     const [owner, repo] = scan.repository.fullName.split('/');
+    const isPRScan = !!scan.pullRequestId;
 
-    // Build annotations (max 50 per API call)
-    const annotations = scan.findings.slice(0, 50).map(f => ({
-      path: f.filePath,
-      start_line: f.startLine || 1,
-      end_line: f.endLine || f.startLine || 1,
-      annotation_level: this.mapSeverityToAnnotationLevel(f.severity),
-      title: f.ruleId,
-      message: f.title || f.description || 'Security finding',
-      raw_details: f.snippet || undefined,
-    }));
+    // Sort findings by severity (critical > high > medium > low > info)
+    const sortedFindings = this.sortFindingsBySeverity(scan.findings);
 
     // Determine conclusion based on findings
     const hasCritical = scan.findings.some(f => f.severity === 'critical');
@@ -193,25 +200,331 @@ export class PRCommentsService {
     else if (hasHigh) conclusion = 'failure';
     else if (scan.findings.length > 0) conclusion = 'neutral';
 
-    const summary = this.buildCheckRunSummary(scan.findings);
+    // Build summary - for non-PR scans, include direct links to files
+    const summary = isPRScan
+      ? this.buildCheckRunSummary(scan.findings)
+      : this.buildCheckRunSummaryWithLinks(sortedFindings, owner, repo, scan.commitSha);
 
     try {
-      await this.githubProvider.updateCheckRunWithAnnotations(
-        accessToken,
-        owner,
-        repo,
-        checkRunId,
-        'completed',
-        conclusion,
-        {
-          title: 'ThreatDiviner Security Scan',
-          summary,
-          annotations,
-        },
-      );
+      if (isPRScan && sortedFindings.length > 0) {
+        // Build all annotations, prioritized by severity
+        const allAnnotations = sortedFindings.map(f => ({
+          path: f.filePath,
+          start_line: f.startLine || 1,
+          end_line: f.endLine || f.startLine || 1,
+          annotation_level: this.mapSeverityToAnnotationLevel(f.severity),
+          title: f.ruleId,
+          message: f.title || f.description || 'Security finding',
+          raw_details: f.snippet || undefined,
+        }));
+
+        // GitHub API limits to 50 annotations per request, batch them
+        const BATCH_SIZE = 50;
+        const batches: typeof allAnnotations[] = [];
+        for (let i = 0; i < allAnnotations.length; i += BATCH_SIZE) {
+          batches.push(allAnnotations.slice(i, i + BATCH_SIZE));
+        }
+
+        this.logger.log(`Posting ${allAnnotations.length} annotations in ${batches.length} batch(es)`);
+
+        // Post each batch - first batch includes summary, subsequent are append-only
+        for (let i = 0; i < batches.length; i++) {
+          const isLastBatch = i === batches.length - 1;
+          const batch = batches[i];
+
+          await this.githubProvider.updateCheckRunWithAnnotations(
+            accessToken,
+            owner,
+            repo,
+            checkRunId,
+            isLastBatch ? 'completed' : 'in_progress',
+            isLastBatch ? conclusion : undefined,
+            {
+              title: 'ThreatDiviner Security Scan',
+              summary, // GitHub overwrites summary each update, but it's required
+              annotations: batch,
+            },
+          );
+
+          // Small delay between batches to avoid rate limiting
+          if (!isLastBatch) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      } else {
+        // Non-PR scan or no findings - single update with summary only
+        await this.githubProvider.updateCheckRunWithAnnotations(
+          accessToken,
+          owner,
+          repo,
+          checkRunId,
+          'completed',
+          conclusion,
+          {
+            title: 'ThreatDiviner Security Scan',
+            summary,
+            annotations: undefined,
+          },
+        );
+      }
     } catch (error) {
       this.logger.error(`Failed to update check run with annotations: ${error}`);
     }
+  }
+
+  /**
+   * Post AI-generated fix suggestions to PR
+   * Returns results for each finding attempted
+   */
+  async postAISuggestions(
+    scanId: string,
+    findingIds?: string[],
+  ): Promise<{ posted: number; skipped: number; results: SuggestionResult[] }> {
+    const scan = await this.prisma.scan.findUnique({
+      where: { id: scanId },
+      include: {
+        repository: {
+          include: {
+            connection: true,
+            scanConfig: true,
+          },
+        },
+        findings: true,
+      },
+    });
+
+    if (!scan || !scan.pullRequestId) {
+      this.logger.debug(`Scan ${scanId} is not a PR scan, skipping suggestions`);
+      return { posted: 0, skipped: 0, results: [] };
+    }
+
+    const connection = scan.repository.connection;
+    if (connection.provider !== 'github') {
+      this.logger.debug(`Suggestions only supported for GitHub`);
+      return { posted: 0, skipped: 0, results: [] };
+    }
+
+    const accessToken = this.cryptoService.decrypt(connection.accessToken);
+    const [owner, repo] = scan.repository.fullName.split('/');
+    const prNumber = parseInt(scan.pullRequestId, 10);
+
+    // Get PR files to ensure we only post suggestions for changed files
+    let prFiles: string[];
+    try {
+      const files = await this.githubProvider.getPRFiles(accessToken, owner, repo, prNumber);
+      prFiles = files.map(f => f.filename);
+    } catch (error) {
+      this.logger.error(`Failed to get PR files: ${error}`);
+      return { posted: 0, skipped: scan.findings.length, results: [] };
+    }
+
+    // Filter findings
+    let eligibleFindings = scan.findings.filter(f => {
+      // Must be in a file that was changed in the PR
+      const isInDiff = prFiles.some(file => f.filePath.endsWith(file) || file.endsWith(f.filePath));
+      // Must have line information
+      const hasLineInfo = f.startLine !== null;
+      // If specific IDs provided, filter to those
+      const matchesIds = !findingIds || findingIds.includes(f.id);
+      return isInDiff && hasLineInfo && matchesIds;
+    });
+
+    // Sort by severity (critical/high first)
+    eligibleFindings = this.sortFindingsBySeverity(eligibleFindings);
+
+    const results: SuggestionResult[] = [];
+    let posted = 0;
+    let skipped = 0;
+
+    // Process each finding
+    for (const finding of eligibleFindings) {
+      const prFilePath = prFiles.find(f => finding.filePath.endsWith(f) || f.endsWith(finding.filePath));
+      if (!prFilePath) {
+        results.push({ findingId: finding.id, success: false, error: 'File not in PR diff' });
+        skipped++;
+        continue;
+      }
+
+      try {
+        // Generate fix if not already cached
+        let fixResult: AutoFixResultWithSource | null = null;
+
+        if (finding.autoFix && finding.aiConfidence) {
+          // Use cached fix
+          fixResult = {
+            fixedCode: finding.autoFix,
+            explanation: finding.aiRemediation || 'AI-generated fix',
+            confidence: finding.aiConfidence,
+            source: 'cached', // Previously generated
+          };
+        } else {
+          // Generate new fix
+          const fileContent = await this.githubProvider.getFileContent(
+            accessToken,
+            owner,
+            repo,
+            prFilePath,
+            scan.commitSha,
+          );
+
+          fixResult = await this.aiService.generateAutoFixWithSource({
+            finding: {
+              ruleId: finding.ruleId,
+              title: finding.title,
+              description: finding.description || '',
+              severity: finding.severity,
+              filePath: finding.filePath,
+              startLine: finding.startLine || 1,
+              endLine: finding.endLine || undefined,
+              snippet: finding.snippet || undefined,
+              cweId: finding.cweId || undefined,
+            },
+            fileContent: fileContent.content,
+          });
+
+          // Cache the fix in the database
+          if (fixResult) {
+            await this.prisma.finding.update({
+              where: { id: finding.id },
+              data: {
+                autoFix: fixResult.fixedCode,
+                aiRemediation: fixResult.explanation,
+                aiConfidence: fixResult.confidence,
+              },
+            });
+          }
+        }
+
+        if (!fixResult || !fixResult.fixedCode) {
+          results.push({ findingId: finding.id, success: false, error: 'AI could not generate fix' });
+          skipped++;
+          continue;
+        }
+
+        // Check confidence threshold (0.8 = 80%)
+        if (!this.aiService.meetsSuggestionThreshold(fixResult)) {
+          results.push({
+            findingId: finding.id,
+            success: false,
+            error: `Confidence too low: ${Math.round(fixResult.confidence * 100)}%`
+          });
+          skipped++;
+          continue;
+        }
+
+        // Post suggestion to PR
+        const commentId = await this.githubProvider.createPRSuggestionComment(
+          accessToken,
+          owner,
+          repo,
+          prNumber,
+          scan.commitSha,
+          prFilePath,
+          finding.startLine || 1,
+          finding.endLine || finding.startLine || 1,
+          fixResult.fixedCode,
+          finding.title,
+          finding.severity,
+          fixResult.explanation,
+          fixResult.confidence,
+          fixResult.source,
+        );
+
+        results.push({ findingId: finding.id, success: true, commentId });
+        posted++;
+
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to post suggestion for finding ${finding.id}: ${errorMsg}`);
+        results.push({ findingId: finding.id, success: false, error: errorMsg });
+        skipped++;
+      }
+    }
+
+    // Post summary comment if suggestions were posted
+    if (posted > 0) {
+      try {
+        const summaryBody = this.formatSuggestionSummary(posted, skipped);
+        await this.githubProvider.createPRComment(accessToken, owner, repo, prNumber, summaryBody);
+      } catch (error) {
+        this.logger.warn(`Failed to post suggestion summary: ${error}`);
+      }
+    }
+
+    this.logger.log(`Posted ${posted} AI suggestions for scan ${scanId} (${skipped} skipped)`);
+    return { posted, skipped, results };
+  }
+
+  /**
+   * Generate and post suggestion for a single finding
+   */
+  async postSuggestionForFinding(findingId: string): Promise<SuggestionResult> {
+    const finding = await this.prisma.finding.findUnique({
+      where: { id: findingId },
+      include: {
+        scan: {
+          include: {
+            repository: {
+              include: {
+                connection: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!finding) {
+      return { findingId, success: false, error: 'Finding not found' };
+    }
+
+    const { scan } = finding;
+    if (!scan.pullRequestId) {
+      return { findingId, success: false, error: 'Not a PR scan' };
+    }
+
+    const results = await this.postAISuggestions(scan.id, [findingId]);
+    return results.results[0] || { findingId, success: false, error: 'No result' };
+  }
+
+  private formatSuggestionSummary(posted: number, skipped: number): string {
+    const lines = [
+      '## 🤖 ThreatDiviner AI Fix Suggestions',
+      '',
+      `**${posted}** fix suggestions have been posted as inline comments.`,
+      '',
+      'Look for 💡 suggestion comments above - click **"Apply suggestion"** to commit the fix directly.',
+      '',
+    ];
+
+    if (skipped > 0) {
+      lines.push(`*${skipped} findings could not be auto-fixed (low confidence or not in changed files)*`);
+    }
+
+    lines.push('', '---', '*Generated by ThreatDiviner AI (Claude/Gemini)*');
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Sort findings by severity priority: critical > high > medium > low > info
+   */
+  private sortFindingsBySeverity<T extends { severity: string }>(findings: T[]): T[] {
+    const severityOrder: Record<string, number> = {
+      critical: 0,
+      high: 1,
+      medium: 2,
+      low: 3,
+      info: 4,
+    };
+
+    return [...findings].sort((a, b) => {
+      const orderA = severityOrder[a.severity.toLowerCase()] ?? 5;
+      const orderB = severityOrder[b.severity.toLowerCase()] ?? 5;
+      return orderA - orderB;
+    });
   }
 
   private formatFindingComment(finding: Finding): string {
@@ -288,6 +601,70 @@ export class PRCommentsService {
     };
 
     return `Found ${findings.length} security issues:\n- Critical: ${counts.critical}\n- High: ${counts.high}\n- Medium: ${counts.medium}\n- Low: ${counts.low}`;
+  }
+
+  /**
+   * Build check run summary with direct file links (for non-PR scans)
+   * Since annotations don't link correctly for non-PR scans, we include direct links in the summary
+   */
+  private buildCheckRunSummaryWithLinks(
+    sortedFindings: Finding[],
+    owner: string,
+    repo: string,
+    commitSha: string,
+  ): string {
+    if (sortedFindings.length === 0) {
+      return '✅ No security issues found!';
+    }
+
+    const counts = {
+      critical: sortedFindings.filter(f => f.severity === 'critical').length,
+      high: sortedFindings.filter(f => f.severity === 'high').length,
+      medium: sortedFindings.filter(f => f.severity === 'medium').length,
+      low: sortedFindings.filter(f => f.severity === 'low').length,
+    };
+
+    const severityEmoji: Record<string, string> = {
+      critical: '🔴',
+      high: '🟠',
+      medium: '🟡',
+      low: '🔵',
+      info: '⚪',
+    };
+
+    const lines = [
+      `Found **${sortedFindings.length}** security issues:`,
+      '',
+      '| Severity | Count |',
+      '|----------|-------|',
+      `| 🔴 Critical | ${counts.critical} |`,
+      `| 🟠 High | ${counts.high} |`,
+      `| 🟡 Medium | ${counts.medium} |`,
+      `| 🔵 Low | ${counts.low} |`,
+      '',
+      '---',
+      '',
+      '### Top Findings (by severity)',
+      '',
+    ];
+
+    // Show top 50 findings with direct links, prioritized by severity
+    const topFindings = sortedFindings.slice(0, 50);
+    for (const finding of topFindings) {
+      const emoji = severityEmoji[finding.severity.toLowerCase()] || '⚪';
+      const line = finding.startLine || 1;
+      const fileUrl = `https://github.com/${owner}/${repo}/blob/${commitSha}/${finding.filePath}#L${line}`;
+      lines.push(
+        `- ${emoji} **${finding.severity.toUpperCase()}** - [${finding.filePath}:${line}](${fileUrl})`,
+        `  - \`${finding.ruleId}\`: ${finding.title || 'Security finding'}`,
+      );
+    }
+
+    if (sortedFindings.length > 50) {
+      lines.push('', `*... and ${sortedFindings.length - 50} more findings*`);
+    }
+
+    return lines.join('\n');
   }
 
   private mapSeverityToAnnotationLevel(

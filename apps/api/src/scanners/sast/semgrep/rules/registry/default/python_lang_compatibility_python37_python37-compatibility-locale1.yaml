@@ -1,0 +1,30 @@
+rules:
+  - id: python.lang.compatibility.python37.python37-compatibility-locale1
+    pattern: locale.format_string(monetary=$X, ...)
+    message: >-
+      Found usage of the 'monetary' argument in a function call of
+      'locale.format_string'. This is only available on Python 3.7+ and is
+      therefore not backwards compatible. Instead, remove the 'monetary'
+      argument.
+    languages:
+      - python
+    severity: ERROR
+    metadata:
+      category: compatibility
+      technology:
+        - python
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      source: >-
+        https://semgrep.dev/r/python.lang.compatibility.python37.python37-compatibility-locale1
+      shortlink: https://sg.run/gLeZ
+      semgrep.dev:
+        rule:
+          r_id: 9585
+          rv_id: 946275
+          rule_id: GdU72R
+          version_id: DkTNp0N
+          url: >-
+            https://semgrep.dev/playground/r/DkTNp0N/python.lang.compatibility.python37.python37-compatibility-locale1
+          origin: community

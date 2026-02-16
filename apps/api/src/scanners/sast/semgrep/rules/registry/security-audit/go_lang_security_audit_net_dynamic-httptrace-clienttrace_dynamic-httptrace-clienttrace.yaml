@@ -1,0 +1,52 @@
+rules:
+  - id: >-
+      go.lang.security.audit.net.dynamic-httptrace-clienttrace.dynamic-httptrace-clienttrace
+    message: >-
+      Detected a potentially dynamic ClientTrace. This occurred because semgrep
+      could not find a static definition for '$TRACE'. Dynamic ClientTraces are
+      dangerous because they deserialize function code to run when certain
+      Request events occur, which could lead to code being run without your
+      knowledge. Ensure that your ClientTrace is statically defined.
+    metadata:
+      cwe:
+        - 'CWE-913: Improper Control of Dynamically-Managed Code Resources'
+      owasp:
+        - A01:2021 - Broken Access Control
+        - A01:2025 - Broken Access Control
+      references:
+        - https://github.com/returntocorp/semgrep-rules/issues/518
+      category: security
+      technology:
+        - go
+      confidence: MEDIUM
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: LOW
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Code Injection
+      source: >-
+        https://semgrep.dev/r/go.lang.security.audit.net.dynamic-httptrace-clienttrace.dynamic-httptrace-clienttrace
+      shortlink: https://sg.run/kXEK
+      semgrep.dev:
+        rule:
+          r_id: 9128
+          rv_id: 1262942
+          rule_id: L1Uyjp
+          version_id: 8KT5rNv
+          url: >-
+            https://semgrep.dev/playground/r/8KT5rNv/go.lang.security.audit.net.dynamic-httptrace-clienttrace.dynamic-httptrace-clienttrace
+          origin: community
+    patterns:
+      - pattern-not-inside: |
+          package $PACKAGE
+          ...
+          &httptrace.ClientTrace { ... }
+          ...
+      - pattern: httptrace.WithClientTrace($ANY, $TRACE)
+    severity: WARNING
+    languages:
+      - go

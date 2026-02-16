@@ -46,6 +46,8 @@ export interface NormalizedFinding {
   cweIds: string[];
   cveIds: string[];
   owaspIds: string[];
+  capecIds: string[];
+  attackIds: string[];
   references: string[];
   fix?: {
     description: string;

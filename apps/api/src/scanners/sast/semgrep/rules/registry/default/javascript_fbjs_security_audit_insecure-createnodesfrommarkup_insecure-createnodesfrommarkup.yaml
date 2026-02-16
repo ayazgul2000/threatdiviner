@@ -1,0 +1,54 @@
+rules:
+  - id: >-
+      javascript.fbjs.security.audit.insecure-createnodesfrommarkup.insecure-createnodesfrommarkup
+    message: >-
+      User controlled data in a `createNodesFromMarkup` is an anti-pattern that
+      can lead to XSS vulnerabilities
+    metadata:
+      cwe:
+        - >-
+          CWE-79: Improper Neutralization of Input During Web Page Generation
+          ('Cross-site Scripting')
+      owasp:
+        - A07:2017 - Cross-Site Scripting (XSS)
+        - A03:2021 - Injection
+        - A05:2025 - Injection
+      category: security
+      technology:
+        - fbjs
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - audit
+      likelihood: LOW
+      impact: MEDIUM
+      confidence: LOW
+      references:
+        - https://owasp.org/Top10/A03_2021-Injection
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Cross-Site-Scripting (XSS)
+      source: >-
+        https://semgrep.dev/r/javascript.fbjs.security.audit.insecure-createnodesfrommarkup.insecure-createnodesfrommarkup
+      shortlink: https://sg.run/J9Yj
+      semgrep.dev:
+        rule:
+          r_id: 9290
+          rv_id: 1263179
+          rule_id: qNUjwb
+          version_id: O9TpxZq
+          url: >-
+            https://semgrep.dev/playground/r/O9TpxZq/javascript.fbjs.security.audit.insecure-createnodesfrommarkup.insecure-createnodesfrommarkup
+          origin: community
+    languages:
+      - javascript
+      - typescript
+    severity: WARNING
+    patterns:
+      - pattern-either:
+          - pattern: createNodesFromMarkup(...)
+          - pattern: $X.createNodesFromMarkup(...)
+      - pattern-not: createNodesFromMarkup("...",...)
+      - pattern-not: $X.createNodesFromMarkup("...",...)

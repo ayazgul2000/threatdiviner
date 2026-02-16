@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface SyncStatus {
   id: string;
   lastSyncAt: string | null;
@@ -36,7 +38,7 @@ export default function SyncStatusPage() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch('/api/vulndb/sync/status');
+      const res = await fetch(`${API_URL}/vulndb/sync/status`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setStatuses(Array.isArray(data) ? data : []);
@@ -51,7 +53,7 @@ export default function SyncStatusPage() {
   const triggerSync = async (source: string) => {
     setSyncing(source);
     try {
-      await fetch(`/api/vulndb/sync/${source}`, { method: 'POST' });
+      await fetch(`${API_URL}/vulndb/sync/${source}`, { method: 'POST', credentials: 'include' });
       // Wait a moment then refresh status
       setTimeout(() => {
         fetchStatus();

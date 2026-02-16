@@ -1,0 +1,7324 @@
+{
+  "_comment": "Layer 2: Subcategory exclusions within types. Each subtype excludes CWEs from the parent type's pool that don't apply.",
+  "_comment_database": "--- DATABASE (42 CWE pool from CWE-1214, CWE-19, Tech:Database Server) ---",
+  "_comment_database_exclusions": "SQL-specific: 89,564,566,619 | LDAP: 90 | Web: 472,565,601 | XML: 611,776 | Non-SQL: 1073",
+  "sql-database": {
+    "category": "database",
+    "icons": [
+      "apsaradb-polardb",
+      "apsaradb-postgresql",
+      "apsaradb-ppas",
+      "apsaradb-sqlserver",
+      "arc-postgresql-",
+      "arc-sql-managed-instance",
+      "arc-sql-server",
+      "aurora",
+      "aurora-instance",
+      "autonomous",
+      "azure-database-mariadb-server",
+      "azure-database-mysql-server",
+      "azure-database-postgresql-server",
+      "azure-database-postgresql-server-group",
+      "azure-sql",
+      "azure-sql-edge",
+      "azure-sql-server-stretch-databases",
+      "azure-sql-vm",
+      "cockroachdb",
+      "database",
+      "database-for-mariadb-servers",
+      "database-for-mysql-servers",
+      "database-for-postgresql-servers",
+      "database-instance-for-sap",
+      "database-service",
+      "database-service-white",
+      "dbaas-primary",
+      "dbaas-primary-standby-more",
+      "dbaas-read-only",
+      "dbaas-standby",
+      "disribute-relational-database-service",
+      "elastic-database-pools",
+      "elastic-job-agents",
+      "generic-database",
+      "hybriddb-for-mysql",
+      "instance-pools",
+      "managed-database",
+      "managed-databases",
+      "mariadb",
+      "mssql",
+      "mysql",
+      "oracle",
+      "oracle-database",
+      "postgis",
+      "postgresql",
+      "production-ready-database",
+      "rds",
+      "rds-instance",
+      "rds-mariadb-instance",
+      "rds-mysql-instance",
+      "rds-on-vmware",
+      "rds-oracle-instance",
+      "rds-postgresql-instance",
+      "rds-sql-server-instance",
+      "relational-database-service",
+      "spanner",
+      "sql",
+      "sql-data-warehouses",
+      "sql-database",
+      "sql-databases",
+      "sql-elastic-pools",
+      "sql-managed-instance",
+      "sql-managed-instances",
+      "sql-server",
+      "sql-server-registries",
+      "sql-server-stretch-databases",
+      "sql-servers",
+      "sql-vm",
+      "table",
+      "virtual-clusters",
+      "web-app-database",
+      "clickhouse",
+      "duckdb",
+      "sql-datawarehouse"
+    ],
+    "excludeCwes": [
+      "CWE-90",
+      "CWE-472",
+      "CWE-565",
+      "CWE-601",
+      "CWE-1073"
+    ]
+  },
+  "database-analytics": {
+    "category": "database",
+    "icons": [
+      "bigdata-service",
+      "bigdata-service-white",
+      "science",
+      "science-white",
+      "virtual-datacenter"
+    ],
+    "excludeCwes": [
+      "CWE-90",
+      "CWE-472",
+      "CWE-565",
+      "CWE-601",
+      "CWE-1073"
+    ]
+  },
+  "nosql-document": {
+    "category": "database",
+    "icons": [
+      "apsaradb-mongodb",
+      "azure-cosmos-db",
+      "cloudant",
+      "cosmos-db",
+      "couchbase",
+      "couchdb",
+      "datastore",
+      "documentdb-mongodb-compatibility",
+      "firestore",
+      "mongodb",
+      "qdrant"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-601",
+      "CWE-619"
+    ]
+  },
+  "kv-store": {
+    "category": "database",
+    "icons": [
+      "apsaradb-memcache",
+      "apsaradb-redis",
+      "cache-for-redis",
+      "cache-redis",
+      "dynamodb",
+      "dynamodb-attribute",
+      "dynamodb-attributes",
+      "dynamodb-dax",
+      "dynamodb-global-secondary-index",
+      "dynamodb-item",
+      "dynamodb-items",
+      "dynamodb-streams",
+      "dynamodb-table",
+      "elasticache",
+      "elasticache-cache-node",
+      "elasticache-for-memcached",
+      "elasticache-for-redis",
+      "memorystore"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-601",
+      "CWE-611",
+      "CWE-619",
+      "CWE-776"
+    ]
+  },
+  "graph-database": {
+    "category": "database",
+    "icons": [
+      "dgraph",
+      "graph-database-service",
+      "janusgraph",
+      "neo4j",
+      "neptune"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-601",
+      "CWE-611",
+      "CWE-619",
+      "CWE-776"
+    ]
+  },
+  "time-series": {
+    "category": "database",
+    "icons": [
+      "druid",
+      "influxdb",
+      "stream",
+      "stream-white",
+      "timestream"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-601",
+      "CWE-611",
+      "CWE-619",
+      "CWE-776"
+    ]
+  },
+  "wide-column": {
+    "category": "database",
+    "icons": [
+      "apsaradb-cassandra",
+      "apsaradb-hbase",
+      "apsaradb-oceanbase",
+      "bigtable",
+      "cassandra",
+      "hbase",
+      "keyspaces-managed-apache-cassandra-service",
+      "managed-instance-apache-cassandra",
+      "scylla"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-601",
+      "CWE-611",
+      "CWE-619",
+      "CWE-776"
+    ]
+  },
+  "data-warehouse": {
+    "category": "analytics",
+    "icons": [
+      "analysis-services",
+      "analytic-db",
+      "athena",
+      "azure-data-explorer-clusters",
+      "azure-synapse-analytics",
+      "bigquery",
+      "click-house",
+      "data-explorer-clusters",
+      "data-lake-analytics",
+      "redshift",
+      "redshift-dense-compute-node",
+      "redshift-dense-storage-node",
+      "snowflake",
+      "synapse-analytics"
+    ],
+    "excludeCwes": [
+      "CWE-472",
+      "CWE-565",
+      "CWE-601"
+    ]
+  },
+  "search-engine": {
+    "category": "database",
+    "icons": [
+      "azure-data-explorer-clusters",
+      "data-explorer-clusters"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-601",
+      "CWE-619"
+    ]
+  },
+  "_comment_network": "--- NETWORK (92 CWE pool from CWE-137, CWE-417, Tech:Web Server) ---",
+  "_comment_network_groups": "WebApp(55): XSS/CSRF/cookies/sessions | SQL(1): 89 | LDAP(1): 90 | Authz(3): 285,862,863 | InjectGen(18): general neutralization | Channel(13): comms integrity | PathTrav(1): 26",
+  "web-server": {
+    "category": "network",
+    "icons": [
+      "apache",
+      "ftp",
+      "glassfish",
+      "gunicorn",
+      "jbossas",
+      "jetty",
+      "tomcat",
+      "wildfly"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90"
+    ]
+  },
+  "gateway-proxy": {
+    "category": "network",
+    "icons": [
+      "api-gateway",
+      "api-gateway-endpoint",
+      "application-gateway",
+      "application-gateways",
+      "azure-communications-gateway",
+      "endpoint",
+      "ep",
+      "gateway",
+      "global-accelerator",
+      "ing",
+      "internet-gateway",
+      "internet-gateway-white",
+      "nat",
+      "nat-gateway",
+      "nat-service",
+      "on-premises-data-gateways",
+      "public-gateway",
+      "service-endpoint-policies",
+      "service-gateway",
+      "service-gateway-white",
+      "smart-access-gateway",
+      "traffic-controller",
+      "traffic-director",
+      "traffic-manager-profiles",
+      "transit-gateway",
+      "transit-gateway-attachment",
+      "vpc-customer-gateway"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90"
+    ]
+  },
+  "service-mesh": {
+    "category": "network",
+    "icons": [
+      "ambassador",
+      "app-mesh",
+      "cloud-map",
+      "consul",
+      "etcd",
+      "istio",
+      "kong",
+      "linkerd",
+      "open-service-mesh",
+      "pomerium",
+      "service-mesh",
+      "tyk"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-219",
+      "CWE-245",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "load-balancer": {
+    "category": "network",
+    "icons": [
+      "caddy",
+      "elastic-load-balancing",
+      "elb-application-load-balancer",
+      "elb-classic-load-balancer",
+      "elb-network-load-balancer",
+      "envoy",
+      "haproxy",
+      "load-balancer",
+      "load-balancer-hub",
+      "load-balancer-listener",
+      "load-balancer-pool",
+      "load-balancer-white",
+      "load-balancers",
+      "load-balancing",
+      "load-balancing-routing",
+      "nginx",
+      "ocelot",
+      "octavia",
+      "server-load-balancer",
+      "traefik",
+      "yarp"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-219",
+      "CWE-245",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "firewall-waf": {
+    "category": "network",
+    "icons": [
+      "application-security-groups",
+      "armor",
+      "azure-firewall-manager",
+      "azure-firewall-policy",
+      "bastions",
+      "cloud-ids",
+      "ddos-protection-plans",
+      "firewall",
+      "firewall-rules",
+      "firewall-white",
+      "firewalls",
+      "nacl",
+      "network-firewall",
+      "network-security",
+      "network-security-groups",
+      "network-security-groups-classic",
+      "opnsense",
+      "pfsense",
+      "rules",
+      "security-lists",
+      "security-lists-white",
+      "web-application-firewall-policieswaf"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-219",
+      "CWE-245",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "cdn-edge": {
+    "category": "network",
+    "icons": [
+      "cdn",
+      "cdn-profiles",
+      "cloud-enterprise-network",
+      "cloudfront",
+      "cloudfront-download-distribution",
+      "cloudfront-edge-location",
+      "cloudfront-streaming-distribution",
+      "connected-cache",
+      "front-door-and-cdn-profiles",
+      "front-doors"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-862",
+      "CWE-863",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "dns-network": {
+    "category": "network",
+    "icons": [
+      "bind-9",
+      "designate",
+      "dns",
+      "dns-multistack",
+      "dns-private-resolver",
+      "dns-private-zones",
+      "dns-security-policy",
+      "dns-zones",
+      "domain",
+      "domain-registration",
+      "powerdns",
+      "route-53",
+      "route-53-hosted-zone"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-862",
+      "CWE-863",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "vpn-private": {
+    "category": "network",
+    "icons": [
+      "azure-network-function-manager",
+      "azure-network-function-manager-functions",
+      "client-vpn",
+      "dedicated-interconnect",
+      "direct-connect",
+      "direct-link",
+      "drg",
+      "drg-white",
+      "express-connect",
+      "express-route-traffic-collector",
+      "expressroute-circuits",
+      "expressroute-direct",
+      "local-network-gateways",
+      "managed-vpn",
+      "partner-interconnect",
+      "private-endpoint",
+      "private-endpoints",
+      "private-link",
+      "private-link-service",
+      "private-link-services",
+      "private-service-connect",
+      "privatelink",
+      "resource-management-private-link",
+      "site-to-site-vpn",
+      "site-to-site-vpng",
+      "virtual-network-gateways",
+      "vpn",
+      "vpn-connection",
+      "vpn-gateway",
+      "vpn-policy"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-140",
+      "CWE-170",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-463",
+      "CWE-464",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-694",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-791",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-917",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1236",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "routing-switching": {
+    "category": "network",
+    "icons": [
+      "atm-multistack",
+      "bridge",
+      "cisco-router",
+      "cisco-switch-l2",
+      "cisco-switch-l3",
+      "mikrotik",
+      "network-connectivity-center",
+      "network-intelligence-center",
+      "network-interfaces",
+      "network-managers",
+      "network-topology",
+      "network-watcher",
+      "route-filters",
+      "route-table",
+      "route-table-white",
+      "route-tables",
+      "router",
+      "routes",
+      "spot-vm",
+      "spot-vmss",
+      "switch",
+      "virtual-router",
+      "vpc-router",
+      "vyos",
+      "zookeeper"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-140",
+      "CWE-170",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-463",
+      "CWE-464",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-694",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-791",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-917",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1236",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "vpc-subnet": {
+    "category": "network",
+    "icons": [
+      "peering-service",
+      "peerings",
+      "private-subnet",
+      "public-subnet",
+      "region",
+      "subnet",
+      "subnets",
+      "vcn",
+      "vcn-white",
+      "virtual-network-classic",
+      "virtual-networks",
+      "virtual-networks-classic",
+      "virtual-private-cloud",
+      "virtual-wan-hub",
+      "virtual-wans",
+      "vpc",
+      "vpc-elastic-network-adapter",
+      "vpc-elastic-network-interface",
+      "vpc-flow-logs",
+      "vpc-peering",
+      "vpc-traffic-mirroring"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-140",
+      "CWE-170",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-463",
+      "CWE-464",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-694",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-791",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-917",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1236",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "ip-addressing": {
+    "category": "network",
+    "icons": [
+      "custom-ip-prefix",
+      "elastic-ip-address",
+      "external-ip-addresses",
+      "floating-ip",
+      "ip-address-manager",
+      "ip-groups",
+      "proximity-placement-groups",
+      "public-ip-addresses",
+      "public-ip-addresses-classic",
+      "public-ip-prefixes",
+      "reserved-ip-addresses-classic"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-140",
+      "CWE-170",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-463",
+      "CWE-464",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-694",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-791",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-917",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1236",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "network-infra": {
+    "category": "network",
+    "icons": [
+      "certificate",
+      "connections",
+      "enterprise",
+      "internet",
+      "internet-alt1",
+      "internet-alt2",
+      "internet-analyzer-profiles",
+      "internet-service",
+      "internet-services",
+      "load-test",
+      "mobile-networks",
+      "net",
+      "netpol",
+      "network",
+      "network-tiers",
+      "networking-and-content-delivery",
+      "neutron",
+      "peer-cloud",
+      "premium-network-tier",
+      "standard-network-tier",
+      "svc"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-140",
+      "CWE-170",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-463",
+      "CWE-464",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-694",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-791",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-917",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1236",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "_comment_compute": "--- COMPUTE (31 CWE pool from CWE-1218, CWE-399) ---",
+  "_comment_compute_groups": "MemBuf(9): 120,124,125,131,786,787,788,805,1284 | PtrRef(2): 763,911 | Deser(4): 470,502,914,915 | File(3): 73,641,694 | DbCursor(1): 619 | Resource(12): broadly applicable",
+  "virtual-machine": {
+    "category": "compute",
+    "icons": [
+      "automanaged-vm",
+      "availability-sets",
+      "avs-vm",
+      "azure-vmware-solution",
+      "bare-metal-infrastructure",
+      "bare-metal-server",
+      "bm",
+      "bm-white",
+      "capacity-reservation-groups",
+      "citrix-virtual-desktops-essentials",
+      "cloudsimple-virtual-machines",
+      "disk-encryption-sets",
+      "disk-snapshots",
+      "disks",
+      "disks-classic",
+      "disks-snapshots",
+      "droplet",
+      "droplet-connect",
+      "droplet-snapshot",
+      "ec2",
+      "ec2-ami",
+      "ec2-auto-scaling",
+      "ec2-elastic-ip-address",
+      "ec2-image-builder",
+      "ec2-instance",
+      "ec2-instances",
+      "ec2-rescue",
+      "ec2-spot-instance",
+      "gpu",
+      "host-groups",
+      "host-pools",
+      "hosts",
+      "image-definitions",
+      "image-templates",
+      "image-versions",
+      "lightsail",
+      "local-zones",
+      "modular-data-center",
+      "outposts",
+      "power-instance",
+      "restore-points",
+      "restore-points-collections",
+      "sap-hana-on-azure",
+      "shared-image-galleries",
+      "virtual-instance-for-sap",
+      "virtual-machine",
+      "virtual-machines-classic",
+      "vm",
+      "vm-app-definitions",
+      "vm-app-versions",
+      "vm-classic",
+      "vm-image-version",
+      "vm-images",
+      "vm-images-classic",
+      "vm-linux",
+      "vm-scale-set",
+      "vm-scale-sets",
+      "vm-white",
+      "vm-windows",
+      "vmware-cloud-on-aws",
+      "wavelength"
+    ],
+    "excludeCwes": [
+      "CWE-619"
+    ]
+  },
+  "container-runtime": {
+    "category": "container",
+    "icons": [
+      "containerd",
+      "crio",
+      "docker",
+      "firecracker",
+      "gvisor",
+      "lxc",
+      "rkt"
+    ],
+    "excludeCwes": []
+  },
+  "serverless": {
+    "category": "compute",
+    "icons": [
+      "app-engine",
+      "app-runner",
+      "app-services",
+      "azure-spring-apps",
+      "cloud-services",
+      "cloud-services-classic",
+      "cloud-services-extended-support",
+      "elastic-beanstalk",
+      "elastic-beanstalk-application",
+      "elastic-beanstalk-deployment",
+      "function-apps",
+      "function-compute",
+      "functions",
+      "functions-white",
+      "lambda",
+      "lambda-function",
+      "nomad",
+      "openwhisk",
+      "qinling",
+      "run",
+      "serverless-app-engine",
+      "serverless-application-repository",
+      "spring-cloud",
+      "storage-functions",
+      "web-app-service",
+      "web-jobs"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-619",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-1284"
+    ]
+  },
+  "batch-hpc": {
+    "category": "compute",
+    "icons": [
+      "azure-hpc-workbenches",
+      "batch",
+      "batch-accounts",
+      "batch-compute",
+      "elastic-high-performance-computing",
+      "thinkbox-deadline",
+      "thinkbox-draft",
+      "thinkbox-frost",
+      "thinkbox-krakatoa",
+      "thinkbox-sequoia",
+      "thinkbox-stoke",
+      "thinkbox-xmesh"
+    ],
+    "excludeCwes": [
+      "CWE-470",
+      "CWE-502",
+      "CWE-619",
+      "CWE-914",
+      "CWE-915"
+    ]
+  },
+  "autoscaling": {
+    "category": "compute",
+    "icons": [
+      "application-auto-scaling",
+      "auto-scaling",
+      "autoscale",
+      "autoscale-white",
+      "compute-optimizer"
+    ],
+    "excludeCwes": [
+      "CWE-73",
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-470",
+      "CWE-502",
+      "CWE-619",
+      "CWE-641",
+      "CWE-694",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-1284"
+    ]
+  },
+  "vm-images": {
+    "category": "compute",
+    "icons": [
+      "binary-authorization",
+      "image-service",
+      "images",
+      "os-configuration-management",
+      "os-images",
+      "os-images-classic",
+      "os-inventory-management",
+      "os-patch-management",
+      "simple-application-server"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-470",
+      "CWE-502",
+      "CWE-619",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-1284"
+    ]
+  },
+  "compute-infra": {
+    "category": "compute",
+    "icons": [
+      "application-group",
+      "azure-compute-galleries",
+      "compute",
+      "compute-engine",
+      "deploy",
+      "direct-connect",
+      "elastic-compute-service",
+      "elastic-search",
+      "ibm-public-cloud",
+      "instance",
+      "instance-pools",
+      "instance-pools-white",
+      "key",
+      "maintenance-configuration",
+      "managed-service-fabric",
+      "metrics-advisor",
+      "nova",
+      "operation-orchestration-service",
+      "rack",
+      "resource-orchestration-service",
+      "server",
+      "server-farm",
+      "server-load-balancer",
+      "service-fabric-clusters",
+      "traditional-server",
+      "workspaces",
+      "workspaces-2"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-470",
+      "CWE-502",
+      "CWE-619",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-1284"
+    ]
+  },
+  "container-service": {
+    "category": "compute",
+    "icons": [
+      "container",
+      "container-apps",
+      "container-optimized-os",
+      "container-service",
+      "container-services-deprecated",
+      "container-white",
+      "containers",
+      "elastic-container-instance",
+      "elastic-container-service",
+      "elastic-container-service-container",
+      "elastic-container-service-service",
+      "elastic-container-service-service-connect",
+      "elastic-container-service-task",
+      "fargate",
+      "mesh-applications",
+      "zun"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-619",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-1284"
+    ]
+  },
+  "container-registry": {
+    "category": "compute",
+    "icons": [
+      "ec2-container-registry",
+      "ec2-container-registry-image",
+      "ec2-container-registry-registry",
+      "ocir",
+      "ocir-white"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-470",
+      "CWE-502",
+      "CWE-619",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-1284"
+    ]
+  },
+  "k8s-cluster": {
+    "category": "compute",
+    "icons": [
+      "elastic-kubernetes-service",
+      "gke-on-prem",
+      "k8s-cluster",
+      "k8s-node",
+      "k8s-node-pool",
+      "kubernetes-engine",
+      "oke",
+      "oke-white"
+    ],
+    "excludeCwes": [
+      "CWE-619"
+    ]
+  },
+  "k8s-workload": {
+    "category": "compute",
+    "icons": [
+      "cronjob",
+      "ds",
+      "job",
+      "pod",
+      "rs",
+      "sts"
+    ],
+    "excludeCwes": [
+      "CWE-619"
+    ]
+  },
+  "_comment_security": "--- SECURITY (50 CWE pool from CWE-1211, CWE-1212, CWE-255, CWE-310, CWE-320) ---",
+  "_comment_security_groups": "Cred(12): passwords/defaults | Auth(15): authn bypass/mechanisms | Authz(9): access control | Crypto(11): hash/PRNG/signatures | Key(3): key exchange/reuse/expiry",
+  "iam-identity": {
+    "category": "security",
+    "icons": [
+      "access-context-manager",
+      "ad-connector",
+      "azure-ad-authentication-methods",
+      "azure-ad-identity-protection",
+      "azure-ad-privleged-identity-management",
+      "azure-ad-risky-signins",
+      "azure-ad-risky-users",
+      "cloud-directory",
+      "cognito",
+      "conditional-access",
+      "directory-service",
+      "iam",
+      "id-access",
+      "id-access-white",
+      "id-verification",
+      "identity-access-management",
+      "identity-and-access-management",
+      "identity-and-access-management-iam",
+      "identity-and-access-management-iam-access-analyzer",
+      "identity-and-access-management-iam-add-on",
+      "identity-and-access-management-iam-aws-sts",
+      "identity-and-access-management-iam-aws-sts-alternate",
+      "identity-and-access-management-iam-data-encryption-key",
+      "identity-and-access-management-iam-encrypted-data",
+      "identity-and-access-management-iam-long-term-security-credential",
+      "identity-and-access-management-iam-mfa-token",
+      "identity-and-access-management-iam-permissions",
+      "identity-and-access-management-iam-role",
+      "identity-and-access-management-iam-temporary-security-credential",
+      "identity-provider",
+      "identity-secure-score",
+      "managed-microsoft-ad",
+      "multifactor-authentication",
+      "security-identity-and-compliance",
+      "simple-ad",
+      "single-sign-on",
+      "user-settings"
+    ],
+    "excludeCwes": [
+      "CWE-261",
+      "CWE-322",
+      "CWE-323",
+      "CWE-324",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-347",
+      "CWE-916",
+      "CWE-1204",
+      "CWE-1240"
+    ]
+  },
+  "encryption-kms": {
+    "category": "security",
+    "icons": [
+      "azureattestation",
+      "bitwarden",
+      "certificate-authority",
+      "certificate-authority-service",
+      "certificate-manager",
+      "cloudhsm",
+      "data-encryption-service",
+      "encryption",
+      "encryption-white",
+      "key-management",
+      "key-management-service",
+      "key-management-white",
+      "key-vaults",
+      "secret-manager",
+      "secrets-manager",
+      "ssl-certificates",
+      "trustend-computing",
+      "vault",
+      "vault-white"
+    ],
+    "excludeCwes": [
+      "CWE-256",
+      "CWE-257",
+      "CWE-260",
+      "CWE-262",
+      "CWE-263",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-295",
+      "CWE-301",
+      "CWE-303",
+      "CWE-305",
+      "CWE-306",
+      "CWE-307",
+      "CWE-308",
+      "CWE-309",
+      "CWE-425",
+      "CWE-521",
+      "CWE-523",
+      "CWE-549",
+      "CWE-551",
+      "CWE-552",
+      "CWE-603",
+      "CWE-620",
+      "CWE-639",
+      "CWE-640",
+      "CWE-645",
+      "CWE-653",
+      "CWE-798",
+      "CWE-804",
+      "CWE-836",
+      "CWE-842",
+      "CWE-939",
+      "CWE-1220",
+      "CWE-1230",
+      "CWE-1392"
+    ]
+  },
+  "firewall-perimeter": {
+    "category": "security",
+    "icons": [
+      "anti-bot-service",
+      "anti-ddos-basic",
+      "anti-ddos-pro",
+      "application-security-groups",
+      "bastion-host",
+      "cloud-firewall",
+      "ddos",
+      "ddos-white",
+      "firewall",
+      "firewall-manager",
+      "game-shield",
+      "generic-firewall",
+      "network-security-perimeters",
+      "shield",
+      "shield-advanced",
+      "waf",
+      "waf-filtering-rule",
+      "waf-white",
+      "web-application-firewall"
+    ],
+    "excludeCwes": [
+      "CWE-256",
+      "CWE-257",
+      "CWE-260",
+      "CWE-261",
+      "CWE-262",
+      "CWE-263",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-295",
+      "CWE-301",
+      "CWE-303",
+      "CWE-305",
+      "CWE-306",
+      "CWE-307",
+      "CWE-308",
+      "CWE-309",
+      "CWE-322",
+      "CWE-323",
+      "CWE-324",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-347",
+      "CWE-521",
+      "CWE-523",
+      "CWE-549",
+      "CWE-603",
+      "CWE-620",
+      "CWE-640",
+      "CWE-645",
+      "CWE-798",
+      "CWE-804",
+      "CWE-836",
+      "CWE-916",
+      "CWE-1204",
+      "CWE-1240",
+      "CWE-1392"
+    ]
+  },
+  "threat-detection": {
+    "category": "security",
+    "icons": [
+      "azure-sentinel",
+      "cloud-guard",
+      "cloud-guard-white",
+      "cloud-security-scanner",
+      "crowdsourced-security-testing",
+      "crowdstrike",
+      "defender",
+      "detective",
+      "detonation",
+      "guardduty",
+      "inspector",
+      "inspector-agent",
+      "macie",
+      "microsoft-defender-easm",
+      "microsoft-defender-for-cloud",
+      "microsoft-defender-for-iot",
+      "security-command-center",
+      "security-health-advisor",
+      "security-hub",
+      "security-hub-finding",
+      "security-lake",
+      "security-monitoring-intelligence",
+      "security-scanner",
+      "sentinel",
+      "siem",
+      "sonarqube",
+      "trivy",
+      "xdr"
+    ],
+    "excludeCwes": [
+      "CWE-261",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-295",
+      "CWE-301",
+      "CWE-303",
+      "CWE-305",
+      "CWE-306",
+      "CWE-307",
+      "CWE-308",
+      "CWE-309",
+      "CWE-322",
+      "CWE-323",
+      "CWE-324",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-347",
+      "CWE-603",
+      "CWE-645",
+      "CWE-804",
+      "CWE-836",
+      "CWE-916",
+      "CWE-1204",
+      "CWE-1240"
+    ]
+  },
+  "compliance-governance": {
+    "category": "security",
+    "icons": [
+      "app-compliance-automation",
+      "assured-workloads",
+      "cloud-asset-inventory",
+      "compliance-center",
+      "governance-risk-compliance",
+      "open-supply-chain-platform",
+      "resource-access-manager",
+      "resource-guard",
+      "resource-manager"
+    ],
+    "excludeCwes": [
+      "CWE-261",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-295",
+      "CWE-301",
+      "CWE-303",
+      "CWE-305",
+      "CWE-306",
+      "CWE-307",
+      "CWE-308",
+      "CWE-309",
+      "CWE-322",
+      "CWE-323",
+      "CWE-324",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-347",
+      "CWE-603",
+      "CWE-645",
+      "CWE-804",
+      "CWE-836",
+      "CWE-916",
+      "CWE-1204",
+      "CWE-1240"
+    ]
+  },
+  "data-security": {
+    "category": "security",
+    "icons": [
+      "antifraud-service",
+      "api-security",
+      "azure-information-protection",
+      "blockchain-security-service",
+      "content-moderation",
+      "data-security",
+      "db-audit"
+    ],
+    "excludeCwes": [
+      "CWE-256",
+      "CWE-257",
+      "CWE-260",
+      "CWE-262",
+      "CWE-263",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-295",
+      "CWE-301",
+      "CWE-303",
+      "CWE-305",
+      "CWE-306",
+      "CWE-307",
+      "CWE-308",
+      "CWE-309",
+      "CWE-322",
+      "CWE-323",
+      "CWE-324",
+      "CWE-521",
+      "CWE-523",
+      "CWE-549",
+      "CWE-603",
+      "CWE-620",
+      "CWE-640",
+      "CWE-645",
+      "CWE-798",
+      "CWE-804",
+      "CWE-836",
+      "CWE-1392"
+    ]
+  },
+  "security-infra": {
+    "category": "security",
+    "icons": [
+      "artifact",
+      "controls",
+      "controls-horizontal",
+      "endpoint",
+      "extended-security-updates",
+      "extendedsecurityupdates",
+      "gateway",
+      "iap",
+      "infrastructure-security",
+      "managed-security-service",
+      "max-security-zone",
+      "max-security-zone-white",
+      "physical-security",
+      "security",
+      "security-center",
+      "security-services",
+      "server-guard",
+      "virtual-enclaves",
+      "vpn"
+    ],
+    "excludeCwes": []
+  },
+  "_comment_iot": "--- IOT (52 CWE pool from CWE-417, CWE-1218, CWE-399, Tech:Microcontroller/Sensor Hardware) ---",
+  "_comment_iot_groups": "HW(9): 1247,1252,1257,1299,1314,1319,1320,1423,1429 | MemBuf(9): 120,124,125,131,786,787,788,805,1284 | PtrRef(2): 763,911 | Channel(12): comms integrity | Resource(20): lifecycle/alloc",
+  "iot-device-hardware": {
+    "category": "iot",
+    "icons": [
+      "azure-edge-hardware-center",
+      "azure-sphere",
+      "defender-cm-local-manager",
+      "defender-dcs-controller",
+      "defender-distributer-control-system",
+      "defender-engineering-station",
+      "defender-external-management",
+      "defender-freezer-monitor",
+      "defender-historian",
+      "defender-hmi",
+      "defender-industrial-packaging-system",
+      "defender-industrial-printer",
+      "defender-industrial-robot",
+      "defender-industrial-scale-system",
+      "defender-marquee",
+      "defender-meter",
+      "defender-plc",
+      "defender-pneumatic-device",
+      "defender-programable-board",
+      "defender-relay",
+      "defender-robot-controller",
+      "defender-rtu",
+      "defender-sensor",
+      "defender-slot",
+      "defender-web-guiding-system",
+      "freertos",
+      "industrial-iot",
+      "iot-actuator",
+      "iot-button",
+      "iot-camera",
+      "iot-coffee-pot",
+      "iot-door-lock",
+      "iot-factory",
+      "iot-generic",
+      "iot-hardware-board",
+      "iot-lightbulb",
+      "iot-sensor",
+      "iot-servo",
+      "iot-simulator",
+      "iot-thermostat",
+      "iot-windfarm",
+      "rtos",
+      "sphere",
+      "windows10-core-services"
+    ],
+    "excludeCwes": []
+  },
+  "iot-hub-platform": {
+    "category": "iot",
+    "icons": [
+      "azure-cosmos-db",
+      "azure-iot-operations",
+      "device-provisioning-services",
+      "device-update-iot-hub",
+      "digital-twins",
+      "function-apps",
+      "internet-of-things",
+      "iot-central-applications",
+      "iot-certificate",
+      "iot-core",
+      "iot-desired-state",
+      "iot-device-defender",
+      "iot-device-gateway",
+      "iot-device-management",
+      "iot-edge",
+      "iot-greengrass",
+      "iot-greengrass-connector",
+      "iot-hub",
+      "iot-hub-security",
+      "iot-internet-device-id",
+      "iot-jobs",
+      "iot-lambda",
+      "iot-over-the-air-update",
+      "iot-platform",
+      "iot-policy",
+      "iot-policy-emergency",
+      "iot-reported-state",
+      "iot-rule",
+      "iot-shadow",
+      "iot-sitewise",
+      "iot-things-graph",
+      "iot-topic",
+      "windows-10-iot-core-services"
+    ],
+    "excludeCwes": [
+      "CWE-1247",
+      "CWE-1252",
+      "CWE-1257",
+      "CWE-1299",
+      "CWE-1314",
+      "CWE-1319",
+      "CWE-1320",
+      "CWE-1423",
+      "CWE-1429"
+    ]
+  },
+  "iot-connectivity": {
+    "category": "iot",
+    "icons": [
+      "azure-databox-gateway",
+      "azure-maps-accounts",
+      "azure-orbital",
+      "azure-stack",
+      "iot-action",
+      "iot-cloud",
+      "iot-http",
+      "iot-http2",
+      "iot-link-wan",
+      "iot-mobile-connection-package",
+      "iot-mqtt",
+      "maps",
+      "stack-hci-premium"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-1247",
+      "CWE-1252",
+      "CWE-1257",
+      "CWE-1284",
+      "CWE-1299",
+      "CWE-1314",
+      "CWE-1319",
+      "CWE-1320",
+      "CWE-1423",
+      "CWE-1429"
+    ]
+  },
+  "iot-analytics": {
+    "category": "iot",
+    "icons": [
+      "event-grid-subscriptions",
+      "event-hub-clusters",
+      "event-hubs",
+      "iot-analytics",
+      "iot-analytics-channel",
+      "iot-analytics-data-set",
+      "iot-analytics-data-store",
+      "iot-analytics-notebook",
+      "iot-analytics-pipeline",
+      "iot-events",
+      "logic-apps",
+      "machine-learning-studio-classic-web-services",
+      "machine-learning-studio-web-service-plans",
+      "machine-learning-studio-workspaces",
+      "notification-hub-namespaces",
+      "notification-hubs",
+      "stream-analytics-jobs",
+      "time-series-data-sets",
+      "time-series-insights-access-policies",
+      "time-series-insights-environments",
+      "time-series-insights-event-sources",
+      "time-series-insights-events-sources"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-322",
+      "CWE-346",
+      "CWE-385",
+      "CWE-419",
+      "CWE-420",
+      "CWE-425",
+      "CWE-515",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-918",
+      "CWE-924",
+      "CWE-940",
+      "CWE-941",
+      "CWE-1247",
+      "CWE-1252",
+      "CWE-1257",
+      "CWE-1284",
+      "CWE-1299",
+      "CWE-1314",
+      "CWE-1319",
+      "CWE-1320",
+      "CWE-1327",
+      "CWE-1423",
+      "CWE-1429"
+    ]
+  },
+  "iot-consumer": {
+    "category": "iot",
+    "icons": [
+      "iot-1-click",
+      "iot-alexa-echo",
+      "iot-alexa-enabled-device",
+      "iot-alexa-skill",
+      "iot-alexa-voice-service",
+      "iot-bank",
+      "iot-bicycle",
+      "iot-car",
+      "iot-cart",
+      "iot-fire-tv",
+      "iot-fire-tv-stick",
+      "iot-house",
+      "iot-medical-emergency",
+      "iot-travel",
+      "iot-utility"
+    ],
+    "excludeCwes": [
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-763",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-911",
+      "CWE-1247",
+      "CWE-1252",
+      "CWE-1257",
+      "CWE-1284",
+      "CWE-1299",
+      "CWE-1314",
+      "CWE-1319",
+      "CWE-1320",
+      "CWE-1423",
+      "CWE-1429"
+    ]
+  },
+  "_comment_storage": "--- STORAGE (26 CWE pool from CWE-1219, CWE-199) ---",
+  "_comment_storage_groups": "FileHandling(9): path traversal 22,41,59,66 | temp 378,379 | search path 426,427,428 | InfoExposure(17): all CWE-199 members",
+  "file-storage": {
+    "category": "storage",
+    "icons": [
+      "azure-fileshares",
+      "azure-hcp-cache",
+      "azure-netapp-files",
+      "azurefxtedgefiler",
+      "efs-infrequentaccess-primary-bg",
+      "efs-standard-primary-bg",
+      "elastic-file-system-efs",
+      "elastic-file-system-efs-file-system",
+      "file-storage",
+      "file-storage-hdfs",
+      "file-storage-nas",
+      "file-storage-white",
+      "filestore",
+      "fsx",
+      "fsx-for-lustre",
+      "fsx-for-windows-file-server",
+      "glusterfs",
+      "manila",
+      "netapp-files",
+      "storage-azure-files",
+      "storsimple-data-managers",
+      "storsimple-device-managers"
+    ],
+    "excludeCwes": []
+  },
+  "block-storage": {
+    "category": "storage",
+    "icons": [
+      "block-storage",
+      "block-storage-clone",
+      "block-storage-clone-white",
+      "block-storage-white",
+      "ceph",
+      "ceph-osd",
+      "cinder",
+      "disk",
+      "disk-pool",
+      "elastic-block-store-ebs",
+      "elastic-block-store-ebs-snapshot",
+      "elastic-block-store-ebs-volume",
+      "elastic-san",
+      "local-ssd",
+      "multiple-volumes-resource",
+      "persistent-disk",
+      "portworx",
+      "pv",
+      "pvc",
+      "sc",
+      "ssd",
+      "vol",
+      "volume",
+      "volume-snapshot"
+    ],
+    "excludeCwes": [
+      "CWE-378",
+      "CWE-379",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428"
+    ]
+  },
+  "object-storage": {
+    "category": "storage",
+    "icons": [
+      "blob-block",
+      "blob-page",
+      "blob-storage",
+      "buckets",
+      "buckets-white",
+      "cloud-storage-gateway",
+      "data-lake-storage",
+      "data-lake-storage-gen1",
+      "object-storage",
+      "object-storage-service",
+      "object-storage-white",
+      "object-table-store",
+      "s3-access-points",
+      "s3-glacier",
+      "s3-glacier-archive",
+      "s3-glacier-vault",
+      "s3-object-lambda-access-points",
+      "simple-storage-service",
+      "simple-storage-service-s3",
+      "simple-storage-service-s3-bucket",
+      "simple-storage-service-s3-bucket-with-objects",
+      "simple-storage-service-s3-object",
+      "swift"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-378",
+      "CWE-379",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428"
+    ]
+  },
+  "backup-dr": {
+    "category": "storage",
+    "icons": [
+      "azure-databox-gateway",
+      "azure-stack-edge",
+      "azure-storage-mover",
+      "backup",
+      "backup-restore",
+      "backup-restore-white",
+      "backup-vault",
+      "cloudendure-disaster-recovery",
+      "data-box",
+      "data-box-edge-data-box-gateway",
+      "data-transfer",
+      "data-transfer-white",
+      "database-backup-service",
+      "hybrid-backup-recovery",
+      "hybrid-cloud-disaster-recovery",
+      "import-export-jobs",
+      "recovery-services-vaults",
+      "snow-family-snowball-import-export",
+      "snowball",
+      "snowball-edge",
+      "snowmobile"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-378",
+      "CWE-379",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428"
+    ]
+  },
+  "archive-storage": {
+    "category": "storage",
+    "icons": [
+      "archive-storage",
+      "space",
+      "tape-storage"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-378",
+      "CWE-379",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428"
+    ]
+  },
+  "storage-infra": {
+    "category": "storage",
+    "icons": [
+      "data-share-invitations",
+      "data-shares",
+      "elastic-performance",
+      "elastic-performance-white",
+      "folder",
+      "general-storage",
+      "imm",
+      "queues-storage",
+      "storage",
+      "storage-accounts",
+      "storage-accounts-classic",
+      "storage-container",
+      "storage-explorer",
+      "storage-gateway",
+      "storage-gateway-cached-volume",
+      "storage-gateway-non-cached-volume",
+      "storage-gateway-virtual-tape-library",
+      "storage-gateway-white",
+      "storage-sync-services",
+      "table-storage"
+    ],
+    "excludeCwes": [
+      "CWE-378",
+      "CWE-379",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428"
+    ]
+  },
+  "_comment_management": "--- MANAGEMENT (44 CWE pool from CWE-265, CWE-1210, CWE-1211, CWE-1212) ---",
+  "_comment_management_groups": "AuthProtocol(6): 289,290,294,301,303,322 | WebAuthUI(3): 603,804,836 | SandboxCode(2): 243,580",
+  "monitoring-alerting": {
+    "category": "management",
+    "icons": [
+      "alert-notification",
+      "amazon-devops-guru",
+      "amazon-managed-grafana",
+      "amazon-managed-prometheus",
+      "chatbot",
+      "cloudwatch",
+      "cloudwatch-alarm",
+      "cloudwatch-event-event-based",
+      "cloudwatch-event-time-based",
+      "cloudwatch-logs",
+      "cloudwatch-rule",
+      "codeguru",
+      "monitoring-metrics",
+      "opsworks-monitoring",
+      "personal-health-dashboard",
+      "push-notifications",
+      "user-notifications"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-301",
+      "CWE-303",
+      "CWE-322",
+      "CWE-580",
+      "CWE-603",
+      "CWE-804",
+      "CWE-836"
+    ]
+  },
+  "iac-config-mgmt": {
+    "category": "management",
+    "icons": [
+      "cloudformation",
+      "cloudformation-change-set",
+      "cloudformation-stack",
+      "cloudformation-template",
+      "config",
+      "opsworks",
+      "opsworks-apps",
+      "opsworks-deployments",
+      "opsworks-instances",
+      "opsworks-layers",
+      "opsworks-permissions",
+      "opsworks-resources",
+      "opsworks-stack",
+      "proton",
+      "systems-manager",
+      "systems-manager-app-config",
+      "systems-manager-automation",
+      "systems-manager-documents",
+      "systems-manager-inventory",
+      "systems-manager-maintenance-windows",
+      "systems-manager-opscenter",
+      "systems-manager-parameter-store",
+      "systems-manager-patch-manager",
+      "systems-manager-run-command",
+      "systems-manager-state-manager",
+      "update-management-center"
+    ],
+    "excludeCwes": [
+      "CWE-603",
+      "CWE-804",
+      "CWE-836"
+    ]
+  },
+  "governance-audit": {
+    "category": "management",
+    "icons": [
+      "azure-quotas",
+      "cloudtrail",
+      "control-tower",
+      "information-governance",
+      "management-groups",
+      "managementgroups",
+      "organizations",
+      "organizations-account",
+      "organizations-organizational-unit",
+      "quotas",
+      "reservations",
+      "reserved-capacity",
+      "trusted-advisor",
+      "trusted-advisor-checklist",
+      "trusted-advisor-checklist-cost",
+      "trusted-advisor-checklist-fault-tolerant",
+      "trusted-advisor-checklist-performance",
+      "trusted-advisor-checklist-security",
+      "well-architected-tool",
+      "ns"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-301",
+      "CWE-303",
+      "CWE-322",
+      "CWE-580",
+      "CWE-603",
+      "CWE-804",
+      "CWE-836"
+    ]
+  },
+  "resource-portal": {
+    "category": "management",
+    "icons": [
+      "billing",
+      "cloud-management",
+      "command-line-interface",
+      "license-manager",
+      "managed-services",
+      "management",
+      "management-and-governance",
+      "management-console",
+      "management-portal",
+      "marketplace-management",
+      "project",
+      "provider-cloud-portal-service",
+      "resource",
+      "resource-explorer",
+      "resource-group-list",
+      "resource-groups",
+      "resource-linked",
+      "resourcegroups",
+      "service-catalog",
+      "service-management-tools",
+      "subscriptions",
+      "support",
+      "wac"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-301",
+      "CWE-303",
+      "CWE-322",
+      "CWE-580"
+    ]
+  },
+  "domain-specific-mgmt": {
+    "category": "management",
+    "icons": [
+      "amazon-managed-workflows-apache-airflow",
+      "api-management",
+      "arc-data-services",
+      "auto-scaling",
+      "cluster-management",
+      "content-management",
+      "data-management-service",
+      "data-services",
+      "device-management",
+      "edge-management",
+      "it-service-management",
+      "process-management",
+      "region-management",
+      "scvmm-management-servers",
+      "targets-management"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-580",
+      "CWE-603",
+      "CWE-804",
+      "CWE-836"
+    ]
+  },
+  "_comment_analytics": "--- ANALYTICS (32 CWE pool from CWE-19, CWE-1214) ---",
+  "_comment_analytics_groups": "Web(3): 472,565,601 | XML(2): 611,776",
+  "stream-processing": {
+    "category": "analytics",
+    "icons": [
+      "event-hub-clusters",
+      "event-hubs",
+      "flink",
+      "kinesis",
+      "kinesis-data-analytics",
+      "kinesis-data-firehose",
+      "kinesis-data-streams",
+      "kinesis-video-streams",
+      "managed-streaming-for-kafka",
+      "norikra",
+      "pubsub",
+      "storm",
+      "stream-analytics-jobs",
+      "streaming-computing"
+    ],
+    "excludeCwes": [
+      "CWE-472",
+      "CWE-565",
+      "CWE-601",
+      "CWE-611",
+      "CWE-776"
+    ]
+  },
+  "etl-pipeline": {
+    "category": "analytics",
+    "icons": [
+      "beam",
+      "composer",
+      "data-factories",
+      "data-factory",
+      "data-fusion",
+      "data-integration",
+      "data-pipeline",
+      "dataflow",
+      "dataflow-apache",
+      "dataform",
+      "datalab",
+      "dataprep",
+      "dataproc",
+      "dbt",
+      "dcat",
+      "glue",
+      "glue-crawlers",
+      "glue-data-catalog",
+      "private-link-services",
+      "singer",
+      "stitch"
+    ],
+    "excludeCwes": [
+      "CWE-472",
+      "CWE-565",
+      "CWE-601"
+    ]
+  },
+  "bi-visualization": {
+    "category": "analytics",
+    "icons": [
+      "analytics",
+      "azure-workbooks",
+      "device-analytics",
+      "endpoint-analytics",
+      "log-analytics-workspaces",
+      "looker",
+      "metabase",
+      "power-bi-embedded",
+      "power-platform",
+      "powerbi",
+      "quicksight",
+      "superset",
+      "tableau",
+      "video-analyzers"
+    ],
+    "excludeCwes": []
+  },
+  "search-analytics": {
+    "category": "analytics",
+    "icons": [
+      "amazon-opensearch-service",
+      "cloudsearch",
+      "cloudsearch-search-documents",
+      "elasticsearch-service",
+      "open-search"
+    ],
+    "excludeCwes": [
+      "CWE-472",
+      "CWE-565",
+      "CWE-601"
+    ]
+  },
+  "big-data-compute": {
+    "category": "analytics",
+    "icons": [
+      "azure-databricks",
+      "databricks",
+      "dremio",
+      "elatic-map-reduce",
+      "emr",
+      "emr-cluster",
+      "emr-engine",
+      "emr-engine-mapr-m3",
+      "emr-engine-mapr-m5",
+      "emr-engine-mapr-m7",
+      "emr-hdfs-cluster",
+      "genomics",
+      "hadoop",
+      "hd-insight-clusters",
+      "hive",
+      "presto",
+      "spark",
+      "trino"
+    ],
+    "excludeCwes": [
+      "CWE-472",
+      "CWE-565",
+      "CWE-601",
+      "CWE-611",
+      "CWE-776"
+    ]
+  },
+  "data-lake-catalog": {
+    "category": "analytics",
+    "icons": [
+      "data-catalog",
+      "data-lake",
+      "data-lake-resource",
+      "data-lake-store-gen1",
+      "data-repositories",
+      "lake-formation"
+    ],
+    "excludeCwes": [
+      "CWE-472",
+      "CWE-565",
+      "CWE-601",
+      "CWE-611",
+      "CWE-776"
+    ]
+  },
+  "_comment_ml": "--- ML (17 CWE pool from Tech:AI/ML) ---",
+  "_comment_ml_groups": "PathTraversal(3): 22,23,36 | GenAI(3): 1426,1427,1434",
+  "ml-platform": {
+    "category": "ml",
+    "icons": [
+      "advanced-solutions-lab",
+      "ai-hub",
+      "ai-platform",
+      "apache-mxnet-on-aws",
+      "automl",
+      "automl-tables",
+      "batch-ai",
+      "deep-learning-amis",
+      "deep-learning-containers",
+      "elastic-inference",
+      "inference-api",
+      "jobs-api",
+      "machine-learning",
+      "machine-learning-service-workspaces",
+      "machine-learning-studio-web-service-plans",
+      "machine-learning-studio-web-services",
+      "machine-learning-studio-workspaces",
+      "sagemaker",
+      "sagemaker-ground-truth",
+      "sagemaker-model",
+      "sagemaker-notebook",
+      "sagemaker-training-job",
+      "tensorflow-on-aws",
+      "tpu",
+      "vertex-ai"
+    ],
+    "excludeCwes": []
+  },
+  "nlp-language": {
+    "category": "ml",
+    "icons": [
+      "automl-natural-language",
+      "automl-translation",
+      "azure-speech-service",
+      "comprehend",
+      "dialog-flow-enterprise-edition",
+      "kendra",
+      "lex",
+      "natural-language-api",
+      "polly",
+      "q",
+      "speech-to-text",
+      "text-to-speech",
+      "textract",
+      "transcribe",
+      "translate",
+      "translation-api"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-23",
+      "CWE-36"
+    ]
+  },
+  "vision-media": {
+    "category": "ml",
+    "icons": [
+      "automl-video-intelligence",
+      "automl-vision",
+      "deepcomposer",
+      "deeplens",
+      "deepracer",
+      "rekognition",
+      "rekognition-image",
+      "rekognition-video",
+      "video-intelligence-api",
+      "vision-api"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-23",
+      "CWE-36",
+      "CWE-1426",
+      "CWE-1427",
+      "CWE-1434"
+    ]
+  },
+  "ai-services": {
+    "category": "ml",
+    "icons": [
+      "ai-platform-data-labeling-service",
+      "augmented-ai",
+      "azure-open-ai",
+      "bedrock",
+      "bot-services",
+      "cognitive-services",
+      "forecast",
+      "fraud-detector",
+      "genomics-accounts",
+      "personalize",
+      "recommendations-ai",
+      "retrieve-rank",
+      "transform"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-23",
+      "CWE-36"
+    ]
+  },
+  "_comment_integration": "--- INTEGRATION (35 CWE pool from CWE-1228, CWE-137, CWE-840) ---",
+  "_comment_integration_groups": "SQL/LDAP(2): 89,90 | Web(1): 79 | CodeLevel(4): 170,463,464,695 | Password(1): 640",
+  "api-gateway-integration": {
+    "category": "integration",
+    "icons": [
+      "api-connections",
+      "api-for-fhir",
+      "api-management",
+      "api-management-services",
+      "appsync",
+      "azure-api-for-fhir"
+    ],
+    "excludeCwes": [
+      "CWE-170",
+      "CWE-463",
+      "CWE-464",
+      "CWE-695"
+    ]
+  },
+  "event-messaging": {
+    "category": "integration",
+    "icons": [
+      "azure-service-bus",
+      "event-grid-domains",
+      "event-grid-subscriptions",
+      "event-grid-topics",
+      "event-resource",
+      "eventbridge",
+      "eventbridge-custom-event-bus-resource",
+      "eventbridge-default-event-bus-resource",
+      "eventbridge-event",
+      "eventbridge-pipes",
+      "eventbridge-rule",
+      "eventbridge-saas-partner-event-bus-resource",
+      "eventbridge-scheduler",
+      "eventbridge-schema",
+      "mq",
+      "partner-namespace",
+      "partner-registration",
+      "partner-topic",
+      "relays",
+      "service-bus",
+      "service-bus-relays",
+      "simple-notification-service-sns",
+      "simple-notification-service-sns-email-notification",
+      "simple-notification-service-sns-http-notification",
+      "simple-notification-service-sns-topic",
+      "simple-queue-service-sqs",
+      "simple-queue-service-sqs-message",
+      "simple-queue-service-sqs-queue",
+      "system-topic"
+    ],
+    "excludeCwes": [
+      "CWE-79",
+      "CWE-89",
+      "CWE-90",
+      "CWE-170",
+      "CWE-463",
+      "CWE-464",
+      "CWE-640",
+      "CWE-695"
+    ]
+  },
+  "workflow-logic": {
+    "category": "integration",
+    "icons": [
+      "application-integration",
+      "biz-talk",
+      "express-workflows",
+      "integration-accounts",
+      "integration-environments",
+      "integration-service-environments",
+      "logic-apps",
+      "logic-apps-custom-connector",
+      "step-functions"
+    ],
+    "excludeCwes": [
+      "CWE-170",
+      "CWE-463",
+      "CWE-464",
+      "CWE-640",
+      "CWE-695"
+    ]
+  },
+  "data-integration": {
+    "category": "integration",
+    "icons": [
+      "app-configuration",
+      "azure-data-catalog",
+      "azure-databox-gateway",
+      "azure-sql-server-stretch-databases",
+      "azure-stack-edge",
+      "data-catalog",
+      "data-transmission-service",
+      "dis",
+      "sendgrid-accounts",
+      "sql-data-warehouses",
+      "storsimple-device-managers"
+    ],
+    "excludeCwes": [
+      "CWE-79",
+      "CWE-170",
+      "CWE-463",
+      "CWE-464",
+      "CWE-640",
+      "CWE-695"
+    ]
+  },
+  "saas-connectors": {
+    "category": "integration",
+    "icons": [
+      "console-mobile-application",
+      "power-platform",
+      "service-catalog-managed-application-definitions",
+      "software-as-a-service"
+    ],
+    "excludeCwes": [
+      "CWE-79",
+      "CWE-89",
+      "CWE-90",
+      "CWE-170",
+      "CWE-463",
+      "CWE-464",
+      "CWE-640",
+      "CWE-695"
+    ]
+  },
+  "_comment_networking": "--- NETWORKING (92 CWE pool from CWE-137, CWE-417, Tech:Web Server) — same pool as network ---",
+  "_comment_networking_groups": "Same tiers as network: T1(L7)=SQL+LDAP | T2(L4-L7)=WebApp+SQL+LDAP | T3(proto)=+Authz | T4(infra)=+InjectGen",
+  "gateway-lb-networking": {
+    "category": "networking",
+    "icons": [
+      "application-gateways",
+      "azure-communications-gateway",
+      "cdn-profiles",
+      "connected-cache",
+      "front-door-and-cdn-profiles",
+      "load-balancer-hub",
+      "load-balancers",
+      "local-network-gateways",
+      "octavia",
+      "on-premises-data-gateways",
+      "traffic-controller",
+      "traffic-manager-profiles",
+      "virtual-network-gateways"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90"
+    ]
+  },
+  "firewall-security-networking": {
+    "category": "networking",
+    "icons": [
+      "azure-firewall-manager",
+      "azure-firewall-policy",
+      "bastions",
+      "ddos-protection-plans",
+      "dns-security-policy",
+      "firewalls",
+      "network-security-groups",
+      "web-application-firewall-policieswaf"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-219",
+      "CWE-245",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "dns-networking": {
+    "category": "networking",
+    "icons": [
+      "designate",
+      "dns-multistack",
+      "dns-private-resolver",
+      "dns-zones"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-862",
+      "CWE-863",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "vnet-routing-networking": {
+    "category": "networking",
+    "icons": [
+      "atm-multistack",
+      "connections",
+      "expressroute-circuits",
+      "nat",
+      "network-interfaces",
+      "network-watcher",
+      "neutron",
+      "route-filters",
+      "route-tables",
+      "spot-vm",
+      "spot-vmss",
+      "subnet",
+      "virtual-networks",
+      "virtual-networks-classic",
+      "virtual-router",
+      "virtual-wan-hub",
+      "virtual-wans"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-140",
+      "CWE-170",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-463",
+      "CWE-464",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-694",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-791",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-917",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1236",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "addressing-private-networking": {
+    "category": "networking",
+    "icons": [
+      "ip-address-manager",
+      "ip-groups",
+      "private-link",
+      "private-link-service",
+      "private-link-services",
+      "proximity-placement-groups",
+      "public-ip-addresses",
+      "public-ip-addresses-classic",
+      "public-ip-prefixes",
+      "reserved-ip-addresses-classic",
+      "resource-management-private-link",
+      "service-endpoint-policies"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-140",
+      "CWE-170",
+      "CWE-219",
+      "CWE-245",
+      "CWE-285",
+      "CWE-352",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-463",
+      "CWE-464",
+      "CWE-472",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-551",
+      "CWE-553",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-612",
+      "CWE-613",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-694",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-791",
+      "CWE-799",
+      "CWE-804",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-917",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1236",
+      "CWE-1275",
+      "CWE-1385"
+    ]
+  },
+  "_comment_identity": "--- IDENTITY (40 CWE pool from CWE-1211, CWE-1212, CWE-255) ---",
+  "_comment_identity_groups": "AuthProtoWire(4): 294,301,303,322 | WebBrowsing(2): 425,939 | FileSystem(1): 552",
+  "directory-services": {
+    "category": "identity",
+    "icons": [
+      "aad-licenses",
+      "active-directory",
+      "active-directory-connect-health",
+      "ad-domain-services",
+      "azure-active-directory",
+      "azure-ad-domain-services",
+      "azure-ad-roles-and-administrators",
+      "custom-azure-ad-roles",
+      "entra-connect",
+      "entra-domain-services",
+      "tenant-properties"
+    ],
+    "excludeCwes": []
+  },
+  "identity-protection": {
+    "category": "identity",
+    "icons": [
+      "access-review",
+      "ad-identity-protection",
+      "ad-privileged-identity-management",
+      "azure-ad-identity-protection",
+      "azure-ad-privilege-identity-management",
+      "azure-ad-privleged-identity-management",
+      "conditional-access",
+      "entra-id-protection",
+      "entra-privleged-identity-management",
+      "global-secure-access",
+      "identity-governance"
+    ],
+    "excludeCwes": [
+      "CWE-294",
+      "CWE-301",
+      "CWE-303",
+      "CWE-322"
+    ]
+  },
+  "user-group-mgmt": {
+    "category": "identity",
+    "icons": [
+      "administrative-units",
+      "app-registrations",
+      "enterprise-applications",
+      "entra-managed-identities",
+      "external-identities",
+      "groups",
+      "managed-identities",
+      "user-settings",
+      "users"
+    ],
+    "excludeCwes": [
+      "CWE-294",
+      "CWE-301",
+      "CWE-303",
+      "CWE-322",
+      "CWE-425",
+      "CWE-939"
+    ]
+  },
+  "identity-providers": {
+    "category": "identity",
+    "icons": [
+      "ad-b2c",
+      "auth0",
+      "azure-ad-b2c",
+      "dex",
+      "okta"
+    ],
+    "excludeCwes": []
+  },
+  "info-protection": {
+    "category": "identity",
+    "icons": [
+      "azure-information-protection",
+      "entra-verified-id",
+      "information-protection",
+      "security",
+      "verifiable-credentials"
+    ],
+    "excludeCwes": [
+      "CWE-294",
+      "CWE-301",
+      "CWE-303",
+      "CWE-322",
+      "CWE-425",
+      "CWE-552",
+      "CWE-939"
+    ]
+  },
+  "network-access": {
+    "category": "identity",
+    "icons": [
+      "api-proxy",
+      "internet-access",
+      "private-access"
+    ],
+    "excludeCwes": [
+      "CWE-294",
+      "CWE-301",
+      "CWE-303",
+      "CWE-322",
+      "CWE-425",
+      "CWE-939"
+    ]
+  },
+  "_comment_devtools": "--- DEVTOOLS (20 CWE pool from CWE-1228, CWE-265) ---",
+  "_comment_devtools_groups": "JavaOOP(1): 580 | Chroot(1): 243 | LowLevel(2): 676,695",
+  "ci-cd-tools": {
+    "category": "devtools",
+    "icons": [
+      "build",
+      "codebuild",
+      "codedeploy",
+      "codepipeline",
+      "codestar",
+      "scheduler",
+      "tasks"
+    ],
+    "excludeCwes": [
+      "CWE-580"
+    ]
+  },
+  "ide-sdk": {
+    "category": "devtools",
+    "icons": [
+      "cloud9",
+      "cloud9-resource",
+      "code",
+      "code-for-intellij",
+      "dev-console",
+      "developer-tools",
+      "developertools",
+      "generic-sdk",
+      "gradle-app-engine-plugin",
+      "ide-plugins",
+      "maven-app-engine-plugin",
+      "microsoft-dev-box",
+      "sdk",
+      "toolbox",
+      "toolkit",
+      "tools-and-sdks",
+      "tools-for-eclipse",
+      "tools-for-powershell",
+      "tools-for-visual-studio"
+    ],
+    "excludeCwes": []
+  },
+  "source-artifact": {
+    "category": "devtools",
+    "icons": [
+      "backlog",
+      "codeartifact",
+      "codecommit",
+      "container-registry",
+      "service-catalog",
+      "source-repositories"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-580",
+      "CWE-676",
+      "CWE-695"
+    ]
+  },
+  "cloud-shell-cli": {
+    "category": "devtools",
+    "icons": [
+      "azure-dev-tunnels",
+      "azurite",
+      "cloud-development-kit",
+      "cloud-shell",
+      "cloudshell",
+      "command-line-interface"
+    ],
+    "excludeCwes": [
+      "CWE-580"
+    ]
+  },
+  "testing-debug": {
+    "category": "devtools",
+    "icons": [
+      "bug",
+      "test-base",
+      "test-lab",
+      "x-ray"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-580"
+    ]
+  },
+  "_comment_monitoring": "--- MONITORING (23 CWE pool from CWE-1210, CWE-199) ---",
+  "_comment_monitoring_groups": "DebugCode(3): 214,215,524 | TimingObservable(3): 204,205,208",
+  "observability-platform": {
+    "category": "monitoring",
+    "icons": [
+      "azure-managed-grafana",
+      "cortex",
+      "datadog",
+      "dynatrace",
+      "grafana",
+      "humio",
+      "mimir",
+      "monasca",
+      "nagios",
+      "newrelic",
+      "prometheus",
+      "prometheus-operator",
+      "sentry",
+      "splunk",
+      "thanos",
+      "zabbix"
+    ],
+    "excludeCwes": []
+  },
+  "health-alerting": {
+    "category": "monitoring",
+    "icons": [
+      "alarm",
+      "alarm-white",
+      "azure-monitor-dashboard",
+      "health-check",
+      "health-check-white",
+      "notifications",
+      "notifications-white",
+      "service-health",
+      "servicehealth",
+      "telemetry",
+      "telemetry-white"
+    ],
+    "excludeCwes": [
+      "CWE-214",
+      "CWE-215",
+      "CWE-524"
+    ]
+  },
+  "data-collection": {
+    "category": "monitoring",
+    "icons": [
+      "data-collection-rules",
+      "events",
+      "events-white",
+      "process-explorer",
+      "queue",
+      "queue-white",
+      "search",
+      "search-white"
+    ],
+    "excludeCwes": []
+  },
+  "workflow-comms": {
+    "category": "monitoring",
+    "icons": [
+      "azure-load-testing",
+      "email",
+      "email-white",
+      "workbooks",
+      "workflow",
+      "workflow-white"
+    ],
+    "excludeCwes": [
+      "CWE-204",
+      "CWE-205",
+      "CWE-208",
+      "CWE-214",
+      "CWE-215",
+      "CWE-524"
+    ]
+  },
+  "_comment_general": "--- GENERAL (241 CWE pool from 15 subs + Tech:WebServer,DatabaseServer) ---",
+  "_comment_general_note": "Broadest type. Subtypes keep CWEs from their relevant subcategory domains only.",
+  "general-web-client": {
+    "category": "general",
+    "icons": [
+      "browser",
+      "client",
+      "internet",
+      "internet-gateway",
+      "mobile",
+      "mobile-engagement"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-73",
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-201",
+      "CWE-204",
+      "CWE-205",
+      "CWE-208",
+      "CWE-209",
+      "CWE-212",
+      "CWE-213",
+      "CWE-214",
+      "CWE-215",
+      "CWE-242",
+      "CWE-243",
+      "CWE-250",
+      "CWE-266",
+      "CWE-267",
+      "CWE-268",
+      "CWE-270",
+      "CWE-272",
+      "CWE-273",
+      "CWE-274",
+      "CWE-280",
+      "CWE-312",
+      "CWE-319",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-347",
+      "CWE-348",
+      "CWE-349",
+      "CWE-351",
+      "CWE-353",
+      "CWE-354",
+      "CWE-359",
+      "CWE-378",
+      "CWE-379",
+      "CWE-403",
+      "CWE-410",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428",
+      "CWE-470",
+      "CWE-474",
+      "CWE-475",
+      "CWE-477",
+      "CWE-494",
+      "CWE-497",
+      "CWE-501",
+      "CWE-502",
+      "CWE-524",
+      "CWE-538",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-580",
+      "CWE-619",
+      "CWE-648",
+      "CWE-649",
+      "CWE-676",
+      "CWE-695",
+      "CWE-749",
+      "CWE-763",
+      "CWE-770",
+      "CWE-771",
+      "CWE-772",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-805",
+      "CWE-826",
+      "CWE-829",
+      "CWE-908",
+      "CWE-909",
+      "CWE-910",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-920",
+      "CWE-921",
+      "CWE-1073",
+      "CWE-1188",
+      "CWE-1204",
+      "CWE-1240",
+      "CWE-1341"
+    ]
+  },
+  "general-infra": {
+    "category": "general",
+    "icons": [
+      "cloud-services",
+      "enterprise",
+      "input-output",
+      "microservices-mesh",
+      "service-discovery-configuration",
+      "transformation-connectivity"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-22",
+      "CWE-26",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-112",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-140",
+      "CWE-170",
+      "CWE-179",
+      "CWE-183",
+      "CWE-184",
+      "CWE-219",
+      "CWE-245",
+      "CWE-256",
+      "CWE-257",
+      "CWE-260",
+      "CWE-261",
+      "CWE-262",
+      "CWE-263",
+      "CWE-285",
+      "CWE-324",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-347",
+      "CWE-348",
+      "CWE-349",
+      "CWE-351",
+      "CWE-352",
+      "CWE-353",
+      "CWE-354",
+      "CWE-356",
+      "CWE-357",
+      "CWE-378",
+      "CWE-379",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-447",
+      "CWE-448",
+      "CWE-449",
+      "CWE-463",
+      "CWE-464",
+      "CWE-472",
+      "CWE-494",
+      "CWE-521",
+      "CWE-523",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-549",
+      "CWE-553",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-606",
+      "CWE-612",
+      "CWE-613",
+      "CWE-620",
+      "CWE-640",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-649",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-784",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-791",
+      "CWE-798",
+      "CWE-799",
+      "CWE-805",
+      "CWE-807",
+      "CWE-829",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-916",
+      "CWE-917",
+      "CWE-923",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1007",
+      "CWE-1021",
+      "CWE-1022",
+      "CWE-1073",
+      "CWE-1173",
+      "CWE-1204",
+      "CWE-1236",
+      "CWE-1240",
+      "CWE-1275",
+      "CWE-1284",
+      "CWE-1285",
+      "CWE-1286",
+      "CWE-1287",
+      "CWE-1288",
+      "CWE-1289",
+      "CWE-1385",
+      "CWE-1392"
+    ]
+  },
+  "general-security": {
+    "category": "general",
+    "icons": [
+      "data-security",
+      "governance-risk-compliance",
+      "identity-access-management",
+      "identity-provider",
+      "infrastructure-security"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-22",
+      "CWE-26",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-73",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-112",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-140",
+      "CWE-170",
+      "CWE-179",
+      "CWE-183",
+      "CWE-184",
+      "CWE-219",
+      "CWE-242",
+      "CWE-245",
+      "CWE-285",
+      "CWE-346",
+      "CWE-348",
+      "CWE-349",
+      "CWE-351",
+      "CWE-352",
+      "CWE-353",
+      "CWE-354",
+      "CWE-356",
+      "CWE-357",
+      "CWE-378",
+      "CWE-379",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-385",
+      "CWE-403",
+      "CWE-410",
+      "CWE-419",
+      "CWE-420",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-447",
+      "CWE-448",
+      "CWE-449",
+      "CWE-463",
+      "CWE-464",
+      "CWE-470",
+      "CWE-472",
+      "CWE-474",
+      "CWE-475",
+      "CWE-477",
+      "CWE-494",
+      "CWE-502",
+      "CWE-515",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-553",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-606",
+      "CWE-612",
+      "CWE-613",
+      "CWE-619",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-649",
+      "CWE-650",
+      "CWE-651",
+      "CWE-676",
+      "CWE-692",
+      "CWE-694",
+      "CWE-695",
+      "CWE-698",
+      "CWE-749",
+      "CWE-756",
+      "CWE-763",
+      "CWE-770",
+      "CWE-771",
+      "CWE-772",
+      "CWE-784",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-791",
+      "CWE-799",
+      "CWE-805",
+      "CWE-807",
+      "CWE-826",
+      "CWE-829",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-908",
+      "CWE-909",
+      "CWE-910",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-917",
+      "CWE-918",
+      "CWE-920",
+      "CWE-923",
+      "CWE-924",
+      "CWE-940",
+      "CWE-941",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1007",
+      "CWE-1021",
+      "CWE-1022",
+      "CWE-1073",
+      "CWE-1173",
+      "CWE-1188",
+      "CWE-1236",
+      "CWE-1275",
+      "CWE-1284",
+      "CWE-1285",
+      "CWE-1286",
+      "CWE-1287",
+      "CWE-1288",
+      "CWE-1289",
+      "CWE-1327",
+      "CWE-1341",
+      "CWE-1385"
+    ]
+  },
+  "general-management": {
+    "category": "general",
+    "icons": [
+      "cost-management",
+      "cost-management-and-billing",
+      "dashboard",
+      "monitoring",
+      "monitoring-logging",
+      "support",
+      "workflow"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-22",
+      "CWE-26",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-73",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-112",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-140",
+      "CWE-170",
+      "CWE-179",
+      "CWE-183",
+      "CWE-184",
+      "CWE-219",
+      "CWE-245",
+      "CWE-256",
+      "CWE-257",
+      "CWE-260",
+      "CWE-261",
+      "CWE-262",
+      "CWE-263",
+      "CWE-285",
+      "CWE-324",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-346",
+      "CWE-347",
+      "CWE-348",
+      "CWE-349",
+      "CWE-351",
+      "CWE-352",
+      "CWE-353",
+      "CWE-354",
+      "CWE-356",
+      "CWE-357",
+      "CWE-378",
+      "CWE-379",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-385",
+      "CWE-403",
+      "CWE-410",
+      "CWE-419",
+      "CWE-420",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-447",
+      "CWE-448",
+      "CWE-449",
+      "CWE-463",
+      "CWE-464",
+      "CWE-470",
+      "CWE-472",
+      "CWE-494",
+      "CWE-502",
+      "CWE-515",
+      "CWE-521",
+      "CWE-523",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-549",
+      "CWE-553",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-606",
+      "CWE-612",
+      "CWE-613",
+      "CWE-619",
+      "CWE-620",
+      "CWE-640",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-649",
+      "CWE-650",
+      "CWE-651",
+      "CWE-692",
+      "CWE-694",
+      "CWE-698",
+      "CWE-756",
+      "CWE-763",
+      "CWE-770",
+      "CWE-771",
+      "CWE-772",
+      "CWE-784",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-791",
+      "CWE-798",
+      "CWE-799",
+      "CWE-805",
+      "CWE-807",
+      "CWE-826",
+      "CWE-829",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-862",
+      "CWE-863",
+      "CWE-908",
+      "CWE-909",
+      "CWE-910",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-916",
+      "CWE-917",
+      "CWE-918",
+      "CWE-920",
+      "CWE-923",
+      "CWE-924",
+      "CWE-940",
+      "CWE-941",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1007",
+      "CWE-1021",
+      "CWE-1022",
+      "CWE-1073",
+      "CWE-1173",
+      "CWE-1188",
+      "CWE-1204",
+      "CWE-1236",
+      "CWE-1240",
+      "CWE-1275",
+      "CWE-1284",
+      "CWE-1285",
+      "CWE-1286",
+      "CWE-1287",
+      "CWE-1288",
+      "CWE-1289",
+      "CWE-1327",
+      "CWE-1341",
+      "CWE-1385",
+      "CWE-1392"
+    ]
+  },
+  "general-dev": {
+    "category": "general",
+    "icons": [
+      "code",
+      "extensions",
+      "scheduler",
+      "sdk",
+      "versions"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-22",
+      "CWE-26",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-73",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-97",
+      "CWE-98",
+      "CWE-113",
+      "CWE-116",
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-201",
+      "CWE-204",
+      "CWE-205",
+      "CWE-208",
+      "CWE-209",
+      "CWE-212",
+      "CWE-213",
+      "CWE-214",
+      "CWE-215",
+      "CWE-219",
+      "CWE-245",
+      "CWE-256",
+      "CWE-257",
+      "CWE-260",
+      "CWE-261",
+      "CWE-262",
+      "CWE-263",
+      "CWE-285",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-295",
+      "CWE-301",
+      "CWE-303",
+      "CWE-305",
+      "CWE-306",
+      "CWE-307",
+      "CWE-308",
+      "CWE-309",
+      "CWE-312",
+      "CWE-319",
+      "CWE-322",
+      "CWE-324",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-346",
+      "CWE-347",
+      "CWE-348",
+      "CWE-349",
+      "CWE-351",
+      "CWE-352",
+      "CWE-353",
+      "CWE-354",
+      "CWE-356",
+      "CWE-357",
+      "CWE-359",
+      "CWE-378",
+      "CWE-379",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-385",
+      "CWE-403",
+      "CWE-410",
+      "CWE-419",
+      "CWE-420",
+      "CWE-425",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-447",
+      "CWE-448",
+      "CWE-449",
+      "CWE-470",
+      "CWE-472",
+      "CWE-494",
+      "CWE-497",
+      "CWE-502",
+      "CWE-515",
+      "CWE-521",
+      "CWE-523",
+      "CWE-524",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-538",
+      "CWE-539",
+      "CWE-549",
+      "CWE-551",
+      "CWE-552",
+      "CWE-553",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-603",
+      "CWE-612",
+      "CWE-613",
+      "CWE-619",
+      "CWE-620",
+      "CWE-639",
+      "CWE-640",
+      "CWE-642",
+      "CWE-644",
+      "CWE-645",
+      "CWE-646",
+      "CWE-647",
+      "CWE-649",
+      "CWE-650",
+      "CWE-651",
+      "CWE-653",
+      "CWE-692",
+      "CWE-698",
+      "CWE-756",
+      "CWE-763",
+      "CWE-770",
+      "CWE-771",
+      "CWE-772",
+      "CWE-784",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-798",
+      "CWE-799",
+      "CWE-804",
+      "CWE-805",
+      "CWE-807",
+      "CWE-826",
+      "CWE-829",
+      "CWE-830",
+      "CWE-836",
+      "CWE-837",
+      "CWE-842",
+      "CWE-862",
+      "CWE-863",
+      "CWE-908",
+      "CWE-909",
+      "CWE-910",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-916",
+      "CWE-918",
+      "CWE-920",
+      "CWE-921",
+      "CWE-923",
+      "CWE-924",
+      "CWE-939",
+      "CWE-940",
+      "CWE-941",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1007",
+      "CWE-1021",
+      "CWE-1022",
+      "CWE-1073",
+      "CWE-1188",
+      "CWE-1204",
+      "CWE-1220",
+      "CWE-1230",
+      "CWE-1240",
+      "CWE-1275",
+      "CWE-1327",
+      "CWE-1341",
+      "CWE-1385",
+      "CWE-1392"
+    ]
+  },
+  "general-data": {
+    "category": "general",
+    "icons": [
+      "cognitive-services",
+      "object-storage",
+      "search",
+      "text-to-speech"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-26",
+      "CWE-73",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-97",
+      "CWE-98",
+      "CWE-112",
+      "CWE-113",
+      "CWE-116",
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-179",
+      "CWE-183",
+      "CWE-184",
+      "CWE-219",
+      "CWE-242",
+      "CWE-243",
+      "CWE-245",
+      "CWE-250",
+      "CWE-256",
+      "CWE-257",
+      "CWE-260",
+      "CWE-261",
+      "CWE-262",
+      "CWE-263",
+      "CWE-266",
+      "CWE-267",
+      "CWE-268",
+      "CWE-270",
+      "CWE-272",
+      "CWE-273",
+      "CWE-274",
+      "CWE-280",
+      "CWE-285",
+      "CWE-289",
+      "CWE-290",
+      "CWE-294",
+      "CWE-295",
+      "CWE-301",
+      "CWE-303",
+      "CWE-305",
+      "CWE-306",
+      "CWE-307",
+      "CWE-308",
+      "CWE-309",
+      "CWE-324",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-352",
+      "CWE-356",
+      "CWE-357",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-385",
+      "CWE-403",
+      "CWE-410",
+      "CWE-419",
+      "CWE-420",
+      "CWE-425",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-447",
+      "CWE-448",
+      "CWE-449",
+      "CWE-470",
+      "CWE-472",
+      "CWE-474",
+      "CWE-475",
+      "CWE-477",
+      "CWE-501",
+      "CWE-502",
+      "CWE-515",
+      "CWE-521",
+      "CWE-523",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-539",
+      "CWE-549",
+      "CWE-551",
+      "CWE-552",
+      "CWE-553",
+      "CWE-564",
+      "CWE-566",
+      "CWE-580",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-603",
+      "CWE-606",
+      "CWE-612",
+      "CWE-613",
+      "CWE-619",
+      "CWE-620",
+      "CWE-639",
+      "CWE-640",
+      "CWE-642",
+      "CWE-644",
+      "CWE-645",
+      "CWE-646",
+      "CWE-647",
+      "CWE-648",
+      "CWE-650",
+      "CWE-651",
+      "CWE-653",
+      "CWE-676",
+      "CWE-692",
+      "CWE-695",
+      "CWE-698",
+      "CWE-749",
+      "CWE-756",
+      "CWE-763",
+      "CWE-770",
+      "CWE-771",
+      "CWE-772",
+      "CWE-784",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-798",
+      "CWE-799",
+      "CWE-804",
+      "CWE-805",
+      "CWE-807",
+      "CWE-826",
+      "CWE-830",
+      "CWE-836",
+      "CWE-837",
+      "CWE-842",
+      "CWE-862",
+      "CWE-863",
+      "CWE-908",
+      "CWE-909",
+      "CWE-910",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-916",
+      "CWE-918",
+      "CWE-920",
+      "CWE-923",
+      "CWE-939",
+      "CWE-940",
+      "CWE-941",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1007",
+      "CWE-1021",
+      "CWE-1022",
+      "CWE-1073",
+      "CWE-1173",
+      "CWE-1188",
+      "CWE-1204",
+      "CWE-1220",
+      "CWE-1240",
+      "CWE-1275",
+      "CWE-1284",
+      "CWE-1285",
+      "CWE-1286",
+      "CWE-1287",
+      "CWE-1288",
+      "CWE-1289",
+      "CWE-1327",
+      "CWE-1341",
+      "CWE-1385",
+      "CWE-1392"
+    ]
+  },
+  "general-user": {
+    "category": "general",
+    "icons": [
+      "cloud-messaging",
+      "user",
+      "users"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-22",
+      "CWE-26",
+      "CWE-41",
+      "CWE-59",
+      "CWE-66",
+      "CWE-73",
+      "CWE-76",
+      "CWE-78",
+      "CWE-79",
+      "CWE-80",
+      "CWE-81",
+      "CWE-82",
+      "CWE-83",
+      "CWE-84",
+      "CWE-85",
+      "CWE-86",
+      "CWE-88",
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-93",
+      "CWE-94",
+      "CWE-97",
+      "CWE-98",
+      "CWE-112",
+      "CWE-113",
+      "CWE-116",
+      "CWE-117",
+      "CWE-120",
+      "CWE-124",
+      "CWE-125",
+      "CWE-131",
+      "CWE-140",
+      "CWE-170",
+      "CWE-179",
+      "CWE-183",
+      "CWE-184",
+      "CWE-201",
+      "CWE-204",
+      "CWE-205",
+      "CWE-208",
+      "CWE-209",
+      "CWE-212",
+      "CWE-213",
+      "CWE-214",
+      "CWE-215",
+      "CWE-219",
+      "CWE-242",
+      "CWE-243",
+      "CWE-245",
+      "CWE-250",
+      "CWE-266",
+      "CWE-267",
+      "CWE-268",
+      "CWE-270",
+      "CWE-272",
+      "CWE-273",
+      "CWE-274",
+      "CWE-280",
+      "CWE-285",
+      "CWE-312",
+      "CWE-319",
+      "CWE-325",
+      "CWE-328",
+      "CWE-331",
+      "CWE-334",
+      "CWE-335",
+      "CWE-338",
+      "CWE-347",
+      "CWE-348",
+      "CWE-349",
+      "CWE-351",
+      "CWE-352",
+      "CWE-353",
+      "CWE-354",
+      "CWE-359",
+      "CWE-378",
+      "CWE-379",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-403",
+      "CWE-410",
+      "CWE-426",
+      "CWE-427",
+      "CWE-428",
+      "CWE-433",
+      "CWE-434",
+      "CWE-444",
+      "CWE-463",
+      "CWE-464",
+      "CWE-470",
+      "CWE-472",
+      "CWE-474",
+      "CWE-475",
+      "CWE-477",
+      "CWE-494",
+      "CWE-497",
+      "CWE-501",
+      "CWE-502",
+      "CWE-524",
+      "CWE-525",
+      "CWE-530",
+      "CWE-536",
+      "CWE-538",
+      "CWE-539",
+      "CWE-551",
+      "CWE-552",
+      "CWE-553",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-580",
+      "CWE-594",
+      "CWE-598",
+      "CWE-600",
+      "CWE-601",
+      "CWE-606",
+      "CWE-612",
+      "CWE-613",
+      "CWE-619",
+      "CWE-639",
+      "CWE-641",
+      "CWE-642",
+      "CWE-644",
+      "CWE-646",
+      "CWE-647",
+      "CWE-648",
+      "CWE-649",
+      "CWE-650",
+      "CWE-651",
+      "CWE-653",
+      "CWE-676",
+      "CWE-692",
+      "CWE-694",
+      "CWE-695",
+      "CWE-698",
+      "CWE-749",
+      "CWE-756",
+      "CWE-763",
+      "CWE-770",
+      "CWE-771",
+      "CWE-772",
+      "CWE-784",
+      "CWE-786",
+      "CWE-787",
+      "CWE-788",
+      "CWE-791",
+      "CWE-799",
+      "CWE-805",
+      "CWE-807",
+      "CWE-826",
+      "CWE-829",
+      "CWE-830",
+      "CWE-837",
+      "CWE-838",
+      "CWE-842",
+      "CWE-862",
+      "CWE-863",
+      "CWE-908",
+      "CWE-909",
+      "CWE-910",
+      "CWE-911",
+      "CWE-914",
+      "CWE-915",
+      "CWE-917",
+      "CWE-920",
+      "CWE-921",
+      "CWE-923",
+      "CWE-939",
+      "CWE-942",
+      "CWE-1004",
+      "CWE-1022",
+      "CWE-1073",
+      "CWE-1173",
+      "CWE-1188",
+      "CWE-1204",
+      "CWE-1220",
+      "CWE-1230",
+      "CWE-1236",
+      "CWE-1240",
+      "CWE-1275",
+      "CWE-1284",
+      "CWE-1285",
+      "CWE-1286",
+      "CWE-1287",
+      "CWE-1288",
+      "CWE-1289",
+      "CWE-1341",
+      "CWE-1385"
+    ]
+  },
+  "_comment_batch_small": "=== BATCH: Small types (≤10 icons) — single subtype, no exclusions ===",
+  "auth-all": {
+    "category": "auth",
+    "icons": [
+      "boundary",
+      "buzzfeed-sso",
+      "generic-saml-token",
+      "oauth2-proxy",
+      "saml-token"
+    ],
+    "excludeCwes": []
+  },
+  "rbac-all": {
+    "category": "rbac",
+    "icons": [
+      "c-role",
+      "crb",
+      "group",
+      "rb",
+      "role",
+      "sa",
+      "user"
+    ],
+    "excludeCwes": []
+  },
+  "certificates-all": {
+    "category": "certificates",
+    "icons": [
+      "cert-manager",
+      "confidential-ledgers",
+      "dedicated-hsm",
+      "lets-encrypt",
+      "ssh-keys",
+      "ssl-padlock"
+    ],
+    "excludeCwes": []
+  },
+  "containers-all": {
+    "category": "containers",
+    "icons": [
+      "app-services",
+      "azure-red-hat-openshift",
+      "batch-accounts",
+      "container-instances",
+      "container-registries",
+      "kubernetes-services",
+      "service-fabric-clusters"
+    ],
+    "excludeCwes": []
+  },
+  "queue-all": {
+    "category": "queue",
+    "icons": [
+      "activemq",
+      "celery",
+      "emqx",
+      "kafka",
+      "nats",
+      "rabbitmq",
+      "storage-queue",
+      "zeromq"
+    ],
+    "excludeCwes": []
+  },
+  "messaging-all": {
+    "category": "messaging",
+    "icons": [
+      "centrifugo",
+      "windows-notification-services"
+    ],
+    "excludeCwes": []
+  },
+  "logging-all": {
+    "category": "logging",
+    "icons": [
+      "datadog",
+      "fluentbit",
+      "graylog",
+      "log-analytics-query-pack",
+      "log-streaming",
+      "loki",
+      "newrelic",
+      "papertrail",
+      "rsyslog",
+      "syslog-ng"
+    ],
+    "excludeCwes": []
+  },
+  "tracing-all": {
+    "category": "tracing",
+    "icons": [
+      "jaeger",
+      "tempo"
+    ],
+    "excludeCwes": []
+  },
+  "observability-all": {
+    "category": "observability",
+    "icons": [
+      "apm",
+      "logs",
+      "metrics",
+      "observability",
+      "uptime"
+    ],
+    "excludeCwes": []
+  },
+  "client-all": {
+    "category": "client",
+    "icons": [
+      "client",
+      "user",
+      "users"
+    ],
+    "excludeCwes": []
+  },
+  "api-all": {
+    "category": "api",
+    "icons": [
+      "api-gateway",
+      "apigee",
+      "endpoints",
+      "fhir-service",
+      "medtech-service"
+    ],
+    "excludeCwes": []
+  },
+  "ci-all": {
+    "category": "ci",
+    "icons": [
+      "builds",
+      "circleci",
+      "concourseci",
+      "droneci",
+      "github-actions",
+      "gitlabci",
+      "jenkins",
+      "teamcity",
+      "travisci",
+      "zuulci"
+    ],
+    "excludeCwes": []
+  },
+  "cd-all": {
+    "category": "cd",
+    "icons": [
+      "spinnaker",
+      "tekton",
+      "tekton-cli"
+    ],
+    "excludeCwes": []
+  },
+  "dns-all": {
+    "category": "dns",
+    "icons": [
+      "coredns",
+      "powerdns"
+    ],
+    "excludeCwes": []
+  },
+  "inmemory-all": {
+    "category": "inmemory",
+    "icons": [
+      "aerospike",
+      "cache",
+      "hazelcast",
+      "memcached",
+      "redis"
+    ],
+    "excludeCwes": []
+  },
+  "etl-all": {
+    "category": "etl",
+    "icons": [
+      "embulk",
+      "ssis-lift-and-shift-ir"
+    ],
+    "excludeCwes": []
+  },
+  "vcs-all": {
+    "category": "vcs",
+    "icons": [
+      "branch",
+      "commit",
+      "git",
+      "gitea",
+      "github",
+      "gitlab",
+      "svn",
+      "tfs-vc-repository"
+    ],
+    "excludeCwes": []
+  },
+  "gitops-all": {
+    "category": "gitops",
+    "icons": [
+      "argocd",
+      "flagger",
+      "flux"
+    ],
+    "excludeCwes": []
+  },
+  "iac-all": {
+    "category": "iac",
+    "icons": [
+      "ansible",
+      "atlantis",
+      "awx",
+      "mission-landing-zone",
+      "pulumi",
+      "puppet",
+      "template-specs",
+      "templates",
+      "terraform"
+    ],
+    "excludeCwes": []
+  },
+  "registry-all": {
+    "category": "registry",
+    "icons": [
+      "harbor",
+      "jfrog"
+    ],
+    "excludeCwes": []
+  },
+  "search-all": {
+    "category": "search",
+    "icons": [
+      "solr"
+    ],
+    "excludeCwes": []
+  },
+  "workflow-all": {
+    "category": "workflow",
+    "icons": [
+      "airflow",
+      "digdag",
+      "kubeflow",
+      "nifi"
+    ],
+    "excludeCwes": []
+  },
+  "virtualization-all": {
+    "category": "virtualization",
+    "icons": [
+      "qemu",
+      "virtualbox",
+      "vmware",
+      "xen"
+    ],
+    "excludeCwes": []
+  },
+  "runtime-all": {
+    "category": "runtime",
+    "icons": [
+      "dapr"
+    ],
+    "excludeCwes": []
+  },
+  "baremetal-all": {
+    "category": "baremetal",
+    "icons": [
+      "cyborg",
+      "ironic"
+    ],
+    "excludeCwes": []
+  },
+  "infra-all": {
+    "category": "infra",
+    "icons": [
+      "etcd",
+      "master",
+      "node"
+    ],
+    "excludeCwes": []
+  },
+  "alerting-all": {
+    "category": "alerting",
+    "icons": [
+      "newrelic",
+      "opsgenie",
+      "pagerduty",
+      "pushover",
+      "xmatters"
+    ],
+    "excludeCwes": []
+  },
+  "routing-all": {
+    "category": "routing",
+    "icons": [
+      "graphhopper",
+      "osrm",
+      "pgrouting",
+      "valhalla"
+    ],
+    "excludeCwes": []
+  },
+  "nfv-all": {
+    "category": "nfv",
+    "icons": [
+      "tacker"
+    ],
+    "excludeCwes": []
+  },
+  "deployment-all": {
+    "category": "deployment",
+    "icons": [
+      "ansible",
+      "azure-deployment-environments",
+      "charms",
+      "chef",
+      "helm",
+      "kolla",
+      "tripleo"
+    ],
+    "excludeCwes": []
+  },
+  "containerservices-all": {
+    "category": "containerservices",
+    "icons": [
+      "kuryr"
+    ],
+    "excludeCwes": []
+  },
+  "controlplane-all": {
+    "category": "controlplane",
+    "icons": [
+      "api",
+      "c-c-m",
+      "c-m",
+      "k-proxy",
+      "kubelet",
+      "sched"
+    ],
+    "excludeCwes": []
+  },
+  "clusterconfig-all": {
+    "category": "clusterconfig",
+    "icons": [
+      "hpa",
+      "limits",
+      "quota"
+    ],
+    "excludeCwes": []
+  },
+  "podconfig-all": {
+    "category": "podconfig",
+    "icons": [
+      "cm",
+      "secret"
+    ],
+    "excludeCwes": []
+  },
+  "packaging-all": {
+    "category": "packaging",
+    "icons": [
+      "loci",
+      "puppet",
+      "rpm"
+    ],
+    "excludeCwes": []
+  },
+  "orchestration-all": {
+    "category": "orchestration",
+    "icons": [
+      "blazar",
+      "ece",
+      "eck",
+      "heat",
+      "mistral",
+      "senlin",
+      "zaqar"
+    ],
+    "excludeCwes": []
+  },
+  "chat-all": {
+    "category": "chat",
+    "icons": [
+      "discord",
+      "line",
+      "mattermost",
+      "messenger",
+      "rocket-chat",
+      "slack",
+      "teams",
+      "telegram"
+    ],
+    "excludeCwes": []
+  },
+  "communication-all": {
+    "category": "communication",
+    "icons": [
+      "azure-communication-services",
+      "direct-mail",
+      "exchange-on-premises-access",
+      "mobile-push",
+      "twilio"
+    ],
+    "excludeCwes": []
+  },
+  "enterprisesearch-all": {
+    "category": "enterprisesearch",
+    "icons": [
+      "app-search",
+      "crawler",
+      "enterprise-search",
+      "site-search",
+      "workplace-search"
+    ],
+    "excludeCwes": []
+  },
+  "migrate-all": {
+    "category": "migrate",
+    "icons": [
+      "azure-databox-gateway",
+      "azure-migrate",
+      "azure-stack-edge",
+      "cost-management-and-billing",
+      "data-box",
+      "recovery-services-vaults"
+    ],
+    "excludeCwes": []
+  },
+  "filesharing-all": {
+    "category": "filesharing",
+    "icons": [
+      "nextcloud"
+    ],
+    "excludeCwes": []
+  },
+  "mlops-all": {
+    "category": "mlops",
+    "icons": [
+      "mlflow",
+      "polyaxon"
+    ],
+    "excludeCwes": []
+  },
+  "recommendation-all": {
+    "category": "recommendation",
+    "icons": [
+      "recombee"
+    ],
+    "excludeCwes": []
+  },
+  "apiproxies-all": {
+    "category": "apiproxies",
+    "icons": [
+      "ec2api"
+    ],
+    "excludeCwes": []
+  },
+  "cli-all": {
+    "category": "cli",
+    "icons": [
+      "azure-cloud-shell",
+      "gdal",
+      "imposm",
+      "lastools",
+      "mapnik",
+      "mdal",
+      "pdal",
+      "powershell"
+    ],
+    "excludeCwes": []
+  },
+  "desktop-all": {
+    "category": "desktop",
+    "icons": [
+      "maptunik",
+      "qgis"
+    ],
+    "excludeCwes": []
+  },
+  "frontend-all": {
+    "category": "frontend",
+    "icons": [
+      "horizon"
+    ],
+    "excludeCwes": []
+  },
+  "automation-all": {
+    "category": "automation",
+    "icons": [
+      "n8n"
+    ],
+    "excludeCwes": []
+  },
+  "beats-all": {
+    "category": "beats",
+    "icons": [
+      "apm",
+      "auditbeat",
+      "filebeat",
+      "functionbeat",
+      "heartbeat",
+      "metricbeat",
+      "packetbeat",
+      "winlogbeat"
+    ],
+    "excludeCwes": []
+  },
+  "operations-all": {
+    "category": "operations",
+    "icons": [
+      "logging",
+      "monitoring"
+    ],
+    "excludeCwes": []
+  },
+  "agent-all": {
+    "category": "agent",
+    "icons": [
+      "agent",
+      "endpoint",
+      "fleet",
+      "integrations"
+    ],
+    "excludeCwes": []
+  },
+  "aggregator-all": {
+    "category": "aggregator",
+    "icons": [
+      "fluentd",
+      "vector"
+    ],
+    "excludeCwes": []
+  },
+  "develop-all": {
+    "category": "develop",
+    "icons": [
+      "authentication",
+      "firestore",
+      "functions",
+      "hosting",
+      "ml-kit",
+      "realtime-database",
+      "storage"
+    ],
+    "excludeCwes": []
+  },
+  "sharedservices-all": {
+    "category": "sharedservices",
+    "icons": [
+      "barbican",
+      "glance",
+      "karbor",
+      "keystone",
+      "searchlight"
+    ],
+    "excludeCwes": []
+  },
+  "applicationlifecycle-all": {
+    "category": "applicationlifecycle",
+    "icons": [
+      "freezer",
+      "masakari",
+      "murano",
+      "solum"
+    ],
+    "excludeCwes": []
+  },
+  "workloadprovisioning-all": {
+    "category": "workloadprovisioning",
+    "icons": [
+      "magnum",
+      "sahara",
+      "trove"
+    ],
+    "excludeCwes": []
+  },
+  "ecosystem-all": {
+    "category": "ecosystem",
+    "icons": [
+      "external-dns",
+      "helm",
+      "krew",
+      "kustomize"
+    ],
+    "excludeCwes": []
+  },
+  "quality-all": {
+    "category": "quality",
+    "icons": [
+      "app-distribution",
+      "crash-reporting",
+      "crashlytics",
+      "performance-monitoring",
+      "test-lab"
+    ],
+    "excludeCwes": []
+  },
+  "enduser-all": {
+    "category": "enduser",
+    "icons": [
+      "appstream-2-0",
+      "desktop-and-app-streaming",
+      "workdocs",
+      "worklink",
+      "workspaces"
+    ],
+    "excludeCwes": []
+  },
+  "chaos-all": {
+    "category": "chaos",
+    "icons": [
+      "azure-chaos-studio",
+      "chaos-mesh",
+      "litmus-chaos"
+    ],
+    "excludeCwes": []
+  },
+  "optimization-all": {
+    "category": "optimization",
+    "icons": [
+      "congress",
+      "rally",
+      "vitrage",
+      "watcher"
+    ],
+    "excludeCwes": []
+  },
+  "engagement-all": {
+    "category": "engagement",
+    "icons": [
+      "connect",
+      "customer-engagement",
+      "pinpoint",
+      "simple-email-service-ses",
+      "simple-email-service-ses-email"
+    ],
+    "excludeCwes": []
+  },
+  "enablement-all": {
+    "category": "enablement",
+    "icons": [
+      "customer-enablement",
+      "iq",
+      "managed-services",
+      "professional-services",
+      "support"
+    ],
+    "excludeCwes": []
+  },
+  "azureecosystem-all": {
+    "category": "azureecosystem",
+    "icons": [
+      "applens",
+      "azure-hybrid-center",
+      "collaborative-service"
+    ],
+    "excludeCwes": []
+  },
+  "azurestack-all": {
+    "category": "azurestack",
+    "icons": [
+      "capacity",
+      "infrastructure-backup",
+      "multi-tenancy",
+      "offers",
+      "plans",
+      "updates",
+      "user-subscriptions"
+    ],
+    "excludeCwes": []
+  },
+  "grow-all": {
+    "category": "grow",
+    "icons": [
+      "ab-testing",
+      "app-indexing",
+      "dynamic-links",
+      "in-app-messaging",
+      "invites",
+      "messaging",
+      "predictions",
+      "remote-config"
+    ],
+    "excludeCwes": []
+  },
+  "hybridmulticloud-all": {
+    "category": "hybridmulticloud",
+    "icons": [
+      "azure-operator-5g-core",
+      "azure-operator-insights",
+      "azure-operator-nexus",
+      "azure-operator-service-manager",
+      "azure-programmable-connectivity"
+    ],
+    "excludeCwes": []
+  },
+  "multiregion-all": {
+    "category": "multiregion",
+    "icons": [
+      "tricircle"
+    ],
+    "excludeCwes": []
+  },
+  "satellite-all": {
+    "category": "satellite",
+    "icons": [
+      "ground-station",
+      "satellite"
+    ],
+    "excludeCwes": []
+  },
+  "robotics-all": {
+    "category": "robotics",
+    "icons": [
+      "robomaker",
+      "robomaker-cloud-extension-ros",
+      "robomaker-development-environment",
+      "robomaker-fleet-management",
+      "robomaker-simulator",
+      "robotics"
+    ],
+    "excludeCwes": []
+  },
+  "business-all": {
+    "category": "business",
+    "icons": [
+      "alexa-for-business",
+      "business-applications",
+      "chime",
+      "workmail"
+    ],
+    "excludeCwes": []
+  },
+  "crm-all": {
+    "category": "crm",
+    "icons": [
+      "intercom",
+      "zendesk"
+    ],
+    "excludeCwes": []
+  },
+  "social-all": {
+    "category": "social",
+    "icons": [
+      "communities",
+      "facebook",
+      "file-sync",
+      "live-collaboration",
+      "messaging",
+      "networking",
+      "twitter"
+    ],
+    "excludeCwes": []
+  },
+  "ar-all": {
+    "category": "ar",
+    "icons": [
+      "ar-vr",
+      "sumerian"
+    ],
+    "excludeCwes": []
+  },
+  "mixedreality-all": {
+    "category": "mixedreality",
+    "icons": [
+      "remote-rendering",
+      "spatial-anchor-accounts"
+    ],
+    "excludeCwes": []
+  },
+  "game-all": {
+    "category": "game",
+    "icons": [
+      "game-tech",
+      "gamelift"
+    ],
+    "excludeCwes": []
+  },
+  "quantum-all": {
+    "category": "quantum",
+    "icons": [
+      "braket",
+      "quantum-technologies"
+    ],
+    "excludeCwes": []
+  },
+  "place-all": {
+    "category": "place",
+    "icons": [
+      "datacenter"
+    ],
+    "excludeCwes": []
+  },
+  "proxmox-all": {
+    "category": "proxmox",
+    "icons": [
+      "pve"
+    ],
+    "excludeCwes": []
+  },
+  "groupware-all": {
+    "category": "groupware",
+    "icons": [
+      "nextcloud"
+    ],
+    "excludeCwes": []
+  },
+  "geocoding-all": {
+    "category": "geocoding",
+    "icons": [
+      "addok",
+      "gisgraphy",
+      "nominatim",
+      "pelias"
+    ],
+    "excludeCwes": []
+  },
+  "javascript-all": {
+    "category": "javascript",
+    "icons": [
+      "cesium",
+      "geostyler",
+      "keplerjs",
+      "leaflet",
+      "maplibre",
+      "ol-ext",
+      "openlayers",
+      "turfjs"
+    ],
+    "excludeCwes": []
+  },
+  "newicons-all": {
+    "category": "newicons",
+    "icons": [
+      "azure-sustainability",
+      "connected-vehicle-platform",
+      "entra-connect-health",
+      "entra-connect-sync",
+      "icm-troubleshooting",
+      "osconfig",
+      "storage-actions"
+    ],
+    "excludeCwes": []
+  },
+  "others-all": {
+    "category": "others",
+    "icons": [
+      "crd",
+      "psp"
+    ],
+    "excludeCwes": []
+  },
+  "appservices-all": {
+    "category": "appservices",
+    "icons": [
+      "app-service-certificates",
+      "app-service-domains",
+      "app-service-environments",
+      "app-service-plans",
+      "app-services",
+      "cdn-profiles",
+      "cognitive-search",
+      "notification-hubs"
+    ],
+    "excludeCwes": []
+  },
+  "cdn-all": {
+    "category": "cdn",
+    "icons": [
+      "akamai",
+      "cloudflare",
+      "fastly",
+      "imperva"
+    ],
+    "excludeCwes": []
+  },
+  "os-all": {
+    "category": "os",
+    "icons": [
+      "android",
+      "centos",
+      "debian",
+      "ios",
+      "linux-general",
+      "raspbian",
+      "red-hat",
+      "suse",
+      "ubuntu",
+      "windows"
+    ],
+    "excludeCwes": []
+  },
+  "organization-all": {
+    "category": "organization",
+    "icons": [
+      "osgeo"
+    ],
+    "excludeCwes": []
+  },
+  "payment-all": {
+    "category": "payment",
+    "icons": [
+      "adyen",
+      "amazon-pay",
+      "paypal",
+      "stripe"
+    ],
+    "excludeCwes": []
+  },
+  "billing-all": {
+    "category": "billing",
+    "icons": [
+      "cloudkitty"
+    ],
+    "excludeCwes": []
+  },
+  "cost-all": {
+    "category": "cost",
+    "icons": [
+      "budgets",
+      "cost-alerts",
+      "cost-analysis",
+      "cost-and-usage-report",
+      "cost-budgets",
+      "cost-explorer",
+      "cost-export",
+      "cost-management",
+      "reserved-instance-reporting",
+      "savings-plans"
+    ],
+    "excludeCwes": []
+  },
+  "device-all": {
+    "category": "device",
+    "icons": [
+      "mobile",
+      "tablet"
+    ],
+    "excludeCwes": []
+  },
+  "saas-all": {
+    "category": "saas",
+    "icons": [
+      "cloud",
+      "elastic",
+      "firebase",
+      "marketplace"
+    ],
+    "excludeCwes": []
+  },
+  "other-all": {
+    "category": "other",
+    "icons": [
+      "aad-licenses",
+      "app-registrations",
+      "azure-backup-center",
+      "azure-compute-galleries",
+      "azure-virtual-desktop",
+      "central-service-instance-for-sap",
+      "instance-pools",
+      "local-network-gateways",
+      "resource-mover",
+      "savings-plans"
+    ],
+    "excludeCwes": []
+  },
+  "_comment_devops": "=== DEVOPS (33 icons, 20 CWEs from CWE-1228+CWE-265) | Exclusion: Chroot(1): CWE-243 ===",
+  "devops-api-mgmt": {
+    "category": "devops",
+    "icons": [
+      "api-connections",
+      "api-gateway",
+      "api-gateway-white",
+      "api-management-services",
+      "api-service",
+      "api-service-white"
+    ],
+    "excludeCwes": [
+      "CWE-243"
+    ]
+  },
+  "devops-cicd": {
+    "category": "devops",
+    "icons": [
+      "build-test",
+      "cloudtest",
+      "continuous-deploy",
+      "continuous-testing",
+      "load-testing",
+      "pipelines",
+      "release-management",
+      "test-plans"
+    ],
+    "excludeCwes": []
+  },
+  "devops-code-artifact": {
+    "category": "devops",
+    "icons": [
+      "artifact-management",
+      "artifacts",
+      "code-editor",
+      "code-optimization",
+      "collaborative-development",
+      "repos"
+    ],
+    "excludeCwes": [
+      "CWE-243"
+    ]
+  },
+  "devops-platform": {
+    "category": "devops",
+    "icons": [
+      "application-insights",
+      "azure-devops",
+      "boards",
+      "change-analysis",
+      "configuration-management",
+      "devops",
+      "devops-starter"
+    ],
+    "excludeCwes": [
+      "CWE-243"
+    ]
+  },
+  "devops-lab-provision": {
+    "category": "devops",
+    "icons": [
+      "devtest-labs",
+      "lab-accounts",
+      "lab-services",
+      "provision",
+      "resource-mgmt",
+      "resource-mgmt-white"
+    ],
+    "excludeCwes": []
+  },
+  "_comment_managementgovernance": "=== MANAGEMENTGOVERNANCE (33 icons, 44 CWEs from CWE-265+CWE-1211+CWE-1212+CWE-1210) | Exclusions: Chroot(1): CWE-243 | CAPTCHA(1): CWE-804 | AuthProtocol(3): CWE-301,303,322 | PasswordHash(1): CWE-836 ===",
+  "mgovern-monitoring": {
+    "category": "managementgovernance",
+    "icons": [
+      "activity-log",
+      "alerts",
+      "application-insights",
+      "diagnostics-settings",
+      "log-analytics-workspaces",
+      "metrics",
+      "monitor",
+      "operation-log-classic"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-804",
+      "CWE-836"
+    ]
+  },
+  "mgovern-governance": {
+    "category": "managementgovernance",
+    "icons": [
+      "blueprints",
+      "compliance",
+      "policy",
+      "resource-graph-explorer",
+      "service-catalog-mad"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-804"
+    ]
+  },
+  "mgovern-hybrid": {
+    "category": "managementgovernance",
+    "icons": [
+      "arc-machines",
+      "azure-arc",
+      "azure-lighthouse",
+      "machinesazurearc",
+      "my-customers",
+      "service-providers"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-804"
+    ]
+  },
+  "mgovern-resource": {
+    "category": "managementgovernance",
+    "icons": [
+      "advisor",
+      "cost-management-and-billing",
+      "managed-applications-center",
+      "resources-provider",
+      "scheduler-job-collections",
+      "solutions"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-301",
+      "CWE-303",
+      "CWE-322",
+      "CWE-804",
+      "CWE-836"
+    ]
+  },
+  "mgovern-security": {
+    "category": "managementgovernance",
+    "icons": [
+      "automation-accounts",
+      "customer-lockbox-for-microsoft-azure",
+      "education",
+      "intune-trends",
+      "managed-desktop",
+      "recovery-services-vaults",
+      "universal-print",
+      "user-privacy"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-804"
+    ]
+  },
+  "_comment_aimachinelearning": "=== AIMACHINELEARNING (32 icons, 17 CWEs from Tech:AI/ML) | Exclusions: PathTraversal(3): CWE-22,23,36 | GenAI(3): CWE-1426,1427,1434 ===",
+  "aiml-platform": {
+    "category": "aimachinelearning",
+    "icons": [
+      "ai-studio",
+      "azure-experimentation-studio",
+      "batch-ai",
+      "machine-learning",
+      "machine-learning-studio-classic-web-services",
+      "machine-learning-studio-web-service-plans",
+      "machine-learning-studio-workspaces",
+      "metrics-advisor"
+    ],
+    "excludeCwes": []
+  },
+  "aiml-nlp-language": {
+    "category": "aimachinelearning",
+    "icons": [
+      "immersive-readers",
+      "language",
+      "language-understanding",
+      "qna-makers",
+      "speech-services",
+      "translator-text"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-23",
+      "CWE-36"
+    ]
+  },
+  "aiml-vision": {
+    "category": "aimachinelearning",
+    "icons": [
+      "azure-object-understanding",
+      "computer-vision",
+      "custom-vision",
+      "face-apis",
+      "form-recognizers"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-23",
+      "CWE-36",
+      "CWE-1426",
+      "CWE-1427",
+      "CWE-1434"
+    ]
+  },
+  "aiml-genai": {
+    "category": "aimachinelearning",
+    "icons": [
+      "azure-openai",
+      "bot-services",
+      "content-moderators",
+      "personalizers"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-23",
+      "CWE-36"
+    ]
+  },
+  "aiml-cognitive": {
+    "category": "aimachinelearning",
+    "icons": [
+      "azure-applied-ai-services",
+      "cognitive-search",
+      "cognitive-services",
+      "cognitive-services-decisions",
+      "serverless-search"
+    ],
+    "excludeCwes": []
+  },
+  "aiml-domain": {
+    "category": "aimachinelearning",
+    "icons": [
+      "anomaly-detector",
+      "bonsai",
+      "genomics",
+      "genomics-accounts"
+    ],
+    "excludeCwes": [
+      "CWE-22",
+      "CWE-23",
+      "CWE-36",
+      "CWE-1426",
+      "CWE-1427",
+      "CWE-1434"
+    ]
+  },
+  "_comment_blockchain": "=== BLOCKCHAIN (29 icons, 24 CWEs from CWE-1214+CWE-310) | Exclusions: Cookie(1): CWE-565 | PasswordWeak(2): CWE-261,916 ===",
+  "blockchain-platform": {
+    "category": "blockchain",
+    "icons": [
+      "azure-blockchain-service",
+      "blockchain",
+      "hyperledger-fabric",
+      "managed-blockchain",
+      "quantum-ledger-database-qldb"
+    ],
+    "excludeCwes": [
+      "CWE-565"
+    ]
+  },
+  "blockchain-crypto": {
+    "category": "blockchain",
+    "icons": [
+      "azure-token-service",
+      "certificate-authority",
+      "key-management",
+      "wallet"
+    ],
+    "excludeCwes": [
+      "CWE-565"
+    ]
+  },
+  "blockchain-smartcontract": {
+    "category": "blockchain",
+    "icons": [
+      "blockchain-applications",
+      "blockchain-developer",
+      "blockchain-resource",
+      "client-application",
+      "smart-contract"
+    ],
+    "excludeCwes": [
+      "CWE-261",
+      "CWE-565",
+      "CWE-916"
+    ]
+  },
+  "blockchain-network": {
+    "category": "blockchain",
+    "icons": [
+      "abs-member",
+      "consensus",
+      "consortium",
+      "membership",
+      "membership-services-provider-api",
+      "node"
+    ],
+    "excludeCwes": [
+      "CWE-565"
+    ]
+  },
+  "blockchain-comms": {
+    "category": "blockchain",
+    "icons": [
+      "communication",
+      "event",
+      "event-listener",
+      "existing-enterprise-systems",
+      "message-bus",
+      "outbound-connection"
+    ],
+    "excludeCwes": [
+      "CWE-261",
+      "CWE-565",
+      "CWE-916"
+    ]
+  },
+  "blockchain-ledger": {
+    "category": "blockchain",
+    "icons": [
+      "ledger",
+      "services",
+      "transaction-manager"
+    ],
+    "excludeCwes": [
+      "CWE-261",
+      "CWE-565",
+      "CWE-916"
+    ]
+  },
+  "_comment_web": "=== WEB (27 icons, 105 CWEs from CWE-137+CWE-1215+CWE-355+CWE-1217+Tech:WebServer) | Exclusions: J2EE(6): CWE-6,7,245,382,383,594 | SQL+LDAP(2): CWE-89,90 | PHP(1): CWE-98 | Session(4): CWE-384,488,613,1004 ===",
+  "web-api": {
+    "category": "web",
+    "icons": [
+      "api-center",
+      "api-connections",
+      "api-management-services"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-594"
+    ]
+  },
+  "web-appservice": {
+    "category": "web",
+    "icons": [
+      "app-service-certificates",
+      "app-service-domains",
+      "app-service-environments",
+      "app-service-plans",
+      "app-services",
+      "app-space",
+      "azure-spring-apps"
+    ],
+    "excludeCwes": []
+  },
+  "web-static": {
+    "category": "web",
+    "icons": [
+      "static-apps",
+      "web-slots",
+      "web-test",
+      "website-power",
+      "website-staging"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90"
+    ]
+  },
+  "web-cdn": {
+    "category": "web",
+    "icons": [
+      "dns",
+      "domain",
+      "front-door-and-cdn-profiles",
+      "signalr"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-89",
+      "CWE-90",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-488",
+      "CWE-594",
+      "CWE-613",
+      "CWE-1004"
+    ]
+  },
+  "web-media": {
+    "category": "web",
+    "icons": [
+      "azure-media-service",
+      "cognitive-search",
+      "cognitive-services",
+      "media-services"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-594"
+    ]
+  },
+  "web-platform": {
+    "category": "web",
+    "icons": [
+      "notification-hub-namespaces",
+      "power-platform",
+      "search",
+      "virtual-visits-builder"
+    ],
+    "excludeCwes": [
+      "CWE-98"
+    ]
+  },
+  "_comment_framework": "=== FRAMEWORK (25 icons, 39 CWEs from CWE-1228+CWE-137+CWE-1215) | Exclusions: SQL+LDAP+XML(4): CWE-89,90,91,112 ===",
+  "framework-frontend": {
+    "category": "framework",
+    "icons": [
+      "angular",
+      "backbone",
+      "ember",
+      "flutter",
+      "react",
+      "svelte",
+      "vue"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-91",
+      "CWE-112"
+    ]
+  },
+  "framework-backend-python": {
+    "category": "framework",
+    "icons": [
+      "django",
+      "fastapi",
+      "flask",
+      "starlette"
+    ],
+    "excludeCwes": []
+  },
+  "framework-backend-java": {
+    "category": "framework",
+    "icons": [
+      "hibernate",
+      "jhipster",
+      "micronaut",
+      "quarkus",
+      "spring"
+    ],
+    "excludeCwes": []
+  },
+  "framework-fullstack": {
+    "category": "framework",
+    "icons": [
+      "camel",
+      "dotnet",
+      "laravel",
+      "nextjs",
+      "phoenix",
+      "rails",
+      "vercel"
+    ],
+    "excludeCwes": []
+  },
+  "framework-api-data": {
+    "category": "framework",
+    "icons": [
+      "graphql",
+      "sqlpage"
+    ],
+    "excludeCwes": []
+  },
+  "_comment_databases": "=== DATABASES (23 icons, 42 CWEs from CWE-1214+CWE-19+Tech:DatabaseServer) | Same exclusion pattern as database type ===",
+  "databases-sql": {
+    "category": "databases",
+    "icons": [
+      "azure-database-mariadb-server",
+      "azure-database-mysql-server",
+      "azure-database-postgresql-server",
+      "azure-database-postgresql-server-group",
+      "azure-sql",
+      "azure-sql-edge",
+      "azure-sql-server-stretch-databases",
+      "azure-sql-vm",
+      "managed-database",
+      "oracle-database",
+      "sql-database",
+      "sql-elastic-pools",
+      "sql-managed-instance",
+      "sql-server",
+      "sql-server-registries"
+    ],
+    "excludeCwes": [
+      "CWE-90",
+      "CWE-472",
+      "CWE-565",
+      "CWE-601",
+      "CWE-1073"
+    ]
+  },
+  "databases-warehouse": {
+    "category": "databases",
+    "icons": [
+      "azure-data-explorer-clusters",
+      "azure-synapse-analytics",
+      "sql-data-warehouses"
+    ],
+    "excludeCwes": [
+      "CWE-90",
+      "CWE-472",
+      "CWE-565",
+      "CWE-601"
+    ]
+  },
+  "databases-nosql": {
+    "category": "databases",
+    "icons": [
+      "azure-cosmos-db"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-601",
+      "CWE-619"
+    ]
+  },
+  "databases-cache": {
+    "category": "databases",
+    "icons": [
+      "cache-redis"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-564",
+      "CWE-565",
+      "CWE-566",
+      "CWE-601",
+      "CWE-611",
+      "CWE-619",
+      "CWE-776"
+    ]
+  },
+  "databases-infra": {
+    "category": "databases",
+    "icons": [
+      "elastic-job-agents",
+      "instance-pools",
+      "virtual-clusters"
+    ],
+    "excludeCwes": [
+      "CWE-90",
+      "CWE-472",
+      "CWE-565",
+      "CWE-601",
+      "CWE-1073"
+    ]
+  },
+  "_comment_language": "=== LANGUAGE (23 icons, 27 CWEs from CWE-1228+CWE-137) | Exclusions: NullTerm+Sentinel(3): CWE-170,463,464 | LowLevel(1): CWE-695 ===",
+  "lang-systems": {
+    "category": "language",
+    "icons": [
+      "c",
+      "cpp",
+      "rust"
+    ],
+    "excludeCwes": []
+  },
+  "lang-jvm": {
+    "category": "language",
+    "icons": [
+      "java",
+      "kotlin",
+      "scala"
+    ],
+    "excludeCwes": [
+      "CWE-170",
+      "CWE-463",
+      "CWE-464"
+    ]
+  },
+  "lang-scripting": {
+    "category": "language",
+    "icons": [
+      "bash",
+      "php",
+      "python",
+      "r",
+      "ruby"
+    ],
+    "excludeCwes": [
+      "CWE-170",
+      "CWE-463",
+      "CWE-464"
+    ]
+  },
+  "lang-webjs": {
+    "category": "language",
+    "icons": [
+      "javascript",
+      "nodejs",
+      "typescript"
+    ],
+    "excludeCwes": [
+      "CWE-170",
+      "CWE-463",
+      "CWE-464"
+    ]
+  },
+  "lang-compiled": {
+    "category": "language",
+    "icons": [
+      "csharp",
+      "dart",
+      "elixir",
+      "erlang",
+      "go",
+      "swift"
+    ],
+    "excludeCwes": [
+      "CWE-170",
+      "CWE-463",
+      "CWE-464"
+    ]
+  },
+  "lang-data": {
+    "category": "language",
+    "icons": [
+      "latex",
+      "matlab",
+      "sql"
+    ],
+    "excludeCwes": [
+      "CWE-170",
+      "CWE-463",
+      "CWE-464",
+      "CWE-695"
+    ]
+  },
+  "_comment_server": "=== SERVER (22 icons, 31 CWEs from CWE-1218+CWE-399) — All GIS servers | Exclusions: Power(1): CWE-920 | Cursor(1): CWE-619 ===",
+  "gis-webserver": {
+    "category": "server",
+    "icons": [
+      "deegree",
+      "geoserver",
+      "geowebcache",
+      "mapproxy",
+      "mapserver",
+      "pycsw",
+      "pygeoapi",
+      "qgis-server",
+      "zooproject"
+    ],
+    "excludeCwes": [
+      "CWE-920"
+    ]
+  },
+  "gis-platform": {
+    "category": "server",
+    "icons": [
+      "g3w-suite",
+      "geomapfish",
+      "geonetwork",
+      "geonode",
+      "georchestra",
+      "mapstore",
+      "mviewer"
+    ],
+    "excludeCwes": [
+      "CWE-920"
+    ]
+  },
+  "gis-data": {
+    "category": "server",
+    "icons": [
+      "actinia",
+      "baremaps",
+      "geomesa",
+      "kepler",
+      "pg_tileserv"
+    ],
+    "excludeCwes": [
+      "CWE-619",
+      "CWE-920"
+    ]
+  },
+  "gis-monitoring": {
+    "category": "server",
+    "icons": [
+      "geohealthcheck"
+    ],
+    "excludeCwes": [
+      "CWE-619",
+      "CWE-920"
+    ]
+  },
+  "_comment_migration": "=== MIGRATION (22 icons, 39 CWEs from CWE-19+CWE-137) | Exclusions: LDAP(1): CWE-90 | Web(3): CWE-79,472,601 ===",
+  "migration-database": {
+    "category": "migration",
+    "icons": [
+      "azure-database-migration-services",
+      "database-migration-service",
+      "database-migration-service-database-migration-workflow",
+      "database-migration-services",
+      "dms"
+    ],
+    "excludeCwes": [
+      "CWE-90"
+    ]
+  },
+  "migration-server": {
+    "category": "migration",
+    "icons": [
+      "cloudendure-migration",
+      "migrate-compute-engine",
+      "migration-projects",
+      "server-migration-service"
+    ],
+    "excludeCwes": [
+      "CWE-90"
+    ]
+  },
+  "migration-physical": {
+    "category": "migration",
+    "icons": [
+      "data-box",
+      "data-box-edge",
+      "snowball",
+      "snowball-edge",
+      "snowmobile",
+      "transfer-appliance"
+    ],
+    "excludeCwes": [
+      "CWE-79",
+      "CWE-90",
+      "CWE-472",
+      "CWE-601"
+    ]
+  },
+  "migration-datasync": {
+    "category": "migration",
+    "icons": [
+      "datasync",
+      "datasync-agent",
+      "transfer-for-sftp"
+    ],
+    "excludeCwes": [
+      "CWE-79",
+      "CWE-90",
+      "CWE-472",
+      "CWE-601"
+    ]
+  },
+  "migration-mgmt": {
+    "category": "migration",
+    "icons": [
+      "application-discovery-service",
+      "migration-and-transfer",
+      "migration-hub",
+      "recovery-services-vaults"
+    ],
+    "excludeCwes": [
+      "CWE-90"
+    ]
+  },
+  "_comment_applications": "=== APPLICATIONS (19 icons, 110 CWEs from CWE-1228+CWE-137+CWE-355+CWE-1215+Tech:WebServer) | Exclusions: J2EE(6): CWE-6,7,245,382,383,594 | PHP(1): CWE-98 ===",
+  "apps-api-runtime": {
+    "category": "applications",
+    "icons": [
+      "api-developer-portal",
+      "api-polyglot-runtimes",
+      "app-server",
+      "runtime-services"
+    ],
+    "excludeCwes": []
+  },
+  "apps-enterprise": {
+    "category": "applications",
+    "icons": [
+      "enterprise-applications",
+      "saas-applications",
+      "service-broker"
+    ],
+    "excludeCwes": []
+  },
+  "apps-analytics": {
+    "category": "applications",
+    "icons": [
+      "actionable-insight",
+      "index",
+      "visualization"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-594"
+    ]
+  },
+  "apps-ai-cognitive": {
+    "category": "applications",
+    "icons": [
+      "annotate",
+      "ontology",
+      "speech-to-text",
+      "visual-recognition"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-594"
+    ]
+  },
+  "apps-logic": {
+    "category": "applications",
+    "icons": [
+      "application-logic",
+      "iot-application",
+      "microservice",
+      "mobile-app",
+      "open-source-tools"
+    ],
+    "excludeCwes": []
+  },
+  "_comment_connectivity": "=== CONNECTIVITY (18 icons, 92 CWEs from CWE-137+CWE-417+Tech:WebServer) — OCI network services | Exclusions: WebApp(10): CWE-6,7,89,90,97,98,245,382,383,594 | Session(4): CWE-384,613,1004,1275 ===",
+  "conn-backbone": {
+    "category": "connectivity",
+    "icons": [
+      "backbone",
+      "backbone-white",
+      "cdn",
+      "cdn-white"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-594",
+      "CWE-613",
+      "CWE-1004",
+      "CWE-1275"
+    ]
+  },
+  "conn-premises": {
+    "category": "connectivity",
+    "icons": [
+      "customer-datacenter",
+      "customer-datacntr-white",
+      "customer-premises",
+      "customer-premises-white",
+      "disconnected-regions",
+      "disconnected-regions-white"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-594",
+      "CWE-613",
+      "CWE-1004",
+      "CWE-1275"
+    ]
+  },
+  "conn-dns": {
+    "category": "connectivity",
+    "icons": [
+      "dns",
+      "dns-white"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-594",
+      "CWE-613",
+      "CWE-1004",
+      "CWE-1275"
+    ]
+  },
+  "conn-gateway": {
+    "category": "connectivity",
+    "icons": [
+      "fast-connect",
+      "fast-connect-white",
+      "nat-gateway",
+      "nat-gateway-white",
+      "vpn",
+      "vpn-white"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-89",
+      "CWE-90",
+      "CWE-97",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-594",
+      "CWE-613",
+      "CWE-1004",
+      "CWE-1275"
+    ]
+  },
+  "_comment_infrastructure": "=== INFRASTRUCTURE (18 icons, 92 CWEs from CWE-137+CWE-417+Tech:WebServer) — IBM infra | Exclusions: J2EE(6): CWE-6,7,245,382,383,594 | PHP(1): CWE-98 | Session(4): CWE-384,613,1004,1275 ===",
+  "infra-messaging": {
+    "category": "infrastructure",
+    "icons": [
+      "channels",
+      "cloud-messaging",
+      "enterprise-messaging",
+      "event-feed"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-594",
+      "CWE-613",
+      "CWE-1004",
+      "CWE-1275"
+    ]
+  },
+  "infra-mesh": {
+    "category": "infrastructure",
+    "icons": [
+      "interservice-communication",
+      "load-balancing-routing",
+      "microservices-mesh",
+      "peer-services",
+      "service-discovery-configuration",
+      "transformation-connectivity"
+    ],
+    "excludeCwes": [
+      "CWE-98"
+    ]
+  },
+  "infra-platform": {
+    "category": "infrastructure",
+    "icons": [
+      "dashboard",
+      "diagnostics",
+      "infrastructure-services",
+      "monitoring",
+      "monitoring-logging"
+    ],
+    "excludeCwes": [
+      "CWE-98"
+    ]
+  },
+  "infra-edge": {
+    "category": "infrastructure",
+    "icons": [
+      "edge-services",
+      "mobile-backend",
+      "mobile-provider-network"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-384",
+      "CWE-594",
+      "CWE-613",
+      "CWE-1004",
+      "CWE-1275"
+    ]
+  },
+  "_comment_intune": "=== INTUNE (18 icons, 50 CWEs from CWE-1211+CWE-1212+CWE-255+CWE-310+CWE-320) | Exclusions: CAPTCHA(1): CWE-804 | URLScheme(1): CWE-939 | PasswordRecovery(1): CWE-640 ===",
+  "intune-identity": {
+    "category": "intune",
+    "icons": [
+      "azure-ad-roles-and-administrators",
+      "intune",
+      "tenant-status"
+    ],
+    "excludeCwes": [
+      "CWE-804",
+      "CWE-939"
+    ]
+  },
+  "intune-device-mgmt": {
+    "category": "intune",
+    "icons": [
+      "device-compliance",
+      "device-configuration",
+      "device-enrollment",
+      "devices"
+    ],
+    "excludeCwes": [
+      "CWE-804",
+      "CWE-939"
+    ]
+  },
+  "intune-device-sec": {
+    "category": "intune",
+    "icons": [
+      "device-security-apple",
+      "device-security-google",
+      "device-security-windows",
+      "security-baselines"
+    ],
+    "excludeCwes": [
+      "CWE-640",
+      "CWE-804"
+    ]
+  },
+  "intune-app-content": {
+    "category": "intune",
+    "icons": [
+      "client-apps",
+      "ebooks",
+      "intune-app-protection",
+      "software-updates"
+    ],
+    "excludeCwes": [
+      "CWE-640",
+      "CWE-804"
+    ]
+  },
+  "intune-access": {
+    "category": "intune",
+    "icons": [
+      "exchange-access",
+      "intune-for-education",
+      "mindaro"
+    ],
+    "excludeCwes": [
+      "CWE-804"
+    ]
+  },
+  "_comment_data": "=== DATA (18 icons, 49 CWEs from CWE-1214+CWE-19+CWE-199) | Exclusions: Web(3): CWE-472,565,601 | XML(2): CWE-611,776 ===",
+  "data-enterprise": {
+    "category": "data",
+    "icons": [
+      "data-services",
+      "data-sources",
+      "enterprise-data",
+      "enterprise-user-directory",
+      "file-repository"
+    ],
+    "excludeCwes": []
+  },
+  "data-device": {
+    "category": "data",
+    "icons": [
+      "device-identity-service",
+      "device-registry",
+      "model"
+    ],
+    "excludeCwes": [
+      "CWE-611",
+      "CWE-776"
+    ]
+  },
+  "data-ai": {
+    "category": "data",
+    "icons": [
+      "caches",
+      "cloud",
+      "conversation-trained-deployed",
+      "ground-truth",
+      "tms-data-interface"
+    ],
+    "excludeCwes": []
+  },
+  "data-gis": {
+    "category": "data",
+    "icons": [
+      "ban",
+      "here",
+      "ign",
+      "openstreetmap",
+      "overturemaps"
+    ],
+    "excludeCwes": [
+      "CWE-472",
+      "CWE-565",
+      "CWE-601"
+    ]
+  },
+  "_comment_media": "=== MEDIA (18 icons, 59 CWEs from CWE-19+CWE-137+CWE-399) | Exclusions: SQL+LDAP(2): CWE-89,90 | Web(2): CWE-472,601 | Power(1): CWE-920 ===",
+  "media-processing": {
+    "category": "media",
+    "icons": [
+      "elastic-transcoder",
+      "elemental-conductor",
+      "elemental-delta",
+      "elemental-live",
+      "elemental-mediaconvert",
+      "elemental-medialive",
+      "elemental-server"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-472",
+      "CWE-601",
+      "CWE-920"
+    ]
+  },
+  "media-distribution": {
+    "category": "media",
+    "icons": [
+      "elemental-mediaconnect",
+      "elemental-mediapackage",
+      "elemental-mediatailor"
+    ],
+    "excludeCwes": [
+      "CWE-89",
+      "CWE-90",
+      "CWE-920"
+    ]
+  },
+  "media-storage": {
+    "category": "media",
+    "icons": [
+      "elemental-mediastore",
+      "kinesis-video-streams"
+    ],
+    "excludeCwes": [
+      "CWE-920"
+    ]
+  },
+  "media-management": {
+    "category": "media",
+    "icons": [
+      "azure-video-indexer",
+      "cloudinary",
+      "media",
+      "media-file",
+      "media-services",
+      "multimedia"
+    ],
+    "excludeCwes": [
+      "CWE-920"
+    ]
+  },
+  "_comment_application": "=== APPLICATION (16 icons, 110 CWEs from CWE-1228+CWE-137+CWE-355+CWE-1215+Tech:WebServer) — Alibaba/Azure/IBM | Exclusions: J2EE(6): CWE-6,7,245,382,383,594 | PHP(1): CWE-98 ===",
+  "app-api-code": {
+    "category": "application",
+    "icons": [
+      "api-gateway",
+      "code-pipeline",
+      "node-js-performance-platform",
+      "performance-testing-service"
+    ],
+    "excludeCwes": []
+  },
+  "app-communication": {
+    "category": "application",
+    "icons": [
+      "cloud-call-center",
+      "direct-mail",
+      "message-notification-service"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-594"
+    ]
+  },
+  "app-ai-analytics": {
+    "category": "application",
+    "icons": [
+      "bee-bot",
+      "open-search",
+      "smart-conversation-analysis"
+    ],
+    "excludeCwes": [
+      "CWE-6",
+      "CWE-7",
+      "CWE-98",
+      "CWE-245",
+      "CWE-382",
+      "CWE-383",
+      "CWE-594"
+    ]
+  },
+  "app-platform": {
+    "category": "application",
+    "icons": [
+      "azure-center-for-sap",
+      "blockchain-as-a-service",
+      "log-service",
+      "microservices-application",
+      "rd-cloud",
+      "yida"
+    ],
+    "excludeCwes": []
+  },
+  "_comment_container": "=== CONTAINER (15 icons, 52 CWEs from CWE-557+CWE-265+CWE-399+CWE-452) | Exclusions: Chroot(1): CWE-243 | JavaClone(1): CWE-580 ===",
+  "container-k8s": {
+    "category": "container",
+    "icons": [
+      "aks-istio",
+      "arc-kubernetes",
+      "hdi-aks-cluster",
+      "k3s",
+      "kubernetes-fleet-manager"
+    ],
+    "excludeCwes": [
+      "CWE-580"
+    ]
+  },
+  "container-services": {
+    "category": "container",
+    "icons": [
+      "container-apps-environments",
+      "ibm-containers",
+      "worker-container-app"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-580"
+    ]
+  },
+  "_comment_elasticsearch": "=== ELASTICSEARCH (14 icons, 39 CWEs from CWE-137+CWE-19) — Elastic Stack | Exclusions: LDAP(1): CWE-90 | Web(2): CWE-472,601 ===",
+  "elastic-core": {
+    "category": "elasticsearch",
+    "icons": [
+      "elasticsearch",
+      "sql",
+      "stack"
+    ],
+    "excludeCwes": [
+      "CWE-90"
+    ]
+  },
+  "elastic-ingest": {
+    "category": "elasticsearch",
+    "icons": [
+      "beats",
+      "logstash",
+      "logstash-pipeline"
+    ],
+    "excludeCwes": [
+      "CWE-90",
+      "CWE-472",
+      "CWE-601"
+    ]
+  },
+  "elastic-ui": {
+    "category": "elasticsearch",
+    "icons": [
+      "kibana",
+      "map-services",
+      "maps"
+    ],
+    "excludeCwes": [
+      "CWE-90"
+    ]
+  },
+  "elastic-features": {
+    "category": "elasticsearch",
+    "icons": [
+      "alerting",
+      "machine-learning",
+      "monitoring",
+      "searchable-snapshots",
+      "security-settings"
+    ],
+    "excludeCwes": [
+      "CWE-90"
+    ]
+  },
+  "_comment_governance": "=== GOVERNANCE (14 icons, 38 CWEs from CWE-265+CWE-1211+CWE-1212) — OCI governance | Exclusions: Chroot(1): CWE-243 | CAPTCHA(1): CWE-804 ===",
+  "govern-identity": {
+    "category": "governance",
+    "icons": [
+      "groups",
+      "groups-white",
+      "ocid",
+      "ocid-white"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-804"
+    ]
+  },
+  "govern-policy": {
+    "category": "governance",
+    "icons": [
+      "compartments",
+      "compartments-white",
+      "policies",
+      "policies-white",
+      "tagging",
+      "tagging-white"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-804"
+    ]
+  },
+  "govern-audit": {
+    "category": "governance",
+    "icons": [
+      "audit",
+      "audit-white",
+      "logging",
+      "logging-white"
+    ],
+    "excludeCwes": [
+      "CWE-243",
+      "CWE-804"
+    ]
+  },
+  "_comment_monitor": "=== MONITOR (12 icons, 23 CWEs from CWE-1210+CWE-199) — Azure Monitor | No exclusions (small homogeneous pool) ===",
+  "monitor-logging": {
+    "category": "monitor",
+    "icons": [
+      "activity-log",
+      "log-analytics-workspaces",
+      "logs"
+    ],
+    "excludeCwes": []
+  },
+  "monitor-metrics": {
+    "category": "monitor",
+    "icons": [
+      "auto-scale",
+      "diagnostics-settings",
+      "metrics",
+      "monitor"
+    ],
+    "excludeCwes": []
+  },
+  "monitor-apm": {
+    "category": "monitor",
+    "icons": [
+      "application-insights",
+      "azure-workbooks",
+      "change-analysis"
+    ],
+    "excludeCwes": []
+  },
+  "monitor-specialized": {
+    "category": "monitor",
+    "icons": [
+      "azure-monitors-for-sap-solutions",
+      "network-watcher"
+    ],
+    "excludeCwes": []
+  },
+  "_comment_user": "=== USER (12 icons, 40 CWEs from CWE-1211+CWE-1212+CWE-255) | Exclusions: CAPTCHA(1): CWE-804 | URLScheme(1): CWE-939 ===",
+  "user-devices": {
+    "category": "user",
+    "icons": [
+      "browser",
+      "device",
+      "physical-entity",
+      "sensor"
+    ],
+    "excludeCwes": [
+      "CWE-804"
+    ]
+  },
+  "user-accounts": {
+    "category": "user",
+    "icons": [
+      "twousericon",
+      "user",
+      "userhealthicon",
+      "usericon",
+      "userprivacy",
+      "userresource"
+    ],
+    "excludeCwes": [
+      "CWE-804",
+      "CWE-939"
+    ]
+  },
+  "user-clients": {
+    "category": "user",
+    "icons": [
+      "integrated-digital-experiences",
+      "openstackclient"
+    ],
+    "excludeCwes": [
+      "CWE-804"
+    ]
+  },
+  "_comment_mobile": "=== MOBILE (17 icons, 27 CWEs from CWE-355+CWE-1211+CWE-1217) | Exclusions: CAPTCHA(1): CWE-804 | Session(2): CWE-384,613 ===",
+  "mobile-platform": {
+    "category": "mobile",
+    "icons": [
+      "amplify",
+      "app-service-mobile",
+      "app-services",
+      "mobile",
+      "mobile-client",
+      "mobile-engagement"
+    ],
+    "excludeCwes": []
+  },
+  "mobile-api": {
+    "category": "mobile",
+    "icons": [
+      "api-gateway",
+      "api-gateway-endpoint",
+      "appsync",
+      "power-platform"
+    ],
+    "excludeCwes": []
+  },
+  "mobile-testing": {
+    "category": "mobile",
+    "icons": [
+      "device-farm",
+      "notification-hubs",
+      "pinpoint"
+    ],
+    "excludeCwes": [
+      "CWE-804"
+    ]
+  },
+  "mobile-field": {
+    "category": "mobile",
+    "icons": [
+      "mergin",
+      "offline-capabilities",
+      "qfield",
+      "smash"
+    ],
+    "excludeCwes": [
+      "CWE-613",
+      "CWE-804"
+    ]
+  }
+}

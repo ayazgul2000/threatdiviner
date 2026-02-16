@@ -1,101 +1,143 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  Badge,
-  SeverityBadge,
-  StatusBadge,
-  Button,
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-  TableEmpty,
-} from '@/components/ui';
-import { scansApi, findingsApi, reportsApi, type Scan, type Finding } from '@/lib/api';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { ArrowLeft, RefreshCw, Loader2, FileCode, Package, Key, Cloud, Calendar, Clock, GitBranch, GitCommit, GitPullRequest, Upload, Play, CheckCircle, XCircle, AlertTriangle, ExternalLink, User } from 'lucide-react';
+import { API_URL } from '@/lib/api';
 
-type ScannerType = 'all' | 'sast' | 'sca' | 'secrets' | 'iac' | 'dast';
+async function fetchScan(scanId: string): Promise<any> {
+  const res = await fetch(`${API_URL}/scm/scans/${scanId}`, { credentials: 'include' });
+  if (!res.ok) throw new Error('Failed to fetch scan');
+  const data = await res.json();
+  return data.scan || data;
+}
 
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: '#dc2626',
-  high: '#ea580c',
-  medium: '#ca8a04',
-  low: '#16a34a',
-  info: '#2563eb',
-};
+async function fetchRepository(repositoryId: string): Promise<any> {
+  const res = await fetch(`${API_URL}/scm/repositories/${repositoryId}`, { credentials: 'include' });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.repository || data;
+}
 
-const SCANNER_LABELS: Record<string, string> = {
-  semgrep: 'SAST (Semgrep)',
-  trivy: 'SCA (Trivy)',
-  gitleaks: 'Secrets (Gitleaks)',
-  trufflehog: 'Secrets (TruffleHog)',
-  checkov: 'IaC (Checkov)',
-  nuclei: 'DAST (Nuclei)',
-  zap: 'DAST (ZAP)',
-};
+async function fetchScanFindings(scanId: string): Promise<any> {
+  const res = await fetch(`${API_URL}/scm/findings?scanId=${scanId}&limit=100`, { credentials: 'include' });
+  if (!res.ok) return { findings: [], total: 0 };
+  const data = await res.json();
+  const findings = data.findings || data || [];
+  const total = data.total || findings.length;
 
-const SCANNER_TO_TYPE: Record<string, ScannerType> = {
-  semgrep: 'sast',
-  trivy: 'sca',
-  gitleaks: 'secrets',
-  trufflehog: 'secrets',
-  checkov: 'iac',
-  nuclei: 'dast',
-  zap: 'dast',
-};
+  return { findings, total, scanId };
+}
+
+function ScannerCard({ name, icon: Icon, color, findings, duration, status }: any) {
+  const colorClasses: Record<string, string> = {
+    violet: 'bg-violet-100 text-violet-600 border-violet-200',
+    orange: 'bg-orange-100 text-orange-600 border-orange-200',
+    rose: 'bg-rose-100 text-rose-600 border-rose-200',
+    sky: 'bg-sky-100 text-sky-600 border-sky-200',
+  };
+
+  return (
+    <div className={`rounded-lg border p-4 ${status === 'completed' ? colorClasses[color] : 'bg-gray-50 border-gray-200'}`}>
+      <div className="flex items-center gap-3 mb-3">
+        <Icon className="w-5 h-5" />
+        <span className="font-medium">{name}</span>
+        {status === 'completed' && <CheckCircle className="w-4 h-4 ml-auto text-emerald-600" />}
+        {status === 'failed' && <XCircle className="w-4 h-4 ml-auto text-rose-600" />}
+        {status === 'running' && <Loader2 className="w-4 h-4 ml-auto animate-spin" />}
+        {status === 'skipped' && <span className="text-xs text-gray-500 ml-auto">Skipped</span>}
+      </div>
+      {status === 'completed' && (
+        <div className="flex items-center justify-between text-sm">
+          <span className={findings > 0 ? 'text-rose-700 font-medium' : 'text-emerald-700'}>
+            {findings} findings
+          </span>
+          {duration && <span className="text-gray-500">{duration}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FindingsSummary({ scan, scanId }: { scan: any; scanId: string }) {
+  // Use API-provided severity stats for accurate counts
+  const stats = scan?.severityStats || { critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+  const total = stats.total || (stats.critical + stats.high + stats.medium + stats.low);
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <h3 className="text-sm font-semibold text-gray-900 mb-4">Findings Summary</h3>
+
+      <div className="grid grid-cols-4 gap-4 mb-4">
+        <div className="text-center p-3 rounded-lg bg-purple-50">
+          <div className="text-2xl font-bold text-purple-700">{stats.critical}</div>
+          <div className="text-xs text-purple-600">Critical</div>
+        </div>
+        <div className="text-center p-3 rounded-lg bg-rose-50">
+          <div className="text-2xl font-bold text-rose-700">{stats.high}</div>
+          <div className="text-xs text-rose-600">High</div>
+        </div>
+        <div className="text-center p-3 rounded-lg bg-amber-50">
+          <div className="text-2xl font-bold text-amber-700">{stats.medium}</div>
+          <div className="text-xs text-amber-600">Medium</div>
+        </div>
+        <div className="text-center p-3 rounded-lg bg-yellow-50">
+          <div className="text-2xl font-bold text-yellow-700">{stats.low}</div>
+          <div className="text-xs text-yellow-600">Low</div>
+        </div>
+      </div>
+
+      {total > 0 && (
+        <a
+          href={`/dashboard/findings?scanId=${scanId}`}
+          className="flex items-center justify-center gap-2 w-full py-2 text-sm text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
+        >
+          View all {total} findings <ExternalLink className="w-4 h-4" />
+        </a>
+      )}
+
+      {total === 0 && (
+        <div className="text-center py-2 text-sm text-emerald-600">
+          <CheckCircle className="w-5 h-5 mx-auto mb-1" />
+          No security issues found
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ScanDetailPage() {
-  const params = useParams();
   const router = useRouter();
-  const scanId = params.id as string;
+  const params = useParams();
+  const scanId = params?.id as string;
 
-  const [scan, setScan] = useState<Scan | null>(null);
-  const [findings, setFindings] = useState<Finding[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ScannerType>('all');
-  const [rerunning, setRerunning] = useState(false);
+  const [scan, setScan] = useState<any>(null);
+  const [repo, setRepo] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [scanData, findingsData] = await Promise.all([
-          scansApi.get(scanId),
-          findingsApi.list({ scanId }),
-        ]);
-        setScan(scanData);
-        setFindings(findingsData.findings || []);
-      } catch (err) {
-        console.error('Failed to fetch scan data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load scan');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    if (scanId) {
+      loadData();
+    }
   }, [scanId]);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const scanData = await fetchScan(scanId);
+      setScan(scanData);
+
+      // Fetch repo info if we have repositoryId
+      if (scanData?.repositoryId) {
+        const repoData = await fetchRepository(scanData.repositoryId);
+        setRepo(repoData);
+      }
+    } catch (err) {
+      console.error('Failed to load scan:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const formatDuration = (ms: number | null) => {
     if (!ms) return '-';
@@ -104,355 +146,182 @@ export default function ScanDetailPage() {
     return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
   };
 
-  const getTriggerLabel = (trigger: string) => {
+  const getTriggerIcon = (trigger: string) => {
     switch (trigger) {
-      case 'push': return 'Push to branch';
-      case 'pull_request': return 'Pull Request';
-      case 'manual': return 'Manual trigger';
-      case 'schedule': return 'Scheduled scan';
-      default: return trigger;
+      case 'pull_request': return GitPullRequest;
+      case 'push': return Upload;
+      case 'schedule': return Clock;
+      default: return Play;
     }
   };
 
-  // Group findings by scanner type
-  const findingsByScanner = findings.reduce((acc, finding) => {
-    const scanner = finding.scanner.toLowerCase();
-    if (!acc[scanner]) acc[scanner] = [];
-    acc[scanner].push(finding);
-    return acc;
-  }, {} as Record<string, Finding[]>);
-
-  // Filter findings by active tab
-  const filteredFindings = activeTab === 'all'
-    ? findings
-    : findings.filter(f => SCANNER_TO_TYPE[f.scanner.toLowerCase()] === activeTab);
-
-  // Severity data for pie chart
-  const severityData = [
-    { name: 'Critical', value: scan?.findingsCount?.critical || 0, color: SEVERITY_COLORS.critical },
-    { name: 'High', value: scan?.findingsCount?.high || 0, color: SEVERITY_COLORS.high },
-    { name: 'Medium', value: scan?.findingsCount?.medium || 0, color: SEVERITY_COLORS.medium },
-    { name: 'Low', value: scan?.findingsCount?.low || 0, color: SEVERITY_COLORS.low },
-    { name: 'Info', value: scan?.findingsCount?.info || 0, color: SEVERITY_COLORS.info },
-  ].filter(d => d.value > 0);
-
-  // Scanner data for bar chart
-  const scannerData = Object.entries(findingsByScanner).map(([scanner, scannerFindings]) => ({
-    name: SCANNER_LABELS[scanner] || scanner,
-    count: scannerFindings.length,
-    critical: scannerFindings.filter(f => f.severity === 'critical').length,
-    high: scannerFindings.filter(f => f.severity === 'high').length,
-    medium: scannerFindings.filter(f => f.severity === 'medium').length,
-    low: scannerFindings.filter(f => f.severity === 'low').length,
-  }));
-
-  const handleRerunScan = async () => {
-    if (!scan?.repositoryId) return;
-    setRerunning(true);
-    try {
-      const newScan = await scansApi.trigger(scan.repositoryId, scan.branch);
-      router.push(`/dashboard/scans/${newScan.id}`);
-    } catch (err) {
-      console.error('Failed to re-run scan:', err);
-      setError('Failed to trigger scan');
-    } finally {
-      setRerunning(false);
-    }
-  };
-
-  const handleDownloadReport = () => {
-    window.open(reportsApi.getScanReport(scanId), '_blank');
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading scan details...</div>
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <span className="ml-3 text-gray-600">Loading scan...</span>
       </div>
     );
   }
 
-  if (error || !scan) {
+  if (!scan) {
     return (
-      <div className="space-y-6">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg">
-          {error || 'Scan not found'}
-        </div>
-        <Link href="/dashboard/scans" className="text-blue-600 hover:text-blue-700">
-          Back to Scans
-        </Link>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="text-center py-12 text-gray-500">Scan not found</div>
       </div>
     );
   }
+
+  const TriggerIcon = getTriggerIcon(scan.triggerEvent || scan.trigger);
+  const scanners = scan.scanners || [];
+  const hasSast = scan.sastEnabled || scanners.includes('semgrep');
+  const hasSca = scan.scaEnabled || scanners.includes('trivy');
+  const hasSecrets = scan.secretsEnabled || scanners.includes('gitleaks');
+  const hasIac = scan.iacEnabled || scanners.includes('checkov');
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard/scans"
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </Link>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Scan Details
-            </h1>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <button onClick={() => router.back()} className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-gray-900">Scan Details</h1>
+              <span className={`inline-flex items-center gap-1 text-sm px-2.5 py-1 rounded-full ${
+                scan.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                scan.status === 'running' ? 'bg-blue-100 text-blue-700' :
+                scan.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-700'
+              }`}>
+                {scan.status === 'completed' && <CheckCircle className="w-4 h-4" />}
+                {scan.status === 'running' && <Loader2 className="w-4 h-4 animate-spin" />}
+                {scan.status === 'failed' && <XCircle className="w-4 h-4" />}
+                {scan.status}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+              <span className="flex items-center gap-1">
+                <GitBranch className="w-4 h-4" />
+                {repo?.fullName || scan.repository?.fullName || 'Unknown repo'}
+              </span>
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{scan.branch || scan.defaultBranch || 'main'}</code>
+            </div>
           </div>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            {scan.repository?.fullName || 'Unknown repository'}
-          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={handleDownloadReport}>
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Download Report
-          </Button>
-          <Button onClick={handleRerunScan} disabled={rerunning}>
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {rerunning ? 'Starting...' : 'Re-run Scan'}
-          </Button>
-        </div>
+        <button 
+          onClick={loadData}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+        >
+          <RefreshCw className="w-4 h-4" /> Refresh
+        </button>
       </div>
 
-      {/* Metadata Card */}
-      <Card variant="bordered">
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Repository</p>
-              <Link
-                href={`/dashboard/repositories/${scan.repositoryId}`}
-                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-              >
-                {scan.repository?.fullName || 'Unknown'}
-              </Link>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Branch</p>
-              <code className="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                {scan.branch || 'main'}
-              </code>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Commit SHA</p>
-              <code className="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                {scan.commitSha?.substring(0, 7) || '-'}
-              </code>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Status</p>
-              <StatusBadge status={scan.status} />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Duration</p>
-              <p className="font-medium text-gray-900 dark:text-white">
-                {formatDuration(scan.duration)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Triggered By</p>
-              <p className="font-medium text-gray-900 dark:text-white">
-                {getTriggerLabel(scan.trigger)}
-              </p>
+      <div className="grid grid-cols-3 gap-6">
+        {/* Left Column - Scan Info */}
+        <div className="col-span-2 space-y-6">
+          {/* Meta Info */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Scan Information</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <TriggerIcon className="w-4 h-4 text-gray-600" />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Triggered By</div>
+                  <div className="text-sm font-medium text-gray-900 capitalize">{scan.triggerEvent || scan.trigger || 'Manual'}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <Clock className="w-4 h-4 text-gray-600" />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Duration</div>
+                  <div className="text-sm font-medium text-gray-900">{formatDuration(scan.duration)}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <Calendar className="w-4 h-4 text-gray-600" />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Started</div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {scan.startedAt ? new Date(scan.startedAt).toLocaleString() : scan.createdAt ? new Date(scan.createdAt).toLocaleString() : '-'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <GitCommit className="w-4 h-4 text-gray-600" />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Commit</div>
+                  <code className="text-sm font-mono text-gray-900">{(scan.commitSha || scan.commitHash || '-').substring(0, 7)}</code>
+                </div>
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Severity Summary */}
-      <Card variant="bordered">
-        <CardHeader>
-          <CardTitle>Severity Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-6 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-red-600"></span>
-              <span className="text-gray-700 dark:text-gray-300">Critical</span>
-              <span className="font-bold text-red-600">{scan.findingsCount?.critical || 0}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-              <span className="text-gray-700 dark:text-gray-300">High</span>
-              <span className="font-bold text-orange-500">{scan.findingsCount?.high || 0}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-              <span className="text-gray-700 dark:text-gray-300">Medium</span>
-              <span className="font-bold text-yellow-500">{scan.findingsCount?.medium || 0}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-green-500"></span>
-              <span className="text-gray-700 dark:text-gray-300">Low</span>
-              <span className="font-bold text-green-500">{scan.findingsCount?.low || 0}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-              <span className="text-gray-700 dark:text-gray-300">Info</span>
-              <span className="font-bold text-blue-500">{scan.findingsCount?.info || 0}</span>
-            </div>
-            <div className="ml-auto text-gray-500 dark:text-gray-400">
-              Total: <span className="font-bold text-gray-900 dark:text-white">{scan.findingsCount?.total || 0}</span>
+          {/* Scanner Breakdown */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Scanner Breakdown</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <ScannerCard 
+                name="SAST (Semgrep)" 
+                icon={FileCode} 
+                color="violet"
+                findings={scan.findingsCount?.sast || 0}
+                duration={scan.scannerDurations?.semgrep ? formatDuration(scan.scannerDurations.semgrep) : null}
+                status={hasSast ? 'completed' : 'skipped'}
+              />
+              <ScannerCard 
+                name="SCA (Trivy)" 
+                icon={Package} 
+                color="orange"
+                findings={scan.findingsCount?.sca || 0}
+                duration={scan.scannerDurations?.trivy ? formatDuration(scan.scannerDurations.trivy) : null}
+                status={hasSca ? 'completed' : 'skipped'}
+              />
+              <ScannerCard 
+                name="Secrets (Gitleaks)" 
+                icon={Key} 
+                color="rose"
+                findings={scan.findingsCount?.secrets || 0}
+                duration={scan.scannerDurations?.gitleaks ? formatDuration(scan.scannerDurations.gitleaks) : null}
+                status={hasSecrets ? 'completed' : 'skipped'}
+              />
+              <ScannerCard 
+                name="IaC (Checkov)" 
+                icon={Cloud} 
+                color="sky"
+                findings={scan.findingsCount?.iac || 0}
+                duration={scan.scannerDurations?.checkov ? formatDuration(scan.scannerDurations.checkov) : null}
+                status={hasIac ? 'completed' : 'skipped'}
+              />
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Charts Row */}
-      {(severityData.length > 0 || scannerData.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Severity Pie Chart */}
-          {severityData.length > 0 && (
-            <Card variant="bordered">
-              <CardHeader>
-                <CardTitle>Findings by Severity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={severityData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, value }) => `${name}: ${value}`}
-                      >
-                        {severityData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Scanner Bar Chart */}
-          {scannerData.length > 0 && (
-            <Card variant="bordered">
-              <CardHeader>
-                <CardTitle>Findings by Scanner</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={scannerData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
-                      <Tooltip />
-                      <Bar dataKey="critical" stackId="a" fill={SEVERITY_COLORS.critical} name="Critical" />
-                      <Bar dataKey="high" stackId="a" fill={SEVERITY_COLORS.high} name="High" />
-                      <Bar dataKey="medium" stackId="a" fill={SEVERITY_COLORS.medium} name="Medium" />
-                      <Bar dataKey="low" stackId="a" fill={SEVERITY_COLORS.low} name="Low" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Error Message */}
+          {scan.status === 'failed' && scan.errorMessage && (
+            <div className="bg-rose-50 border border-rose-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-rose-700 mb-2">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="font-semibold">Scan Failed</h3>
+              </div>
+              <pre className="text-sm text-rose-600 whitespace-pre-wrap">{scan.errorMessage}</pre>
+            </div>
           )}
         </div>
-      )}
 
-      {/* Scanner Tabs */}
-      <Card variant="bordered">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Findings</CardTitle>
-            <div className="flex items-center gap-2 overflow-x-auto">
-              {(['all', 'sast', 'sca', 'secrets', 'iac', 'dast'] as ScannerType[]).map((tab) => {
-                const count = tab === 'all'
-                  ? findings.length
-                  : findings.filter(f => SCANNER_TO_TYPE[f.scanner.toLowerCase()] === tab).length;
-                const labels: Record<ScannerType, string> = {
-                  all: 'All',
-                  sast: 'SAST',
-                  sca: 'SCA',
-                  secrets: 'Secrets',
-                  iac: 'IaC',
-                  dast: 'DAST',
-                };
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
-                      activeTab === tab
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {labels[tab]} ({count})
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow hoverable={false}>
-                <TableHead>Severity</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Scanner</TableHead>
-                <TableHead>File</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredFindings.length === 0 ? (
-                <TableEmpty colSpan={5} message="No findings for this scanner type." />
-              ) : (
-                filteredFindings.map((finding) => (
-                  <TableRow key={finding.id}>
-                    <TableCell>
-                      <SeverityBadge severity={finding.severity} />
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/dashboard/findings/${finding.id}`}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-                      >
-                        {finding.title}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {SCANNER_LABELS[finding.scanner.toLowerCase()] || finding.scanner}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <code className="text-xs text-gray-600 dark:text-gray-400">
-                        {finding.filePath}:{finding.startLine}
-                      </code>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={finding.status} />
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        {/* Right Column - Findings */}
+        <div>
+          <FindingsSummary scan={scan} scanId={scanId} />
+        </div>
+      </div>
     </div>
   );
 }

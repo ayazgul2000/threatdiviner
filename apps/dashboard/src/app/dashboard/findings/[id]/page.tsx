@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Card,
@@ -10,12 +10,14 @@ import {
   CardContent,
   Badge,
   SeverityBadge,
-  StatusBadge,
   Button,
+  PageHeader,
+  useToast,
 } from '@/components/ui';
-import { findingsApi, aiApi, type Finding, type AiTriageResult } from '@/lib/api';
+import { useProject } from '@/contexts/project-context';
+import { findingsApi, API_URL, type Finding } from '@/lib/api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+type FindingStatus = 'open' | 'in_progress' | 'fixed' | 'false_positive' | 'suppressed';
 
 // CWE descriptions mapping (common CWEs)
 const CWE_DESCRIPTIONS: Record<string, string> = {
@@ -64,46 +66,26 @@ const COMPLIANCE_FRAMEWORKS: Record<string, string[]> = {
   'CWE-287': ['SOC2', 'PCI-DSS', 'NIST', 'ISO27001'],
 };
 
-interface FindingHistory {
-  id: string;
-  action: string;
-  previousValue?: string;
-  newValue?: string;
-  userId: string;
-  userEmail?: string;
-  createdAt: string;
-}
-
 export default function FindingDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const findingId = params.id as string;
+  const { currentProject } = useProject();
+  const toastCtx = useToast();
 
   const [finding, setFinding] = useState<Finding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [triaging, setTriaging] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [applyingFix, setApplyingFix] = useState(false);
+  const [suppressing, setSuppressing] = useState(false);
   const [creatingJira, setCreatingJira] = useState(false);
-  const [history, setHistory] = useState<FindingHistory[]>([]);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const findingData = await findingsApi.get(findingId);
         setFinding(findingData);
-        // Fetch history if endpoint exists
-        try {
-          const res = await fetch(`${API_URL}/scm/findings/${findingId}/history`, {
-            credentials: 'include',
-          });
-          if (res.ok) {
-            const historyData = await res.json();
-            setHistory(historyData);
-          }
-        } catch {
-          // History endpoint may not exist yet
-        }
       } catch (err) {
         console.error('Failed to fetch finding:', err);
         setError(err instanceof Error ? err.message : 'Failed to load finding');
@@ -115,11 +97,18 @@ export default function FindingDetailPage() {
     fetchData();
   }, [findingId]);
 
-  const handleRunAiTriage = async () => {
+  // AI Triage - POST to /fix/triage/:id
+  const handleAiTriage = async () => {
     if (!finding) return;
     setTriaging(true);
     try {
-      const result = await aiApi.triageFinding(findingId);
+      const res = await fetch(`${API_URL}/fix/triage/${findingId}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error('AI triage failed');
+      const result = await res.json();
       setFinding({
         ...finding,
         aiAnalysis: result.aiAnalysis,
@@ -130,62 +119,98 @@ export default function FindingDetailPage() {
         aiRemediation: result.aiRemediation,
         aiTriagedAt: result.aiTriagedAt,
       });
+      toastCtx.success('AI Triage Complete', 'Finding has been analyzed by AI.');
     } catch (err) {
       console.error('Failed to triage finding:', err);
-      setError('AI triage failed. Please try again.');
+      toastCtx.error('AI Triage Failed', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setTriaging(false);
     }
   };
 
-  const handleStatusChange = async (newStatus: Finding['status']) => {
+  // Apply Fix - POST to /fix/:id
+  const handleApplyFix = async () => {
     if (!finding) return;
-    setUpdatingStatus(true);
+    setApplyingFix(true);
     try {
-      const updated = await findingsApi.updateStatus(findingId, newStatus);
-      setFinding(updated);
+      const res = await fetch(`${API_URL}/fix/${findingId}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error('Failed to apply fix');
+      const result = await res.json();
+      toastCtx.success('Fix Applied', result.message || 'The fix has been applied successfully.');
     } catch (err) {
-      console.error('Failed to update status:', err);
-      setError('Failed to update status');
+      console.error('Failed to apply fix:', err);
+      toastCtx.error('Apply Fix Failed', err instanceof Error ? err.message : 'Please try again.');
     } finally {
-      setUpdatingStatus(false);
+      setApplyingFix(false);
     }
   };
 
+  // Suppress - POST to /scm/findings/:id/status with { status: 'suppressed' }
+  const handleSuppress = async () => {
+    if (!finding) return;
+    setSuppressing(true);
+    try {
+      const res = await fetch(`${API_URL}/scm/findings/${findingId}/status`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'suppressed' }),
+      });
+      if (!res.ok) throw new Error('Failed to suppress finding');
+      setFinding({ ...finding, status: 'false_positive' });
+      toastCtx.success('Finding Suppressed', 'This finding has been suppressed.');
+    } catch (err) {
+      console.error('Failed to suppress finding:', err);
+      toastCtx.error('Suppress Failed', err instanceof Error ? err.message : 'Please try again.');
+    } finally {
+      setSuppressing(false);
+    }
+  };
+
+  // Create Jira Ticket - POST to /jira/finding/:id
   const handleCreateJira = async () => {
     if (!finding) return;
     setCreatingJira(true);
     try {
-      const res = await fetch(`${API_URL}/scm/findings/${findingId}/jira`, {
+      const res = await fetch(`${API_URL}/jira/finding/${findingId}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       });
       if (!res.ok) throw new Error('Failed to create Jira ticket');
       const data = await res.json();
-      alert(`Jira ticket created: ${data.key}`);
+      toastCtx.success('Jira Ticket Created', `Ticket ${data.key || data.id} has been created.`);
     } catch (err) {
       console.error('Failed to create Jira ticket:', err);
-      setError('Failed to create Jira ticket');
+      toastCtx.error('Create Jira Failed', err instanceof Error ? err.message : 'Please try again.');
     } finally {
       setCreatingJira(false);
     }
   };
 
-  const handleAddToBaseline = async () => {
+  // Status change - PUT to /scm/findings/:id/status
+  const handleStatusChange = async (newStatus: FindingStatus) => {
     if (!finding) return;
+    setUpdatingStatus(true);
     try {
-      const res = await fetch(`${API_URL}/baseline/add`, {
-        method: 'POST',
+      const res = await fetch(`${API_URL}/scm/findings/${findingId}/status`, {
+        method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ findingId }),
+        body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error('Failed to add to baseline');
-      alert('Finding added to baseline');
+      if (!res.ok) throw new Error('Failed to update status');
+      setFinding({ ...finding, status: newStatus as any });
+      toastCtx.success('Status Updated', `Finding status changed to ${newStatus.replace('_', ' ')}.`);
     } catch (err) {
-      console.error('Failed to add to baseline:', err);
-      setError('Failed to add to baseline');
+      console.error('Failed to update status:', err);
+      toastCtx.error('Status Update Failed', err instanceof Error ? err.message : 'Please try again.');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -240,39 +265,174 @@ export default function FindingDetailPage() {
   const owaspMapping = primaryCwe ? OWASP_MAPPING[primaryCwe] : null;
   const complianceTags = primaryCwe ? COMPLIANCE_FRAMEWORKS[primaryCwe] || ['SOC2', 'NIST'] : ['SOC2', 'NIST'];
 
+  // Truncate title for breadcrumb
+  const truncatedTitle = finding.title.length > 30
+    ? finding.title.substring(0, 30) + '...'
+    : finding.title;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard/findings"
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+      {/* PageHeader */}
+      <PageHeader
+        title={finding.title}
+        backHref="/dashboard/findings"
+        breadcrumbs={[
+          { label: currentProject?.name || 'Project', href: '/dashboard' },
+          { label: 'Findings', href: '/dashboard/findings' },
+          { label: truncatedTitle },
+        ]}
+        context={{
+          type: 'finding',
+          status: finding.status,
+          metadata: {
+            Scanner: finding.scanner || 'Unknown',
+            File: finding.filePath || 'N/A',
+            Line: String(finding.startLine || 0),
+          },
+        }}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleAiTriage}
+              disabled={triaging}
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </Link>
-            <SeverityBadge severity={finding.severity} />
-            <StatusBadge status={finding.status} />
+              {triaging ? 'Triaging...' : 'AI Triage'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleApplyFix}
+              disabled={applyingFix}
+            >
+              {applyingFix ? 'Applying...' : 'Apply Fix'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSuppress}
+              disabled={suppressing}
+            >
+              {suppressing ? 'Suppressing...' : 'Suppress'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCreateJira}
+              disabled={creatingJira}
+            >
+              {creatingJira ? 'Creating...' : 'Create Jira Ticket'}
+            </Button>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-            {finding.title}
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Found by {finding.scanner} in {finding.scan?.repository?.fullName || 'unknown repository'}
+        }
+      />
+
+      {/* Status Dropdown */}
+      <Card variant="bordered">
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Status:
+            </label>
+            <select
+              value={finding.status}
+              onChange={(e) => handleStatusChange(e.target.value as FindingStatus)}
+              disabled={updatingStatus}
+              className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="fixed">Fixed</option>
+              <option value="false_positive">False Positive</option>
+              <option value="suppressed">Suppressed</option>
+            </select>
+            <SeverityBadge severity={finding.severity} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Description Card */}
+      <Card variant="bordered">
+        <CardHeader>
+          <CardTitle>Description</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-700 dark:text-gray-300">
+            {finding.description || finding.message || finding.title}
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleAddToBaseline}>
-            Add to Baseline
-          </Button>
-          <Button variant="outline" onClick={handleCreateJira} disabled={creatingJira}>
-            {creatingJira ? 'Creating...' : 'Create Jira Ticket'}
-          </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
+
+      {/* Remediation Card - Show if remediation field exists */}
+      {finding.remediation && (
+        <Card variant="bordered">
+          <CardHeader>
+            <CardTitle>Remediation Guidance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              {finding.remediation}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SLA Deadline Card - Show if slaDeadline exists */}
+      {(finding as any).slaDeadline && (
+        <Card variant="bordered">
+          <CardHeader>
+            <CardTitle>SLA Deadline</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const deadline = new Date((finding as any).slaDeadline);
+              const now = new Date();
+              const isOverdue = deadline < now;
+              const hoursRemaining = Math.max(0, Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60)));
+
+              return (
+                <div className={`flex items-center gap-3 ${isOverdue ? 'text-red-600' : 'text-yellow-600'}`}>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-medium">
+                    {deadline.toLocaleDateString()} {deadline.toLocaleTimeString()}
+                  </span>
+                  <Badge variant={isOverdue ? 'danger' : 'warning'}>
+                    {isOverdue ? 'OVERDUE' : `${hoursRemaining}h remaining`}
+                  </Badge>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Package Info Card - For SCA findings */}
+      {(finding as any).packageName && (
+        <Card variant="bordered">
+          <CardHeader>
+            <CardTitle>Package Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <dt className="text-sm text-gray-500 dark:text-gray-400">Package</dt>
+                <dd className="text-gray-900 dark:text-white font-medium">{(finding as any).packageName}</dd>
+              </div>
+              {(finding as any).currentVersion && (
+                <div>
+                  <dt className="text-sm text-gray-500 dark:text-gray-400">Current Version</dt>
+                  <dd className="text-red-600 font-medium">{(finding as any).currentVersion}</dd>
+                </div>
+              )}
+              {(finding as any).fixedVersion && (
+                <div>
+                  <dt className="text-sm text-gray-500 dark:text-gray-400">Fixed Version</dt>
+                  <dd className="text-green-600 font-medium">{(finding as any).fixedVersion}</dd>
+                </div>
+              )}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Code Snippet */}
       <Card variant="bordered">
@@ -423,7 +583,7 @@ export default function FindingDetailPage() {
           <div className="flex items-center justify-between">
             <CardTitle>AI Triage</CardTitle>
             {!finding.aiTriagedAt && (
-              <Button onClick={handleRunAiTriage} disabled={triaging}>
+              <Button onClick={handleAiTriage} disabled={triaging}>
                 {triaging ? (
                   <>
                     <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -562,75 +722,9 @@ export default function FindingDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Actions */}
-      <Card variant="bordered">
-        <CardHeader>
-          <CardTitle>Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            {/* Status dropdown */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Update Status
-              </label>
-              <select
-                value={finding.status}
-                onChange={(e) => handleStatusChange(e.target.value as Finding['status'])}
-                disabled={updatingStatus}
-                className="block w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="open">Open</option>
-                <option value="fixed">Fixed</option>
-                <option value="ignored">Ignored</option>
-                <option value="false_positive">False Positive</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* History/Audit Trail */}
-      {history.length > 0 && (
-        <Card variant="bordered">
-          <CardHeader>
-            <CardTitle>History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {history.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-start gap-3 py-2 border-b border-gray-100 dark:border-gray-700 last:border-0"
-                >
-                  <div className="w-2 h-2 mt-2 bg-blue-500 rounded-full" />
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {entry.action === 'status_changed' ? (
-                        <>
-                          Status changed from{' '}
-                          <Badge variant="outline">{entry.previousValue}</Badge>
-                          {' '}to{' '}
-                          <Badge variant="outline">{entry.newValue}</Badge>
-                        </>
-                      ) : (
-                        entry.action
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      by {entry.userEmail || 'Unknown'} at {new Date(entry.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Metadata */}
       <Card variant="bordered">
-        <CardContent>
+        <CardContent className="pt-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
             <div>
               <p className="text-gray-500 dark:text-gray-400">First Seen</p>

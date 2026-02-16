@@ -1,0 +1,55 @@
+rules:
+  - id: php.lang.security.redirect-to-request-uri.redirect-to-request-uri
+    patterns:
+      - pattern-either:
+          - pattern: |
+              header('$LOCATION' . $_SERVER['REQUEST_URI']);
+          - pattern: |
+              header('$LOCATION' . $_SERVER['REQUEST_URI'] . $MORE);
+      - metavariable-regex:
+          metavariable: $LOCATION
+          regex: ^(?i)location:\s*$
+    message: >-
+      Redirecting to the current request URL may redirect to another domain, if
+      the current path starts with two slashes.  E.g. in
+      https://www.example.com//attacker.com, the value of REQUEST_URI is
+      //attacker.com, and redirecting to it will redirect to that domain.
+    metadata:
+      references:
+        - https://www.php.net/manual/en/reserved.variables.server.php
+        - >-
+          https://owasp.org/www-project-top-ten/2017/A5_2017-Broken_Access_Control.html
+      category: security
+      technology:
+        - php
+      owasp:
+        - A05:2017 - Broken Access Control
+        - A01:2021 - Broken Access Control
+        - A01:2025 - Broken Access Control
+      cwe:
+        - 'CWE-601: URL Redirection to Untrusted Site (''Open Redirect'')'
+      likelihood: MEDIUM
+      impact: LOW
+      confidence: MEDIUM
+      subcategory:
+        - vuln
+      license: >-
+        Semgrep Rules License v1.0. For more details, visit
+        semgrep.dev/legal/rules-license
+      vulnerability_class:
+        - Open Redirect
+      source: >-
+        https://semgrep.dev/r/php.lang.security.redirect-to-request-uri.redirect-to-request-uri
+      shortlink: https://sg.run/RWl2
+      semgrep.dev:
+        rule:
+          r_id: 35493
+          rv_id: 1263299
+          rule_id: 3qUb4n
+          version_id: A8Tgdvq
+          url: >-
+            https://semgrep.dev/playground/r/A8Tgdvq/php.lang.security.redirect-to-request-uri.redirect-to-request-uri
+          origin: community
+    languages:
+      - php
+    severity: WARNING

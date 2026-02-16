@@ -1,0 +1,542 @@
+{
+  "database": {
+    "cwe699Subcategories": ["CWE-1214", "CWE-19"],
+    "technologyKeywords": ["Database Server"]
+  },
+  "databases": {
+    "cwe699Subcategories": ["CWE-1214", "CWE-19"],
+    "technologyKeywords": ["Database Server"]
+  },
+  "network": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "networking": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "security": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-255", "CWE-310", "CWE-320"],
+    "technologyKeywords": []
+  },
+  "auth": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-255"],
+    "technologyKeywords": []
+  },
+  "identity": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-255"],
+    "technologyKeywords": []
+  },
+  "rbac": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-275", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "certificates": {
+    "cwe699Subcategories": ["CWE-310", "CWE-320"],
+    "technologyKeywords": []
+  },
+  "storage": {
+    "cwe699Subcategories": ["CWE-1219", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "compute": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "container": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "containers": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "queue": {
+    "cwe699Subcategories": ["CWE-417", "CWE-557"],
+    "technologyKeywords": []
+  },
+  "messaging": {
+    "cwe699Subcategories": ["CWE-417", "CWE-557"],
+    "technologyKeywords": []
+  },
+  "logging": {
+    "cwe699Subcategories": ["CWE-1210"],
+    "technologyKeywords": []
+  },
+  "monitoring": {
+    "cwe699Subcategories": ["CWE-1210", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "tracing": {
+    "cwe699Subcategories": ["CWE-1210"],
+    "technologyKeywords": []
+  },
+  "observability": {
+    "cwe699Subcategories": ["CWE-1210"],
+    "technologyKeywords": []
+  },
+  "client": {
+    "cwe699Subcategories": ["CWE-355"],
+    "technologyKeywords": []
+  },
+  "web": {
+    "cwe699Subcategories": ["CWE-137", "CWE-1215", "CWE-355", "CWE-1217"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "mobile": {
+    "cwe699Subcategories": ["CWE-355", "CWE-1211", "CWE-1217"],
+    "technologyKeywords": []
+  },
+  "iot": {
+    "cwe699Subcategories": ["CWE-417", "CWE-1218", "CWE-399"],
+    "technologyKeywords": ["Microcontroller Hardware", "Sensor Hardware"]
+  },
+  "ml": {
+    "cwe699Subcategories": [],
+    "technologyKeywords": ["AI/ML"]
+  },
+  "aimachinelearning": {
+    "cwe699Subcategories": [],
+    "technologyKeywords": ["AI/ML"]
+  },
+  "integration": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137", "CWE-840"],
+    "technologyKeywords": []
+  },
+  "api": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137", "CWE-1215"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "analytics": {
+    "cwe699Subcategories": ["CWE-19", "CWE-1214"],
+    "technologyKeywords": []
+  },
+  "ci": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "cd": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "devops": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "devtools": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "dns": {
+    "cwe699Subcategories": ["CWE-417"],
+    "technologyKeywords": []
+  },
+  "inmemory": {
+    "cwe699Subcategories": ["CWE-1214", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "etl": {
+    "cwe699Subcategories": ["CWE-19", "CWE-137"],
+    "technologyKeywords": []
+  },
+  "vcs": {
+    "cwe699Subcategories": ["CWE-1219", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "gitops": {
+    "cwe699Subcategories": ["CWE-1219", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "iac": {
+    "cwe699Subcategories": ["CWE-265", "CWE-1227"],
+    "technologyKeywords": []
+  },
+  "registry": {
+    "cwe699Subcategories": ["CWE-1219", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "search": {
+    "cwe699Subcategories": ["CWE-137", "CWE-19"],
+    "technologyKeywords": []
+  },
+  "workflow": {
+    "cwe699Subcategories": ["CWE-840", "CWE-1228"],
+    "technologyKeywords": []
+  },
+  "blockchain": {
+    "cwe699Subcategories": ["CWE-1214", "CWE-310"],
+    "technologyKeywords": []
+  },
+
+  "_comment_bucket_a_original": "--- Bucket A: Aliases to existing types ---",
+
+  "server": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "virtualization": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "runtime": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "baremetal": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "infra": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "monitor": {
+    "cwe699Subcategories": ["CWE-1210", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "alerting": {
+    "cwe699Subcategories": ["CWE-1210", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "connectivity": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "routing": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "nfv": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "deployment": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "containerservices": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "controlplane": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "clusterconfig": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "podconfig": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "packaging": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "orchestration": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "chat": {
+    "cwe699Subcategories": ["CWE-417", "CWE-557"],
+    "technologyKeywords": []
+  },
+  "communication": {
+    "cwe699Subcategories": ["CWE-417", "CWE-557"],
+    "technologyKeywords": []
+  },
+  "enterprisesearch": {
+    "cwe699Subcategories": ["CWE-137", "CWE-19"],
+    "technologyKeywords": []
+  },
+  "elasticsearch": {
+    "cwe699Subcategories": ["CWE-137", "CWE-19"],
+    "technologyKeywords": []
+  },
+  "migrate": {
+    "cwe699Subcategories": ["CWE-19", "CWE-137"],
+    "technologyKeywords": []
+  },
+  "migration": {
+    "cwe699Subcategories": ["CWE-19", "CWE-137"],
+    "technologyKeywords": []
+  },
+  "filesharing": {
+    "cwe699Subcategories": ["CWE-1219", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "mlops": {
+    "cwe699Subcategories": [],
+    "technologyKeywords": ["AI/ML"]
+  },
+  "recommendation": {
+    "cwe699Subcategories": [],
+    "technologyKeywords": ["AI/ML"]
+  },
+  "apiproxies": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137", "CWE-1215"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "cli": {
+    "cwe699Subcategories": ["CWE-355"],
+    "technologyKeywords": []
+  },
+  "desktop": {
+    "cwe699Subcategories": ["CWE-355"],
+    "technologyKeywords": []
+  },
+  "frontend": {
+    "cwe699Subcategories": ["CWE-137", "CWE-1215", "CWE-355", "CWE-1217"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "automation": {
+    "cwe699Subcategories": ["CWE-840", "CWE-1228"],
+    "technologyKeywords": []
+  },
+
+  "_comment_bucket_a_from_c": "--- Bucket A from old Bucket C: Aliases ---",
+
+  "infrastructure": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "beats": {
+    "cwe699Subcategories": ["CWE-1210", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "operations": {
+    "cwe699Subcategories": ["CWE-1210", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "agent": {
+    "cwe699Subcategories": ["CWE-1210", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "aggregator": {
+    "cwe699Subcategories": ["CWE-1210"],
+    "technologyKeywords": []
+  },
+  "develop": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "intune": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-255", "CWE-310", "CWE-320"],
+    "technologyKeywords": []
+  },
+  "sharedservices": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-255", "CWE-310", "CWE-320"],
+    "technologyKeywords": []
+  },
+  "applicationlifecycle": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "workloadprovisioning": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "ecosystem": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+  "quality": {
+    "cwe699Subcategories": ["CWE-1210", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "enduser": {
+    "cwe699Subcategories": ["CWE-355"],
+    "technologyKeywords": []
+  },
+  "chaos": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-265"],
+    "technologyKeywords": []
+  },
+  "optimization": {
+    "cwe699Subcategories": ["CWE-1210", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "engagement": {
+    "cwe699Subcategories": ["CWE-417", "CWE-557"],
+    "technologyKeywords": []
+  },
+  "enablement": {
+    "cwe699Subcategories": ["CWE-265", "CWE-1211", "CWE-1212", "CWE-1210"],
+    "technologyKeywords": []
+  },
+  "azureecosystem": {
+    "cwe699Subcategories": ["CWE-265", "CWE-1211", "CWE-1212", "CWE-1210"],
+    "technologyKeywords": []
+  },
+  "azurestack": {
+    "cwe699Subcategories": ["CWE-265", "CWE-1211", "CWE-1212", "CWE-1210"],
+    "technologyKeywords": []
+  },
+  "grow": {
+    "cwe699Subcategories": ["CWE-355", "CWE-1211", "CWE-1217"],
+    "technologyKeywords": []
+  },
+  "hybridmulticloud": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "multiregion": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "satellite": {
+    "cwe699Subcategories": ["CWE-137", "CWE-417"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "robotics": {
+    "cwe699Subcategories": ["CWE-417", "CWE-1218", "CWE-399"],
+    "technologyKeywords": ["Microcontroller Hardware", "Sensor Hardware"]
+  },
+  "business": {
+    "cwe699Subcategories": ["CWE-840", "CWE-1228"],
+    "technologyKeywords": []
+  },
+  "crm": {
+    "cwe699Subcategories": ["CWE-137", "CWE-1215", "CWE-355", "CWE-1217"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "social": {
+    "cwe699Subcategories": ["CWE-137", "CWE-1215", "CWE-355", "CWE-1217"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "ar": {
+    "cwe699Subcategories": ["CWE-355"],
+    "technologyKeywords": []
+  },
+  "mixedreality": {
+    "cwe699Subcategories": ["CWE-355"],
+    "technologyKeywords": []
+  },
+  "game": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "quantum": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "place": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "proxmox": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "groupware": {
+    "cwe699Subcategories": ["CWE-1219", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "geocoding": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137", "CWE-1215"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "javascript": {
+    "cwe699Subcategories": ["CWE-137", "CWE-1215", "CWE-355", "CWE-1217"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "newicons": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-255", "CWE-310", "CWE-320"],
+    "technologyKeywords": []
+  },
+  "others": {
+    "cwe699Subcategories": ["CWE-557", "CWE-265", "CWE-399", "CWE-452"],
+    "technologyKeywords": []
+  },
+
+  "_comment_bucket_b": "--- Bucket B: New entries with curated CWE-699 subcategories ---",
+
+  "application": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137", "CWE-355", "CWE-1215"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "applications": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137", "CWE-355", "CWE-1215"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "appservices": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137", "CWE-355", "CWE-1215"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "management": {
+    "cwe699Subcategories": ["CWE-265", "CWE-1211", "CWE-1212", "CWE-1210"],
+    "technologyKeywords": []
+  },
+  "managementgovernance": {
+    "cwe699Subcategories": ["CWE-265", "CWE-1211", "CWE-1212", "CWE-1210"],
+    "technologyKeywords": []
+  },
+  "governance": {
+    "cwe699Subcategories": ["CWE-265", "CWE-1211", "CWE-1212"],
+    "technologyKeywords": []
+  },
+  "data": {
+    "cwe699Subcategories": ["CWE-1214", "CWE-19", "CWE-199"],
+    "technologyKeywords": []
+  },
+  "media": {
+    "cwe699Subcategories": ["CWE-19", "CWE-137", "CWE-399"],
+    "technologyKeywords": []
+  },
+  "cdn": {
+    "cwe699Subcategories": ["CWE-417", "CWE-137"],
+    "technologyKeywords": ["Web Server"]
+  },
+  "os": {
+    "cwe699Subcategories": ["CWE-1218", "CWE-399", "CWE-265", "CWE-1219"],
+    "technologyKeywords": []
+  },
+  "user": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-255"],
+    "technologyKeywords": []
+  },
+  "organization": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-255"],
+    "technologyKeywords": []
+  },
+  "payment": {
+    "cwe699Subcategories": ["CWE-840", "CWE-255", "CWE-310"],
+    "technologyKeywords": []
+  },
+  "billing": {
+    "cwe699Subcategories": ["CWE-840", "CWE-255", "CWE-310"],
+    "technologyKeywords": []
+  },
+  "cost": {
+    "cwe699Subcategories": ["CWE-840", "CWE-255", "CWE-310"],
+    "technologyKeywords": []
+  },
+  "device": {
+    "cwe699Subcategories": ["CWE-417", "CWE-1218", "CWE-399"],
+    "technologyKeywords": ["Microcontroller Hardware"]
+  },
+  "framework": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137", "CWE-1215"],
+    "technologyKeywords": []
+  },
+  "language": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-137"],
+    "technologyKeywords": []
+  },
+  "saas": {
+    "cwe699Subcategories": ["CWE-1228", "CWE-1211", "CWE-1212", "CWE-137", "CWE-1217"],
+    "technologyKeywords": ["Web Server"]
+  },
+
+  "_comment_broad": "--- Broad entries for provider catch-all modules ---",
+
+  "general": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-137", "CWE-417", "CWE-1214", "CWE-265", "CWE-1219", "CWE-1218", "CWE-399", "CWE-310", "CWE-255", "CWE-1228", "CWE-355", "CWE-1215", "CWE-199"],
+    "technologyKeywords": ["Web Server", "Database Server"]
+  },
+  "other": {
+    "cwe699Subcategories": ["CWE-1211", "CWE-1212", "CWE-137", "CWE-417", "CWE-1214", "CWE-265", "CWE-1219", "CWE-1218", "CWE-399", "CWE-310", "CWE-255", "CWE-1228", "CWE-355", "CWE-1215", "CWE-199"],
+    "technologyKeywords": ["Web Server", "Database Server"]
+  }
+}
